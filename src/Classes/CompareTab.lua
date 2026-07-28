@@ -16,6 +16,13 @@ local buildListHelpers = require("Modules.BuildListHelpers")
 local itemSlotHelper = require("Modules.ItemSlotHelper")
 local configVisibility = require("Modules.ConfigVisibility")
 
+local calculationActorList = {
+	{ label = "Player", actorId = "PLAYER" },
+	{ label = "Player Minion", actorId = "PLAYER_MINION" },
+	{ label = "Mercenary", actorId = "MERCENARY" },
+	{ label = "Mercenary Minion", actorId = "MERCENARY_MINION" },
+}
+
 -- Node IDs below this value are normal passive tree nodes; IDs at or above are cluster jewel nodes
 local CLUSTER_NODE_OFFSET = 65536
 
@@ -548,10 +555,10 @@ function CompareTabClass:InitControls()
 	end)
 	self.controls.primCalcsMineCount.shown = false
 
-	self.controls.primCalcsShowMinion = new("CheckBoxControl"):CheckBoxControl(nil, {0, 0, 18}, nil, function(state)
-		self.primaryBuild.calcsTab.input.showMinion = state
+	self.controls.primCalcsShowMinion = new("DropDownControl"):DropDownControl(nil, {0, 0, 140, 18}, calculationActorList, function(index, value)
+		self.primaryBuild.calcsTab.input.actor = value.actorId
 		self.primaryBuild.buildFlag = true
-	end, "Show stats for the minion instead of the player.")
+	end)
 	self.controls.primCalcsShowMinion.shown = false
 
 	self.controls.primCalcsMinion = new("DropDownControl"):DropDownControl(nil, {0, 0, 140, 18}, {}, function(index, value)
@@ -665,13 +672,13 @@ function CompareTabClass:InitControls()
 	end)
 	self.controls.cmpCalcsMineCount.shown = false
 
-	self.controls.cmpCalcsShowMinion = new("CheckBoxControl"):CheckBoxControl(nil, {0, 0, 18}, nil, function(state)
+	self.controls.cmpCalcsShowMinion = new("DropDownControl"):DropDownControl(nil, {0, 0, 140, 18}, calculationActorList, function(index, value)
 		local entry = self:GetActiveCompare()
 		if entry then
-			entry.calcsTab.input.showMinion = state
+			entry.calcsTab.input.actor = value.actorId
 			entry.buildFlag = true
 		end
-	end, "Show stats for the minion instead of the player.")
+	end)
 	self.controls.cmpCalcsShowMinion.shown = false
 
 	self.controls.cmpCalcsMinion = new("DropDownControl"):DropDownControl(nil, {0, 0, 140, 18}, {}, function(index, value)
@@ -2275,8 +2282,8 @@ function CompareTabClass:RefreshCalcsSkillControls(compareEntry)
 	self.controls.primCalcsSocketGroup.shown = true
 	self.controls.primCalcsMode.shown = true
 	self.controls.primCalcsMode:SelByValue(self.primaryBuild.calcsTab.input.misc_buffMode, "buffMode")
-	self.controls.primCalcsShowMinion.shown = self.controls.primCalcsMinion.shown == true
-	self.controls.primCalcsShowMinion.state = self.primaryBuild.calcsTab.input.showMinion and true or false
+	self.controls.primCalcsShowMinion.shown = true
+	self.controls.primCalcsShowMinion:SelByValue(self.primaryBuild.calcsTab.input.actor, "actorId")
 
 	local cmpControls = {
 		mainSocketGroup = self.controls.cmpCalcsSocketGroup,
@@ -2292,8 +2299,8 @@ function CompareTabClass:RefreshCalcsSkillControls(compareEntry)
 	self.controls.cmpCalcsSocketGroup.shown = true
 	self.controls.cmpCalcsMode.shown = true
 	self.controls.cmpCalcsMode:SelByValue(compareEntry.calcsTab.input.misc_buffMode, "buffMode")
-	self.controls.cmpCalcsShowMinion.shown = self.controls.cmpCalcsMinion.shown == true
-	self.controls.cmpCalcsShowMinion.state = compareEntry.calcsTab.input.showMinion and true or false
+	self.controls.cmpCalcsShowMinion.shown = true
+	self.controls.cmpCalcsShowMinion:SelByValue(compareEntry.calcsTab.input.actor, "actorId")
 
 	-- Wrap .shown booleans set by RefreshSkillSelectControls with a view-mode gate,
 	-- so controls auto-hide when not in CALCS mode (matching configShown pattern)
@@ -4557,8 +4564,8 @@ function CompareTabClass:DrawCalcsSkillHeader(vp, compareEntry, headerHeight, pr
 	if drawLabel("Mines", rightX, rightY, self.controls.cmpCalcsMineCount) then rightY = rightY + rowH end
 
 	-- Show Minion Stats
-	if drawLabel("Show Minion Stats", leftX, leftY, self.controls.primCalcsShowMinion) then leftY = leftY + rowH end
-	if drawLabel("Show Minion Stats", rightX, rightY, self.controls.cmpCalcsShowMinion) then rightY = rightY + rowH end
+	if drawLabel("Calculation Actor", leftX, leftY, self.controls.primCalcsShowMinion) then leftY = leftY + rowH end
+	if drawLabel("Calculation Actor", rightX, rightY, self.controls.cmpCalcsShowMinion) then rightY = rightY + rowH end
 
 	-- Minion
 	if drawLabel("Minion", leftX, leftY, self.controls.primCalcsMinion) then leftY = leftY + rowH end
@@ -4686,8 +4693,8 @@ function CompareTabClass:DrawCalcs(vp, compareEntry)
 	local primaryEnv = self.primaryBuild.calcsTab.calcsEnv
 	local compareEnv = compareEntry.calcsTab and compareEntry.calcsTab.calcsEnv
 	if not primaryEnv or not compareEnv then return end
-	local primaryActor = (self.primaryBuild.calcsTab.input.showMinion and primaryEnv.minion) or primaryEnv.player
-	local compareActor = (compareEntry.calcsTab.input.showMinion and compareEnv.minion) or compareEnv.player
+	local primaryActor = self.primaryBuild.calcsTab:GetDisplayActor(primaryEnv)
+	local compareActor = compareEntry.calcsTab:GetDisplayActor(compareEnv)
 	if not primaryActor or not compareActor then return end
 
 	-- Skill detail header height

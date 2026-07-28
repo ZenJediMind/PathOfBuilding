@@ -18,6 +18,7 @@ local m_modf = math.modf
 local buySimilar = require("Classes.CompareBuySimilar")
 local addImplicit = require("Modules.AddImplicitPopup")
 local gemTooltip = require("Classes.GemTooltip")
+local MercenaryTools = require("Modules.MercenaryTools")
 
 local rarityDropList = {
 	{ label = colorCodes.NORMAL.."Normal", rarity = "NORMAL" },
@@ -201,6 +202,40 @@ function ItemsTabClass:ItemsTab(build)
 		end
 	end
 
+	local function showMercenaryEquipment()
+		return self.build.mercenaryTab and self.build.mercenaryTab.profile.buildId ~= nil
+	end
+	self.controls.mercenarySlotHeader = new("LabelControl"):LabelControl({"TOPLEFT",prevSlot,"BOTTOMLEFT"}, {0, 12, 0, 16}, "^7Mercenary equipment:")
+	self.controls.mercenarySlotHeader.anchor.collapse = true
+	self.controls.mercenarySlotHeader.shown = showMercenaryEquipment
+	prevSlot = self.controls.mercenarySlotHeader
+	self.mercenarySlots = { }
+	local function addMercenarySlot(slot, baseSlotName)
+		prevSlot = slot
+		slot.mercenarySlotName = baseSlotName
+		self.slots[slot.slotName] = slot
+		t_insert(self.mercenarySlots, slot)
+		t_insert(self.controls, slot)
+	end
+	for _, baseSlotName in ipairs(MercenaryTools.equipmentSlots) do
+		local slotName = MercenaryTools.itemSlotName(baseSlotName)
+		local slot = new("ItemSlotControl"):ItemSlotControl({"TOPLEFT",prevSlot,"BOTTOMLEFT"}, 0, 2, self, slotName, slotName)
+		addMercenarySlot(slot, baseSlotName)
+		slot.shown = showMercenaryEquipment
+		if baseSlotName == "Weapon 1" or baseSlotName == "Weapon 2" or baseSlotName == "Helmet" or baseSlotName == "Gloves" or baseSlotName == "Body Armour" or baseSlotName == "Boots" or baseSlotName == "Belt" then
+			for index = 1, 6 do
+				local baseAbyssalSlotName = baseSlotName.." Abyssal Socket "..index
+				local abyssal = new("ItemSlotControl"):ItemSlotControl({"TOPLEFT",prevSlot,"BOTTOMLEFT"}, 0, 2, self, MercenaryTools.itemSlotName(baseAbyssalSlotName), "Mercenary Abyssal #"..index)
+				addMercenarySlot(abyssal, baseAbyssalSlotName)
+				abyssal.parentSlot = slot
+				abyssal.shown = function()
+					return showMercenaryEquipment() and not abyssal.inactive
+				end
+				slot.abyssalSocketList[index] = abyssal
+			end
+		end
+	end
+
 	-- Passive tree dropdown controls
 	self.controls.specSelect = new("DropDownControl"):DropDownControl({"TOPLEFT",prevSlot,"BOTTOMLEFT"}, {0, 8, 216, 20}, nil, function(index, value)
 		if self.build.treeTab.specList[index] then
@@ -274,7 +309,6 @@ function ItemsTabClass:ItemsTab(build)
 		return self.activeItemSet.useSecondWeaponSet
 	end
 	self.controls.weaponSwapLabel = new("LabelControl"):LabelControl({"RIGHT",self.controls.weaponSwap1,"LEFT"}, {-4, 0, 0, 14}, "^7Weapon Set:")
-
 	-- All items list
 	if main.portraitMode then
 		self.controls.itemList = new("ItemListControl"):ItemListControl({"TOPRIGHT",self.lastSlot,"BOTTOMRIGHT"}, {0, 0, 360, 308}, self, true)
@@ -1670,7 +1704,7 @@ function ItemsTabClass:UpdateSockets()
 	table.sort(activeSocketList)
 
 	-- Update the state of the active socket controls
-	self.lastSlot = self.slots[baseSlots[#baseSlots]]
+	self.lastSlot = self.build.mercenaryTab and self.build.mercenaryTab.profile.buildId and self.mercenarySlots[#self.mercenarySlots] or self.slots[baseSlots[#baseSlots]]
 	for index, nodeId in ipairs(activeSocketList) do
 		self.sockets[nodeId].label = "Socket #"..index
 		self.lastSlot = self.sockets[nodeId]
@@ -2557,8 +2591,10 @@ function ItemsTabClass:GetComparisonSlotNameForItem(item)
 end
 -- Check if the given item could be equipped in the given slot, taking into account possible conflicts with currently equipped items
 -- For example, a shield is not valid for Weapon 2 if Weapon 1 is a staff, and a wand is not valid for Weapon 2 if Weapon 1 is a dagger
-function ItemsTabClass:IsItemValidForSlot(item, slotName, itemSet)
+function ItemsTabClass:IsItemValidForBaseSlot(item, slotName, itemSet)
 	itemSet = itemSet or self.activeItemSet
+	local mercenarySlotName = MercenaryTools.baseItemSlotName(slotName)
+	slotName = mercenarySlotName or slotName
 	local slotType, slotId = slotName:match("^([%a ]+) (%d+)$")
 	if not slotType then
 		slotType = slotName
@@ -2593,7 +2629,9 @@ function ItemsTabClass:IsItemValidForSlot(item, slotName, itemSet)
 	elseif slotName == "Weapon 1" or slotName == "Weapon 1 Swap" or slotName == "Weapon" then
 		return item.base.weapon ~= nil
 	elseif slotName == "Weapon 2" or slotName == "Weapon 2 Swap" then
-		local weapon1Sel = itemSet[slotName == "Weapon 2" and "Weapon 1" or "Weapon 1 Swap"].selItemId or 0
+		local weapon1SlotName = slotName == "Weapon 2" and "Weapon 1" or "Weapon 1 Swap"
+		if mercenarySlotName then weapon1SlotName = MercenaryTools.itemSlotName(weapon1SlotName) end
+		local weapon1Sel = itemSet[weapon1SlotName].selItemId or 0
 		local weapon1Type = self.items[weapon1Sel] and self.items[weapon1Sel].base.type or "None"
 		if weapon1Type == "None" then
 			return item.type == "Shield" or (self.build.data.weaponTypeInfo[item.type] and self.build.data.weaponTypeInfo[item.type].oneHand)
@@ -2603,6 +2641,10 @@ function ItemsTabClass:IsItemValidForSlot(item, slotName, itemSet)
 			return item.type == "Shield" or (self.build.data.weaponTypeInfo[item.type] and self.build.data.weaponTypeInfo[item.type].oneHand and ((weapon1Type == "Wand" and item.type == "Wand") or (weapon1Type ~= "Wand" and item.type ~= "Wand")))
 		end
 	end
+end
+
+function ItemsTabClass:IsItemValidForSlot(item, slotName, itemSet)
+	return self:IsItemValidForBaseSlot(item, slotName, itemSet)
 end
 
 -- Opens the item set manager
@@ -3988,6 +4030,12 @@ function ItemsTabClass:AddItemSetTooltip(tooltip, itemSet)
 			end
 		end
 	end
+	for _, slot in ipairs(self.mercenarySlots) do
+		local item = self.items[itemSet[slot.slotName].selItemId]
+		if item then
+			tooltip:AddLine(16, s_format("^7%s: %s%s", slot.label, colorCodes[item.rarity], item.name))
+		end
+	end
 end
 
 function ItemsTabClass:SetTooltipHeaderInfluence(tooltip, item)
@@ -4662,7 +4710,7 @@ end
 ---@param item Item
 ---@param base any
 function ItemsTabClass:AddItemStatDifferences(tooltip, item, base, slot)
-	local calcFunc, calcBase = self.build.calcsTab:GetMiscCalculator()
+	local calcFunc, calcBase, calcBaseByActor = self.build.calcsTab:GetMiscCalculator()
 	if base.flask then
 		-- Special handling for flasks
 		local stats = {}
@@ -4936,7 +4984,8 @@ function ItemsTabClass:AddItemStatDifferences(tooltip, item, base, slot)
 			else
 				header = string.format("^7Equipping this item in %s will give you:%s", compareSlot.label or compareSlot.slotName, selItem and "\n(replacing " .. colorCodes[selItem.rarity] .. selItem.name .. "^7)" or "")
 			end
-			self.build:AddStatComparesToTooltip(tooltip, calcBase, output, header)
+			local comparisonActor = compareSlot.mercenarySlotName and "MERCENARY"
+			self.build:AddStatComparesToTooltip(tooltip, comparisonActor and calcBaseByActor.MERCENARY or calcBase, output, header, nil, comparisonActor)
 		end
 
 		-- if we have a specific slot to compare to, and the user has "Show

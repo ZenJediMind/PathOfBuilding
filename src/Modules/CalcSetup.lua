@@ -5,15 +5,401 @@
 --
 ---@class Calcs
 local calcs = require("Modules.CalcBase")
+local MercenaryTools = require("Modules/MercenaryTools")
 
 local pairs = pairs
 local ipairs = ipairs
 local t_insert = table.insert
 local t_remove = table.remove
+local t_sort = table.sort
 local m_min = math.min
 local m_max = math.max
+local m_floor = math.floor
 
 local tempTable1 = { }
+
+local function mercenarySkillLevel(grantedEffect, actorLevel)
+	local bestLevel, bestRequirement = 1, -1
+	for level, levelData in pairs(grantedEffect.levels or { }) do
+		local requirement = levelData.levelRequirement or 1
+		if type(level) == "number" and requirement <= actorLevel and (requirement > bestRequirement or requirement == bestRequirement and level > bestLevel) then
+			bestLevel, bestRequirement = level, requirement
+		end
+	end
+	return bestLevel
+end
+
+local function mercenarySupportEffect(env, support, errors)
+	if not support then
+		t_insert(errors, "Missing exported Mercenary support data")
+		return
+	end
+	local constantStats = { }
+	local statMap = { }
+	for _, stat in ipairs(support.stats or { }) do
+		local implementation = env.data.mercenarySupportStatMap[stat.id] or env.data.skillStatMap[stat.id]
+		if not implementation then
+			t_insert(errors, "Unsupported Mercenary support stat: "..stat.id)
+		else
+			t_insert(constantStats, { stat.id, stat.value })
+			statMap[stat.id] = copyTable(implementation, true)
+			for _, modOrGroup in ipairs(statMap[stat.id]) do
+				if modOrGroup.name then
+					modOrGroup.source = "Mercenary Support:"..support.id
+				else
+					for _, mod in ipairs(modOrGroup) do mod.source = "Mercenary Support:"..support.id end
+				end
+			end
+		end
+	end
+	local templateId = env.data.mercenaryStatData.supportTemplates[support.id]
+	local template = templateId and env.data.skills[templateId]
+	if templateId and not template then t_insert(errors, "Missing Mercenary support template: "..templateId) end
+	local grantedEffect = {
+		id = "MercenarySupport:"..support.id,
+		name = support.name,
+		modSource = "Mercenary Support:"..support.id,
+		support = true,
+		requireSkillTypes = copyTable(template and template.requireSkillTypes or { }, true),
+		excludeSkillTypes = copyTable(template and template.excludeSkillTypes or { }, true),
+		addSkillTypes = copyTable(template and template.addSkillTypes or { }, true),
+		addFlags = copyTable(template and template.addFlags or { }, true),
+		weaponTypes = template and template.weaponTypes and copyTable(template.weaponTypes, true),
+		ignoreMinionTypes = template and template.ignoreMinionTypes,
+		isTrigger = template and template.isTrigger,
+		baseFlags = { },
+		skillTypes = { },
+		constantStats = constantStats,
+		stats = { },
+		levels = { { levelRequirement = 1 } },
+		statMap = statMap,
+	}
+	setmetatable(grantedEffect.statMap, env.data.skillStatMapMeta)
+	grantedEffect.statMap._grantedEffect = grantedEffect
+	return {
+		grantedEffect = grantedEffect,
+		level = 1,
+		quality = 0,
+		enabled = true,
+		isSupporting = { },
+	}
+end
+
+local function validateMercenarySkillStats(env, grantedEffect, errors)
+	local function validate(statId)
+		if not grantedEffect.statMap[statId] and not env.data.knownUncalculatedSkillStats[statId] then
+			t_insert(errors, "Unsupported Mercenary skill stat: "..statId.." ("..grantedEffect.id..")")
+		end
+	end
+	for _, statId in ipairs(grantedEffect.stats or { }) do validate(statId) end
+	for _, stat in ipairs(grantedEffect.constantStats or { }) do validate(stat[1]) end
+end
+
+local function recordMercenaryAuxiliarySkill(env, auxiliarySkills, statId, selectedSkill)
+	local auxiliarySkillId = env.data.mercenaryStatData.auxiliarySkills[statId]
+	if auxiliarySkillId and not auxiliarySkills[auxiliarySkillId] then auxiliarySkills[auxiliarySkillId] = selectedSkill end
+end
+
+local function mercenaryItemMod(mod, presenceImplicit)
+	if mod.name == "ExtraSkill" or mod.name == "ExtraSupport" or mod.name == "SocketProperty" or mod.name == "GemProperty" or mod.name == "GroupProperty" then
+		return
+	end
+	local copy = copyTable(mod, true)
+	local index = 1
+	while copy[index] do
+		local tag = copy[index]
+		if tag.type == "SocketedIn" then
+			return
+		elseif presenceImplicit and tag.type == "ActorCondition" and tag.actor == "enemy" and (tag.var == "RareOrUnique" or tag.var == "PinnacleBoss") then
+			t_remove(copy, index)
+		else
+			index = index + 1
+		end
+	end
+	return copy
+end
+
+local function addMercenaryItem(env, mercenary, item, slotName, slotNum)
+	mercenary.itemList[slotName] = item
+	local emptySockets = { R = 0, G = 0, B = 0, W = 0 }
+	for _, socket in ipairs(item.sockets or { }) do
+		if emptySockets[socket.color] then emptySockets[socket.color] = emptySockets[socket.color] + 1 end
+	end
+	mercenary.modDB.multipliers["EmptySocketIn"..slotName] = emptySockets.R + emptySockets.G + emptySockets.B + emptySockets.W
+	for color, name in pairs({ R = "Red", G = "Green", B = "Blue", W = "White" }) do
+		local multiplier = "Empty"..name.."SocketsInAnySlot"
+		mercenary.modDB.multipliers[multiplier] = (mercenary.modDB.multipliers[multiplier] or 0) + emptySockets[color]
+	end
+	local presenceImplicitCounts = { }
+	for _, modLine in ipairs(item.implicitModLines or { }) do
+		if modLine.line and modLine.line:lower():match("^while .+ in your presence") then
+			for _, implicitMod in ipairs(modLine.modList or { }) do
+				local key = modLib.formatMod(implicitMod)
+				presenceImplicitCounts[key] = (presenceImplicitCounts[key] or 0) + 1
+			end
+		end
+	end
+	for _, itemMod in ipairs(item.modList or item.slotModList and item.slotModList[slotNum] or { }) do
+		local key = modLib.formatMod(itemMod)
+		local presenceImplicit = (presenceImplicitCounts[key] or 0) > 0
+		if presenceImplicit then presenceImplicitCounts[key] = presenceImplicitCounts[key] - 1 end
+		local mod = mercenaryItemMod(itemMod, presenceImplicit)
+		if mod then mercenary.modDB:AddMod(mod) end
+	end
+	local rarity = (item.rarity == "UNIQUE" or item.rarity == "RELIC") and "UniqueItem" or item.rarity == "RARE" and "RareItem" or item.rarity == "MAGIC" and "MagicItem" or "NormalItem"
+	mercenary.modDB.multipliers[rarity] = (mercenary.modDB.multipliers[rarity] or 0) + 1
+	mercenary.modDB.conditions[rarity.."In"..slotName] = true
+end
+
+local function addMercenaryMonsterStats(env, mercenary, monster, errors)
+	local rawStats = { }
+	for _, stat in ipairs(monster.stats or { }) do
+		if not env.data.mercenaryStatData.knownMonsterStats[stat.id] then
+			t_insert(errors, "Unsupported Mercenary monster stat: "..stat.id)
+		end
+		rawStats[stat.id] = (rawStats[stat.id] or 0) + stat.value
+	end
+	mercenary.modDB:NewMod("MaximumRage", "BASE", rawStats.maximum_rage or 30, "Mercenary")
+	mercenary.modDB:NewMod("ActiveTrapLimit", "BASE", rawStats.base_number_of_traps_allowed or 15, "Mercenary")
+	mercenary.modDB:NewMod("ActiveMineLimit", "BASE", rawStats.base_number_of_remote_mines_allowed or 15, "Mercenary")
+	mercenary.modDB:NewMod("ActiveTotemLimit", "BASE", 1 + (rawStats.number_of_additional_totems_allowed or 0), "Mercenary")
+	mercenary.modDB:NewMod("ManaCost", "INC", -(rawStats["set_base_mana_cost_-%"] or 0), "Mercenary")
+	mercenary.modDB:NewMod("ManaRegen", "BASE", (rawStats.base_mana_regeneration_rate_per_minute or 0) / 60, "Mercenary")
+	mercenary.modDB:NewMod("TotemLife", "MORE", rawStats["set_totem_life_+%_final"] or 0, "Mercenary")
+	mercenary.modDB:NewMod("DamageTaken", "INC", rawStats["set_minion_damage_taken_+%"] or 0, "Mercenary")
+	mercenary.modDB:NewMod("DamageTaken", "MORE", -80, "Mercenary", ModFlag.Dot)
+	-- Rarity stats correct engine rarity bonuses; this normalized actor applies neither side.
+	if monster.damageFixup then
+		mercenary.modDB:NewMod("Damage", "MORE", -100 * monster.damageFixup, "Damage Fixup", ModFlag.Attack)
+		mercenary.modDB:NewMod("Speed", "MORE", 100 * monster.damageFixup, "Damage Fixup", ModFlag.Attack)
+	end
+	if rawStats.keystone_minion_instability == 1 then
+		mercenary.modDB:NewMod("Keystone", "LIST", "Minion Instability", "Mercenary")
+	end
+end
+
+local function addMercenaryPassiveStats(mercenary, mercenaryBuild, errors)
+	mercenary.passiveStats = { }
+	for _, passive in ipairs(mercenaryBuild.passiveStats or { }) do
+		local value = MercenaryTools.passiveStatValue(passive.values, mercenary.level)
+		local scaledValue = value / (passive.divisor or 1)
+		local valueText = scaledValue == m_floor(scaledValue) and tostring(m_floor(scaledValue)) or tostring(scaledValue)
+		local line = passive.line or string.format(passive.format, valueText)
+		if not passive.line or value ~= 0 then
+			local modList, extra = modLib.parseMod(line)
+			if not modList or extra then
+				t_insert(errors, "Unsupported Mercenary passive stat "..passive.id..": "..line)
+			else
+				for _, mod in ipairs(modList) do
+					mercenary.modDB:AddMod(modLib.setSource(mod, "Mercenary Passive: "..passive.id))
+				end
+			end
+		end
+		t_insert(mercenary.passiveStats, { id = passive.id, statId = passive.statId, value = scaledValue })
+	end
+end
+
+function calcs.initMercenary(env)
+	local tab = env.build.mercenaryTab
+	env.actors = { player = env.player }
+	env.mercenary = nil
+	if not tab or not tab.profile.buildId then return end
+	tab.calculationErrors = nil
+	tab:RefreshErrors()
+
+	local profile = tab.profile
+	local mercenaryBuild = env.data.mercenaries.builds[profile.buildId]
+	if not mercenaryBuild then return end
+	local mercenaryClass = mercenaryBuild and env.data.mercenaries.classes[mercenaryBuild.classId]
+	local monster = mercenaryClass and mercenaryClass.monster
+	local calculationErrors = { }
+	if not monster then
+		tab.calculationErrors = { "Selected Mercenary has no allied MonsterVariety data" }
+		tab:RefreshErrors()
+		return
+	end
+
+	local mercenary = {
+		type = "Mercenary",
+		isMercenary = true,
+		player = env.player,
+		parent = env.player,
+		enemy = env.enemy,
+		level = MercenaryTools.effectiveLevel(profile.foundAreaLevel, env.enemyLevel),
+		foundAreaLevel = profile.foundAreaLevel,
+		itemList = { },
+		activeSkillList = { },
+		profile = profile,
+		monster = monster,
+	}
+	mercenary.modDB = new("ModDB")
+	mercenary.modDB.actor = mercenary
+	mercenary.modDB.multipliers.Level = mercenary.level
+	calcs.initModDB(env, mercenary.modDB)
+	local baseStats = env.data.mercenaries.baseStats
+	mercenary.modDB:NewMod("Life", "BASE", baseStats.lifePerLevel * mercenary.level, "Base")
+	mercenary.modDB:NewMod("Mana", "BASE", env.data.monsterConstants.base_maximum_mana + baseStats.manaPerLevel * mercenary.level, "Base")
+	mercenary.modDB:NewMod("EnergyShield", "BASE", 0, "Base")
+	mercenary.modDB:NewMod("Armour", "BASE", round(env.data.monsterArmourTable[mercenary.level] * monster.armour), "Base")
+	mercenary.modDB:NewMod("Evasion", "BASE", round(env.data.monsterEvasionTable[mercenary.level] * monster.evasion), "Base")
+	mercenary.modDB:NewMod("Accuracy", "BASE", baseStats.accuracyPerLevel * mercenary.level, "Base")
+	mercenary.modDB:NewMod("CritMultiplier", "BASE", env.data.characterConstants["base_critical_strike_multiplier"] - 100, "Base")
+	mercenary.modDB:NewMod("DotMultiplier", "BASE", env.data.characterConstants["critical_ailment_dot_multiplier_+"], "Base", { type = "Condition", var = "CriticalStrike" })
+	mercenary.modDB:NewMod("FireResist", "BASE", monster.fireResist, "Base")
+	mercenary.modDB:NewMod("ColdResist", "BASE", monster.coldResist, "Base")
+	mercenary.modDB:NewMod("LightningResist", "BASE", monster.lightningResist, "Base")
+	mercenary.modDB:NewMod("ChaosResist", "BASE", monster.chaosResist, "Base")
+	mercenary.modDB:NewMod("CritChance", "INC", env.data.characterConstants["critical_strike_chance_+%_per_power_charge"], "Base", { type = "Multiplier", var = "PowerCharge" })
+	mercenary.modDB:NewMod("Speed", "INC", env.data.characterConstants["base_attack_speed_+%_per_frenzy_charge"], "Base", ModFlag.Attack, { type = "Multiplier", var = "FrenzyCharge" })
+	mercenary.modDB:NewMod("Speed", "INC", env.data.characterConstants["base_cast_speed_+%_per_frenzy_charge"], "Base", ModFlag.Cast, { type = "Multiplier", var = "FrenzyCharge" })
+	mercenary.modDB:NewMod("Damage", "MORE", env.data.characterConstants["object_inherent_damage_+%_final_per_frenzy_charge"], "Base", { type = "Multiplier", var = "FrenzyCharge" })
+	mercenary.modDB:NewMod("PhysicalDamageReduction", "BASE", env.data.characterConstants["physical_damage_reduction_%_per_endurance_charge"], "Base", { type = "Multiplier", var = "EnduranceCharge" })
+	mercenary.modDB:NewMod("ElementalDamageReduction", "BASE", env.data.characterConstants["elemental_damage_reduction_%_per_endurance_charge"], "Base", { type = "Multiplier", var = "EnduranceCharge" })
+	mercenary.modDB:NewMod("ProjectileCount", "BASE", 1, "Base")
+	mercenary.modDB:NewMod("MineThrowCount", "BASE", 1, "Base")
+	mercenary.modDB:NewMod("TrapThrowCount", "BASE", 1, "Base")
+	mercenary.modDB:NewMod("MaximumFortification", "BASE", env.data.characterConstants["base_max_fortification"], "Base")
+	addMercenaryMonsterStats(env, mercenary, monster, calculationErrors)
+	addMercenaryPassiveStats(mercenary, mercenaryBuild, calculationErrors)
+	for _, value in ipairs(env.modDB:List(nil, "MercenaryModifier")) do
+		mercenary.modDB:AddMod(value.mod)
+	end
+
+	local itemSet = env.build.itemsTab.activeItemSet
+	for _, slotName in ipairs(MercenaryTools.equipmentSlots) do
+		local itemSlotName = MercenaryTools.itemSlotName(slotName)
+		local slot = env.build.itemsTab.slots[itemSlotName]
+		local item
+		if env.override.repSlotName == itemSlotName then
+			item = env.override.repItem
+		else
+			item = itemSet and itemSet[itemSlotName] and env.build.itemsTab.items[itemSet[itemSlotName].selItemId]
+		end
+		if item then addMercenaryItem(env, mercenary, item, slotName, slot and slot.slotNum or 1) end
+		for abyssalSocketIndex = 1, 6 do
+			local abyssalSlotName = slotName.." Abyssal Socket "..abyssalSocketIndex
+			local abyssalItemSlotName = MercenaryTools.itemSlotName(abyssalSlotName)
+			local abyssalSetSlot = itemSet and itemSet[abyssalItemSlotName]
+			local abyssalJewel = env.override.repSlotName == abyssalItemSlotName and env.override.repItem or abyssalSetSlot and env.build.itemsTab.items[abyssalSetSlot.selItemId]
+			if abyssalJewel then addMercenaryItem(env, mercenary, abyssalJewel, abyssalSlotName, abyssalSocketIndex) end
+		end
+	end
+	for _, passiveName in ipairs(mercenary.modDB:List(nil, "GrantedPassive")) do
+		local node = env.spec.tree.notableMap[passiveName] or env.spec.tree.ascendancyMap[passiveName]
+			or env.build.latestTree.notableMap[passiveName] or env.build.latestTree.ascendancyMap[passiveName]
+		if node then
+			mercenary.modDB:AddList((env.spec.nodes[node.id] or node).modList)
+		else
+			t_insert(calculationErrors, "Unsupported Mercenary anoint: "..tostring(passiveName))
+		end
+	end
+	for _, keystoneName in ipairs(mercenary.modDB:List(nil, "Keystone")) do
+		if not env.spec.tree.keystoneMap[keystoneName] and not env.build.latestTree.keystoneMap[keystoneName] then
+			t_insert(calculationErrors, "Unsupported Mercenary keystone: "..tostring(keystoneName))
+		end
+	end
+
+	local attackTime = monster.attackTime
+	mercenary.averageDamage = env.data.monsterAllyDamageTable[mercenary.level] * monster.damage
+	local damage = mercenary.averageDamage
+	if not monster.baseDamageIgnoresAttackSpeed then damage = damage * attackTime end
+	mercenary.weaponData1 = mercenary.itemList["Weapon 1"] and mercenary.itemList["Weapon 1"].weaponData and mercenary.itemList["Weapon 1"].weaponData[1] or {
+		type = "None",
+		AttackRate = 1 / attackTime,
+		CritChance = 5,
+		PhysicalMin = round(damage * (1 - monster.damageSpread)),
+		PhysicalMax = round(damage * (1 + monster.damageSpread)),
+		range = monster.attackRange,
+	}
+	mercenary.weaponData2 = mercenary.itemList["Weapon 2"] and mercenary.itemList["Weapon 2"].weaponData and mercenary.itemList["Weapon 2"].weaponData[2] or { }
+
+	local mercenaryEnv = setmetatable({ modDB = mercenary.modDB, player = mercenary }, { __index = env })
+	mercenary.calcEnv = mercenaryEnv
+	local function addActiveSkill(selectedSkill, grantedEffect, supports, isPrimary, sourceItem)
+		local skillPart = isPrimary and selectedSkill.skillPart or env.data.mercenaryStatData.defaultSkillParts[grantedEffect.id] or 1
+		if grantedEffect.parts and (skillPart < 1 or skillPart > #grantedEffect.parts) then
+			t_insert(calculationErrors, "Invalid Mercenary skill part for "..grantedEffect.id..": "..tostring(skillPart))
+			return
+		end
+		local instance = {
+			skillId = grantedEffect.id,
+			level = sourceItem and (sourceItem.level or mercenary.level) or mercenarySkillLevel(grantedEffect, mercenary.level),
+			quality = 0,
+			enabled = true,
+			mercenarySkill = selectedSkill,
+			fromItem = sourceItem ~= nil,
+			sourceItem = sourceItem,
+			skillPart = skillPart,
+			skillStageCount = isPrimary and selectedSkill.skillStageCount or nil,
+			skillMineCount = isPrimary and selectedSkill.skillMineCount or nil,
+			skillMinionSkill = isPrimary and selectedSkill.skillMinionSkill or nil,
+		}
+		local activeSkill = calcs.createActiveSkill({ grantedEffect = grantedEffect, level = instance.level, quality = 0, srcInstance = instance }, supports or { }, mercenary, selectedSkill)
+		activeSkill.mercenarySkill = selectedSkill
+		activeSkill.isMercenaryPrimary = isPrimary
+		activeSkill.sourceItem = sourceItem
+		activeSkill.isMercenaryAuxiliary = not isPrimary
+		calcs.buildActiveSkillModList(mercenaryEnv, activeSkill)
+		if activeSkill.unsupportedReason then
+			t_insert(calculationErrors, activeSkill.unsupportedReason)
+		else
+			t_insert(mercenary.activeSkillList, activeSkill)
+		end
+		return activeSkill
+	end
+	local auxiliarySkills = { }
+	for _, selectedSkill in ipairs(profile.skills) do
+		if selectedSkill.enabled ~= false then
+			local grantedEffect = env.data.skills[selectedSkill.id]
+			if not grantedEffect then
+				t_insert(calculationErrors, "Missing generated Mercenary skill: "..selectedSkill.id)
+			else
+				validateMercenarySkillStats(env, grantedEffect, calculationErrors)
+				for _, statId in ipairs(grantedEffect.stats or { }) do
+					recordMercenaryAuxiliarySkill(env, auxiliarySkills, statId, selectedSkill)
+				end
+				for _, stat in ipairs(grantedEffect.constantStats or { }) do
+					recordMercenaryAuxiliarySkill(env, auxiliarySkills, stat[1], selectedSkill)
+				end
+				local supports = { }
+				for _, selectedSupport in ipairs(selectedSkill.supports or { }) do
+					local support = env.data.mercenaries.supports[selectedSupport.id]
+					local supportEffect = mercenarySupportEffect(env, support, calculationErrors)
+					if supportEffect then t_insert(supports, supportEffect) end
+					for _, stat in ipairs(support and support.stats or { }) do
+						recordMercenaryAuxiliarySkill(env, auxiliarySkills, stat.id, selectedSkill)
+					end
+				end
+				local activeSkill = addActiveSkill(selectedSkill, grantedEffect, supports, true)
+				if selectedSkill.id == profile.mainSkillId then mercenary.mainSkill = activeSkill end
+			end
+		end
+	end
+	local auxiliarySkillIds = { }
+	for auxiliarySkillId in pairs(auxiliarySkills) do t_insert(auxiliarySkillIds, auxiliarySkillId) end
+	t_sort(auxiliarySkillIds)
+	for _, auxiliarySkillId in ipairs(auxiliarySkillIds) do
+		local auxiliaryEffect = env.data.skills[auxiliarySkillId]
+		if auxiliaryEffect then
+			validateMercenarySkillStats(env, auxiliaryEffect, calculationErrors)
+			addActiveSkill(auxiliarySkills[auxiliarySkillId], auxiliaryEffect, nil, false)
+		else
+			t_insert(calculationErrors, "Missing Mercenary auxiliary skill: "..auxiliarySkillId)
+		end
+	end
+	mercenary.mainSkill = mercenary.mainSkill or mercenary.activeSkillList[1]
+	if not mercenary.mainSkill then
+		t_insert(calculationErrors, "No usable enabled Mercenary skill is configured")
+	end
+	if #calculationErrors > 0 then
+		tab.calculationErrors = calculationErrors
+		tab:RefreshErrors()
+		return
+	end
+	tab.calculationErrors = nil
+	env.mercenary = mercenary
+	env.actors.mercenary = mercenary
+end
 
 -- Initialise modifier database with stats and conditions common to all actors
 function calcs.initModDB(env, modDB)
@@ -1970,6 +2356,7 @@ function calcs.initEnv(build, mode, override, specEnv)
 
 	-- Merge Requirements Tables
 	env.requirementsTable = tableConcat(env.requirementsTableItems, env.requirementsTableGems)
+	calcs.initMercenary(env)
 
 	return env, cachedPlayerDB, cachedEnemyDB, cachedMinionDB
 end

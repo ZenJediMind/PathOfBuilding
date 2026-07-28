@@ -2299,11 +2299,11 @@ skills["Bodyswap"] = {
 		if activeSkill.skillPart == 1 then
 			local skillData = activeSkill.skillData
 			if activeSkill.skillFlags.totem then
-				skillData.FireBonusMin = output.TotemLife * skillData.selfFireExplosionLifeMultiplier
-				skillData.FireBonusMax = output.TotemLife * skillData.selfFireExplosionLifeMultiplier
+				skillData.FireBonusMin = output.TotemLife * (skillData.selfFireExplosionLifeMultiplier or 0)
+				skillData.FireBonusMax = output.TotemLife * (skillData.selfFireExplosionLifeMultiplier or 0)
 			else
-				skillData.FireBonusMin = output.Life * skillData.selfFireExplosionLifeMultiplier
-				skillData.FireBonusMax = output.Life * skillData.selfFireExplosionLifeMultiplier
+				skillData.FireBonusMin = output.Life * (skillData.selfFireExplosionLifeMultiplier or 0)
+				skillData.FireBonusMax = output.Life * (skillData.selfFireExplosionLifeMultiplier or 0)
 			end
 		end
 	end,
@@ -2414,11 +2414,11 @@ skills["BodyswapAltX"] = {
 		if activeSkill.skillPart == 1 then
 			local skillData = activeSkill.skillData
 			if activeSkill.skillFlags.totem then
-				skillData.FireBonusMin = output.TotemLife * skillData.selfFireExplosionLifeMultiplier
-				skillData.FireBonusMax = output.TotemLife * skillData.selfFireExplosionLifeMultiplier
+				skillData.FireBonusMin = output.TotemLife * (skillData.selfFireExplosionLifeMultiplier or 0)
+				skillData.FireBonusMax = output.TotemLife * (skillData.selfFireExplosionLifeMultiplier or 0)
 			else
-				skillData.FireBonusMin = output.Life * skillData.selfFireExplosionLifeMultiplier
-				skillData.FireBonusMax = output.Life * skillData.selfFireExplosionLifeMultiplier
+				skillData.FireBonusMin = output.Life * (skillData.selfFireExplosionLifeMultiplier or 0)
+				skillData.FireBonusMax = output.Life * (skillData.selfFireExplosionLifeMultiplier or 0)
 			end
 		end
 	end,

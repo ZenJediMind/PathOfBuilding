@@ -111,7 +111,7 @@ function calcLib.canGrantedEffectSupportActiveSkill(grantedEffect, activeSkill, 
 	if grantedEffect.excludeSkillTypes[1] and calcLib.doesTypeExpressionMatch(grantedEffect.excludeSkillTypes, effectiveSkillTypes) then
 		return false
 	end
-	if grantedEffect.isTrigger and activeSkill.actor.enemy.player ~= activeSkill.actor then
+	if grantedEffect.isTrigger and activeSkill.actor.enemy.player ~= activeSkill.actor and not activeSkill.actor.isMercenary then
 		return false
 	end
 	-- Special case for Sacred Wisps, i.e. Wisps Support has a weaponType of Wand so it should only match with Active Skills that at least have Wand as a weaponType.

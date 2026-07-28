@@ -61,6 +61,12 @@ function SharedItemSetListClass:AddValueTooltip(tooltip, index, sharedItemSet)
 			end
 		end
 	end
+	for _, slot in ipairs(self.itemsTab.mercenarySlots) do
+		local item = sharedItemSet.slots[slot.slotName]
+		if item then
+			tooltip:AddLine(16, s_format("^7%s: %s%s", slot.label, colorCodes[item.rarity], item.name))
+		end
+	end
 end
 
 function SharedItemSetListClass:GetDragValue(index, value)

@@ -61,6 +61,24 @@ describe("TradeQuery", function()
 			assert.are.equal(0, #tooltip.lines)
 		end)
 	end)
+	describe("GetResultEvaluation", function()
+		it("uses the Mercenary baseline for Mercenary equipment", function()
+			mock_tradeQuery.tradeQueryGenerator = mock_queryGen
+			mock_tradeQuery.itemsTab.build = { calcsTab = { GetMiscCalculator = function()
+				return function() return { Life = 200 } end, { Life = 10 }, {
+					PLAYER = { Life = 10 },
+					MERCENARY = { Life = 100 },
+				}
+			end } }
+			mock_tradeQuery.slotTables[1] = { slotName = "Mercenary Helmet" }
+			mock_tradeQuery.resultTbl[1] = { { item_string = "Rarity: NORMAL\nIron Hat" } }
+			mock_tradeQuery.statSortSelectionList = { { stat = "Life", weightMult = 1 } }
+
+			local evaluation = mock_tradeQuery:GetResultEvaluation(1, 1)
+
+			assert.are.equal(2, evaluation[1].weight)
+		end)
+	end)
 	describe("ReduceOutput", function()
 		it("preserves lower-is-better values for weighted result comparison", function()
 			local weights = {

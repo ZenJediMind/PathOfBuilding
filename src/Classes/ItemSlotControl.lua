@@ -91,7 +91,14 @@ function ItemSlotClass:Populate()
 			end
 		end
 	end
-	if not self.selItemId or not self.itemsTab.items[self.selItemId] or not self.itemsTab:IsItemValidForSlot(self.itemsTab.items[self.selItemId], self.slotName) then
+	local selectedItem = self.itemsTab.items[self.selItemId]
+	local preserveInvalid = selectedItem and self.mercenarySlotName ~= nil
+	if preserveInvalid and self.selIndex == 1 then
+		t_insert(self.items, selectedItem.id)
+		t_insert(self.list, colorCodes.NEGATIVE..selectedItem.name)
+		self.selIndex = #self.list
+	end
+	if not preserveInvalid and (not self.selItemId or not selectedItem or not self.itemsTab:IsItemValidForSlot(selectedItem, self.slotName)) then
 		self:SetSelItemId(0)
 	end
 

@@ -11,6 +11,7 @@ local s_format = string.format
 local t_insert = table.insert
 local tradeHelpers = LoadModule("Classes/TradeHelpers")
 local utils = LoadModule("Modules/Utils")
+local MercenaryTools = require("Modules/MercenaryTools")
 
 -- a table which tells us what subtypes each category we can search for
 -- contains. the commented out lines are type-subtype combinations which don't
@@ -721,7 +722,8 @@ function TradeQueryGeneratorClass:StartQuery(slot, options)
 	end
 
 	-- Calculate base output with a blank item
-	local calcFunc, baseOutput = self.itemsTab.build.calcsTab:GetMiscCalculator()
+	local calcFunc, baseOutput, actorOutputs = self.itemsTab.build.calcsTab:GetMiscCalculator()
+	baseOutput = MercenaryTools.comparisonBaseOutput(baseOutput, actorOutputs, slot and slot.slotName)
 	local baseItemOutput = slot and calcFunc({ repSlotName = slot.slotName, repItem = testItem }) or baseOutput
 	-- make weights more human readable
 	local compStatValue = TradeQueryGeneratorClass.WeightedRatioOutputs(baseOutput, baseItemOutput, options.statWeights) * 1000
@@ -1062,12 +1064,13 @@ function TradeQueryGeneratorClass:RequestQuery(slot, context, statWeights, callb
 	local popupHeight = 110
 	local popupWidth = 400
 
-	local isJewelSlot = slot and slot.slotName:find("Jewel") ~= nil
-	local isAbyssalJewelSlot = slot and slot.slotName:find("Abyssal") ~= nil
-	local isAmuletSlot = slot and slot.slotName == "Amulet"
-	local isBeltSlot = slot and slot.slotName == "Belt"
-	local isWeaponSlot = slot and (slot.slotName == "Weapon 1" or slot.slotName == "Weapon 2")
-	local isEldritchModSlot = slot and eldritchModSlots[slot.slotName] == true
+	local slotName = slot and (MercenaryTools.baseItemSlotName(slot.slotName) or slot.slotName)
+	local isJewelSlot = slotName and slotName:find("Jewel") ~= nil
+	local isAbyssalJewelSlot = slotName and slotName:find("Abyssal") ~= nil
+	local isAmuletSlot = slotName == "Amulet"
+	local isBeltSlot = slotName == "Belt"
+	local isWeaponSlot = slotName == "Weapon 1" or slotName == "Weapon 2"
+	local isEldritchModSlot = eldritchModSlots[slotName] == true
 
 	local lastItemAnchor
 	local function updateLastAnchor(anchor, height)

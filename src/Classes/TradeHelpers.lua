@@ -5,6 +5,7 @@
 --
 local m_floor = math.floor
 local statDescData = require("Data.StatDescriptions.stat_descriptions")
+local MercenaryTools = require("Modules/MercenaryTools")
 
 -- precalculate patterns used for matching stat lines
 local numberPattern = "%%d%+%%.%?%%d*"
@@ -324,6 +325,7 @@ end
 --- @param item table
 function M.getTradeCategory(slotName, item)
 	if not slotName then return nil, nil end
+	slotName = MercenaryTools.baseItemSlotName(slotName) or slotName
 	local itemType = item and (item.type or (item.base and item.base.type))
 	if slotName:find("^Weapon %d") then
 		if not itemType then return "weapon.one", "1HWeapon" end

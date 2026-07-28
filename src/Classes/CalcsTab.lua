@@ -16,6 +16,13 @@ local buffModeDropList = {
 	{ label = "Effective DPS", buffMode = "EFFECTIVE" } 
 }
 
+local calculationActorList = {
+	{ label = "Player", actorId = "PLAYER" },
+	{ label = "Player Minion", actorId = "PLAYER_MINION" },
+	{ label = "Mercenary", actorId = "MERCENARY" },
+	{ label = "Mercenary Minion", actorId = "MERCENARY_MINION" },
+}
+
 local CalcsTabClass = newClass("CalcsTab", "UndoHandler", "ControlHost", "Control", function(self, build)
 	self.UndoHandler()
 	self.ControlHost()
@@ -28,6 +35,7 @@ local CalcsTabClass = newClass("CalcsTab", "UndoHandler", "ControlHost", "Contro
 	self.input = { }
 	self.input.skill_number = 1
 	self.input.misc_buffMode = "EFFECTIVE"
+	self.input.actor = "PLAYER"
 
 	self.colWidth = 230
 	self.sectionList = { }
@@ -39,6 +47,7 @@ local CalcsTabClass = newClass("CalcsTab", "UndoHandler", "ControlHost", "Contro
 	self:NewSection(3, "SkillSelect", 1, colorCodes.NORMAL, {{ defaultCollapsed = false, label = "View Skill Details", data = {
 		{ label = "Socket Group", { controlName = "mainSocketGroup", 
 			control = new("DropDownControl", nil, {0, 0, 300, 16}, nil, function(index, value) 
+				if self:IsMercenaryActor() then return end
 				self.input.skill_number = index
 				self:AddUndoState()
 				self.build.buildFlag = true
@@ -53,21 +62,43 @@ local CalcsTabClass = newClass("CalcsTab", "UndoHandler", "ControlHost", "Contro
 		}, },
 		{ label = "Active Skill", { controlName = "mainSkill", 
 			control = new("DropDownControl", nil, {0, 0, 300, 16}, nil, function(index, value)
+				if self:IsMercenaryActor() then
+					local profile = self.build.mercenaryTab.profile
+					if value and value.skillId then profile.mainSkillId = value.skillId end
+					self.build.mercenaryTab:Changed()
+					return
+				end
 				local mainSocketGroup = self.build.skillsTab.socketGroupList[self.input.skill_number]
 				mainSocketGroup.mainActiveSkillCalcs = index
 				self.build.buildFlag = true
 			end)
 		}, },
-		{ label = "Skill Part", playerFlag = "multiPart", { controlName = "mainSkillPart", 
+		{ label = "Skill Part", flag = "multiPart", { controlName = "mainSkillPart",
 			control = new("DropDownControl", nil, {0, 0, 250, 16}, nil, function(index, value)
+				if self:IsMercenaryActor() then
+					local skill = self:GetMercenaryCalcsSkill()
+					if skill then
+						skill.skillPart = index
+						self.build.mercenaryTab:Changed()
+					end
+					return
+				end
 				local mainSocketGroup = self.build.skillsTab.socketGroupList[self.input.skill_number]
 				local srcInstance = mainSocketGroup.displaySkillListCalcs[mainSocketGroup.mainActiveSkillCalcs].activeEffect.srcInstance
 				srcInstance.skillPartCalcs = index
 				self:AddUndoState()
 				self.build.buildFlag = true
 			end)
-		}, },{ label = "Skill Stages", playerFlag = "multiStage", { controlName = "mainSkillStageCount",
+		}, },{ label = "Skill Stages", flag = "multiStage", { controlName = "mainSkillStageCount",
 			control = new("EditControl", nil, {0, 0, 52, 16}, nil, nil, "%D", nil, function(buf)
+				if self:IsMercenaryActor() then
+					local skill = self:GetMercenaryCalcsSkill()
+					if skill then
+						skill.skillStageCount = tonumber(buf)
+						self.build.mercenaryTab:Changed()
+					end
+					return
+				end
 				local mainSocketGroup = self.build.skillsTab.socketGroupList[self.input.skill_number]
 				local srcInstance = mainSocketGroup.displaySkillListCalcs[mainSocketGroup.mainActiveSkillCalcs].activeEffect.srcInstance
 				srcInstance.skillStageCountCalcs = tonumber(buf)
@@ -75,8 +106,16 @@ local CalcsTabClass = newClass("CalcsTab", "UndoHandler", "ControlHost", "Contro
 				self.build.buildFlag = true
 			end)
 		}, },
-		{ label = "Active Mines", playerFlag = "mine", { controlName = "mainSkillMineCount",
+		{ label = "Active Mines", flag = "mine", { controlName = "mainSkillMineCount",
 			control = new("EditControl", nil, {0, 0, 52, 16}, nil, nil, "%D", nil, function(buf)
+				if self:IsMercenaryActor() then
+					local skill = self:GetMercenaryCalcsSkill()
+					if skill then
+						skill.skillMineCount = tonumber(buf)
+						self.build.mercenaryTab:Changed()
+					end
+					return
+				end
 				local mainSocketGroup = self.build.skillsTab.socketGroupList[self.input.skill_number]
 				local srcInstance = mainSocketGroup.displaySkillListCalcs[mainSocketGroup.mainActiveSkillCalcs].activeEffect.srcInstance
 				srcInstance.skillMineCountCalcs = tonumber(buf)
@@ -84,12 +123,14 @@ local CalcsTabClass = newClass("CalcsTab", "UndoHandler", "ControlHost", "Contro
 				self.build.buildFlag = true
 			end)
 		}, },
-		{ label = "Show Minion Stats", flag = "haveMinion", { controlName = "showMinion", 
-			control = new("CheckBoxControl", nil, {0, 0, 18}, nil, function(state)
-				self.input.showMinion = state
+		{ label = "Calculation Actor", { controlName = "actor",
+			control = new("DropDownControl", nil, {0, 0, 160, 16}, calculationActorList, function(index, value)
+				self.input.actor = value.actorId
 				self:AddUndoState()
-			end, "Show stats for the minion instead of the player.")
+				self.build.buildFlag = true
+			end)
 		}, },
+		{ label = "Actor Status", haveOutput = "ActorUnavailableMessage", textSize = 12, { format = "{output:ActorUnavailableMessage}" }, },
 		{ label = "Minion", flag = "minion", { controlName = "mainSkillMinion",
 			control = new("DropDownControl", nil, {0, 0, 160, 16}, nil, function(index, value)
 				local mainSocketGroup = self.build.skillsTab.socketGroupList[self.input.skill_number]
@@ -137,7 +178,8 @@ Effective DPS: Curses and enemy properties (such as resistances and status condi
 		{ label = "Curses and Debuffs", flag = "effective", textSize = 12, { format = "{output:CurseList}", { breakdown = "SkillDebuffs" } }, },
 	}}}, function(section)
 		self.build:RefreshSkillSelectControls(section.controls, self.input.skill_number, "Calcs")
-		section.controls.showMinion.state = self.input.showMinion
+		self:RefreshMercenarySkillSelectControls(section.controls)
+		section.controls.actor:SelByValue(self.input.actor, "actorId")
 		section.controls.mode:SelByValue(self.input.misc_buffMode, "buffMode")
 	end)
 
@@ -153,7 +195,65 @@ Effective DPS: Curses and enemy properties (such as resistances and status condi
 	self.powerBuilderInitialized = nil
 end)
 
+function CalcsTabClass:IsMercenaryActor()
+	return self.input.actor == "MERCENARY" or self.input.actor == "MERCENARY_MINION"
+end
+
+function CalcsTabClass:GetMercenaryCalcsSkill()
+	local profile = self.build.mercenaryTab.profile
+	for _, skill in ipairs(profile.skills or { }) do
+		if skill.id == profile.mainSkillId then return skill end
+	end
+end
+
+function CalcsTabClass:RefreshMercenarySkillSelectControls(controls)
+	if not self:IsMercenaryActor() then return end
+	local profile = self.build.mercenaryTab.profile
+	controls.mainSocketGroup:SetList({ { label = "Mercenary Inherent Skills" } })
+	controls.mainSocketGroup.selIndex = 1
+	controls.mainSocketGroup.enabled = false
+	controls.mainSocketGroup.shown = true
+	local skillList, selectedIndex = { }, 1
+	for _, skill in ipairs(profile.skills or { }) do
+		if skill.enabled ~= false then
+			t_insert(skillList, { skillId = skill.id, label = self.build.data.skills[skill.id] and self.build.data.skills[skill.id].name or skill.id })
+			if skill.id == profile.mainSkillId then selectedIndex = #skillList end
+		end
+	end
+	if #skillList == 0 then skillList[1] = { label = "<No enabled Mercenary skills>" } end
+	controls.mainSkill:SetList(skillList)
+	controls.mainSkill.selIndex = selectedIndex
+	controls.mainSkill.enabled = #skillList > 1
+	controls.mainSkill.shown = true
+	controls.mainSkillPart.shown = false
+	controls.mainSkillStageCount.shown = false
+	controls.mainSkillMineCount.shown = false
+	controls.mainSkillMinion.shown = false
+	controls.mainSkillMinionLibrary.shown = false
+	controls.mainSkillMinionSkill.shown = false
+	if self.input.actor ~= "MERCENARY" then return end
+	local selectedSkill = self:GetMercenaryCalcsSkill()
+	local grantedEffect = selectedSkill and self.build.data.skills[selectedSkill.id]
+	local activeSkill = self.calcsEnv and self.calcsEnv.mercenary and self.calcsEnv.mercenary.mainSkill
+	if grantedEffect and grantedEffect.parts and #grantedEffect.parts > 1 then
+		local partList = { }
+		for index, part in ipairs(grantedEffect.parts) do t_insert(partList, { label = part.name, index = index }) end
+		controls.mainSkillPart:SetList(partList)
+		controls.mainSkillPart:SelByValue(selectedSkill.skillPart or self.build.data.mercenaryStatData.defaultSkillParts[selectedSkill.id] or 1, "index")
+		controls.mainSkillPart.shown = true
+	end
+	if activeSkill and activeSkill.skillFlags.multiStage then
+		controls.mainSkillStageCount.buf = tostring(selectedSkill.skillStageCount or activeSkill.skillData.stagesMax or activeSkill.skillData.stagesMin or 1)
+		controls.mainSkillStageCount.shown = true
+	end
+	if activeSkill and activeSkill.skillFlags.mine then
+		controls.mainSkillMineCount.buf = tostring(selectedSkill.skillMineCount or "")
+		controls.mainSkillMineCount.shown = true
+	end
+end
+
 function CalcsTabClass:Load(xml, dbFileName)
+	local savedActor
 	for _, node in ipairs(xml) do
 		if type(node) == "table" then
 			if node.elem == "Input" then
@@ -170,6 +270,9 @@ function CalcsTabClass:Load(xml, dbFileName)
 				else
 					launch:ShowErrMsg("^1Error parsing '%s': 'Input' element missing number, string or boolean attribute", fileName)
 					return true
+				end
+				if node.attrib.name == "actor" then
+					savedActor = self.input.actor
 				end
 			elseif node.elem == "Section" then
 				if not node.attrib.id then
@@ -190,6 +293,10 @@ function CalcsTabClass:Load(xml, dbFileName)
 			end
 		end
 	end
+	if not savedActor then
+		self.input.actor = self.input.showMinion and "PLAYER_MINION" or "PLAYER"
+	end
+	self.input.showMinion = nil
 	self:ResetUndo()
 end
 
@@ -387,8 +494,8 @@ function CalcsTabClass:SetDisplayStat(displayData, pin)
 end
 
 function CalcsTabClass:CheckFlag(obj, actor)
-	actor = actor or (self.input.showMinion and self.calcsEnv.minion or self.calcsEnv.player)
-	local skillFlags = actor.mainSkill.skillFlags
+	actor = actor or self:GetDisplayActor(self.calcsEnv)
+	local skillFlags = actor and actor.mainSkill and actor.mainSkill.skillFlags or { }
 	if obj.flag and not skillFlags[obj.flag] then
 		return
 	end
@@ -415,14 +522,27 @@ function CalcsTabClass:CheckFlag(obj, actor)
 	if obj.haveOutput then
 		local ns, var = obj.haveOutput:match("^(%a+)%.(%a+)$")
 		if ns then
-			if not actor.output[ns] or not actor.output[ns][var] or actor.output[ns][var] == 0 then
+			if not actor or not actor.output[ns] or not actor.output[ns][var] or actor.output[ns][var] == 0 then
 				return
 			end
-		elseif not actor.output[obj.haveOutput] or actor.output[obj.haveOutput] == 0 then
+		elseif not actor or not actor.output[obj.haveOutput] or actor.output[obj.haveOutput] == 0 then
 			return
 		end
 	end
 	return true
+end
+
+function CalcsTabClass:GetDisplayActor(env)
+	if not env then
+		return
+	end
+	local actors = {
+		PLAYER = env.player,
+		PLAYER_MINION = env.minion,
+		MERCENARY = env.mercenary,
+		MERCENARY_MINION = env.mercenaryMinion,
+	}
+	return actors[self.input.actor or "PLAYER"]
 end
 
 function CalcsTabClass:SearchMatch(txt)
@@ -452,7 +572,13 @@ function CalcsTabClass:BuildOutput()
 	self.mainEnv = self.calcs.buildOutput(self.build, "MAIN")
 	self.mainOutput = self.mainEnv.player.output
 	self.calcsEnv = self.calcs.buildOutput(self.build, "CALCS")
-	self.calcsOutput = self.calcsEnv.player.output
+	self.calcsActor = self:GetDisplayActor(self.calcsEnv)
+	if self.calcsActor then
+		self.calcsOutput = self.calcsActor.output
+	else
+		local actorLabel = (self.input.actor or "PLAYER"):gsub("_", " "):lower()
+		self.calcsOutput = { ActorUnavailableMessage = "The selected "..actorLabel.." is unavailable for this build." }
+	end
 
 	if self.displayData then
 		self.controls.breakdown:SetBreakdownData()

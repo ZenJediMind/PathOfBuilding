@@ -20,6 +20,7 @@ local skillTypes = {
 	"glove",
 	"minion",
 	"spectre",
+	"mercenary",
 	"sup_str",
 	"sup_dex",
 	"sup_int",
@@ -991,6 +992,8 @@ end
 -- Load skills
 data.skills = { }
 data.skillStatMap = LoadModule("Data/SkillStatMap", makeSkillMod, makeFlagMod, makeSkillDataMod)
+data.mercenaryStatData = LoadModule("Data/MercenaryStatMap", makeSkillMod, makeFlagMod, makeSkillDataMod)
+data.mercenaryStatMap = data.mercenaryStatData.statMap
 data.skillStatMapMeta = {
 	__index = function(t, key)
 		local map = data.skillStatMap[key]
@@ -1007,7 +1010,53 @@ data.skillStatMapMeta = {
 for _, type in pairs(skillTypes) do
 	LoadModule("Data/Skills/"..type, data.skills, makeSkillMod, makeFlagMod, makeSkillDataMod)
 end
-for skillId, grantedEffect in pairs(data.skills) do
+local orderedSkillIds = { }
+for skillId in pairs(data.skills) do t_insert(orderedSkillIds, skillId) end
+table.sort(orderedSkillIds)
+
+-- Some mechanics are mapped on a specific player skill instead of the global
+-- stat map. Reuse those mappings only when every existing implementation is
+-- identical; conflicting meanings must receive an explicit Mercenary override.
+local sharedSkillStatMap, ambiguousSkillStats = { }, { }
+for _, skillId in ipairs(orderedSkillIds) do
+	local grantedEffect = data.skills[skillId]
+	if not grantedEffect.mercenary then
+		for statId, map in pairs(grantedEffect.statMap or { }) do
+			if type(statId) == "string" and statId ~= "_grantedEffect" and not ambiguousSkillStats[statId] then
+				if sharedSkillStatMap[statId] and not tableDeepEquals(sharedSkillStatMap[statId], map) then
+					sharedSkillStatMap[statId] = nil
+					ambiguousSkillStats[statId] = true
+				else
+					sharedSkillStatMap[statId] = map
+				end
+			end
+		end
+	end
+end
+
+for _, skillId in ipairs(orderedSkillIds) do
+	local grantedEffect = data.skills[skillId]
+	if grantedEffect.mercenary then
+		grantedEffect.statMap = grantedEffect.statMap or { }
+		for _, statId in ipairs(grantedEffect.stats or { }) do
+			if not grantedEffect.statMap[statId] then
+				grantedEffect.statMap[statId] = data.mercenaryStatMap[statId] or data.skillStatMap[statId] or sharedSkillStatMap[statId]
+			end
+		end
+		for _, stat in ipairs(grantedEffect.constantStats or { }) do
+			if not grantedEffect.statMap[stat[1]] then
+				grantedEffect.statMap[stat[1]] = data.mercenaryStatMap[stat[1]] or data.skillStatMap[stat[1]] or sharedSkillStatMap[stat[1]]
+			end
+		end
+		local override = data.mercenaryStatData.skillOverrides[skillId]
+		if override then
+			for statId, map in pairs(override.statMap or { }) do grantedEffect.statMap[statId] = map end
+			if override.parts then grantedEffect.parts = copyTable(override.parts, true) end
+			grantedEffect.baseMods = grantedEffect.baseMods or { }
+			for _, baseMod in ipairs(override.baseMods or { }) do t_insert(grantedEffect.baseMods, baseMod) end
+			if override.preDamageFunc then grantedEffect.preDamageFunc = override.preDamageFunc end
+		end
+	end
 	grantedEffect.name = sanitiseText(grantedEffect.name)
 	grantedEffect.id = skillId
 	grantedEffect.modSource = "Skill:"..skillId
@@ -1037,6 +1086,21 @@ for skillId, grantedEffect in pairs(data.skills) do
 					processMod(grantedEffect, mod, name)
 				end
 			end
+		end
+	end
+end
+
+data.knownUncalculatedSkillStats = data.mercenaryStatData.knownUncalculatedStats
+
+-- Mercenary supports store raw stats instead of GrantedEffect references. Reuse
+-- the deterministic stat implementations already exported for skills/supports.
+data.mercenarySupportStatMap = { }
+for statId, map in pairs(data.skillStatMap) do data.mercenarySupportStatMap[statId] = map end
+for statId, map in pairs(data.mercenaryStatMap) do data.mercenarySupportStatMap[statId] = map end
+for _, skillId in ipairs(orderedSkillIds) do
+	for statId, map in pairs(data.skills[skillId].statMap) do
+		if type(statId) == "string" and statId ~= "_grantedEffect" and not data.mercenarySupportStatMap[statId] then
+			data.mercenarySupportStatMap[statId] = map
 		end
 	end
 end
@@ -1115,6 +1179,46 @@ end
 -- Load minions
 data.minions = { }
 LoadModule("Data/Minions", data.minions, makeSkillMod, makeFlagMod)
+data.mercenaries = LoadModule("Data/Mercenaries")
+local function addMercenaryMinionStatMods(minion, stat)
+	local map = data.mercenarySupportStatMap[stat.id]
+	if not map then return end
+	for _, modOrGroup in ipairs(map) do
+		local templates = modOrGroup.name and { modOrGroup } or modOrGroup
+		local value = modOrGroup.value or stat.value * (modOrGroup.mult or map.mult or 1) / (modOrGroup.div or map.div or 1) + (modOrGroup.base or map.base or 0)
+		for _, template in ipairs(templates) do
+			local newMod = copyTable(template, true)
+			if type(newMod.value) == "table" then
+				if newMod.value.mod then
+					newMod.value.mod.value = value
+				else
+					newMod.value.value = value
+				end
+			else
+				newMod.value = value
+			end
+			t_insert(minion.modList, newMod)
+		end
+	end
+end
+for minionId, minion in pairs(data.mercenaries.minions or { }) do
+	minion.skillList = minion.skillIds
+	minion.noFallbackSkill = not minion.skillList[1]
+	minion.modList = { }
+	for _, stat in ipairs(minion.stats or { }) do addMercenaryMinionStatMods(minion, stat) end
+	data.minions[minionId] = minion
+end
+for skillId, minionId in pairs(data.mercenaries.summonedMinions or { }) do
+	local grantedEffect = data.skills[skillId]
+	if grantedEffect then
+		grantedEffect.minionList = { minionId }
+		grantedEffect.baseFlags.minion = true
+		grantedEffect.skillTypes[SkillType.Minion] = true
+		grantedEffect.skillTypes[SkillType.CreatesMinion] = true
+		grantedEffect.baseMods = grantedEffect.baseMods or { }
+		t_insert(grantedEffect.baseMods, makeSkillDataMod("minionLevelIsActorLevel", true))
+	end
+end
 data.spectres = { }
 LoadModule("Data/Spectres", data.spectres, makeSkillMod, makeFlagMod)
 for name, spectre in pairs(data.spectres) do

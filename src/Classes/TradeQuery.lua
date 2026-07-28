@@ -7,6 +7,7 @@
 
 local dkjson = require "dkjson"
 local itemSlotHelper = LoadModule("Modules/ItemSlotHelper")
+local MercenaryTools = require("Modules/MercenaryTools")
 
 local get_time = os.time
 local t_insert = table.insert
@@ -446,7 +447,8 @@ Highest Weight - Displays the order retrieved from trade]]
 	-- loop all slots, set any active abyssal sockets
 	for index, slot in pairs(self.itemsTab.slots) do
 		if index:find("Abyssal") and slot.shown() then
-			t_insert(activeAbyssalSockets[slot.parentSlot.slotName], slot)
+			local sockets = activeAbyssalSockets[slot.parentSlot.slotName]
+			if sockets then t_insert(sockets, slot) end
 		end
 	end
 	for _, abyssal in pairs(activeAbyssalSockets) do -- sort Abyssal #1 > Abyssal #2 etc
@@ -466,6 +468,11 @@ Highest Weight - Displays the order retrieved from trade]]
 			for _, abyssalSocket in pairs(activeAbyssalSockets[slotName]) do
 				t_insert(slotTables, { slotName = abyssalSocket.label, fullName = abyssalSocket.slotName }) -- actual slotName doesn't fit/excessive in slotName on popup but is needed for exact matching later
 			end
+		end
+	end
+	for _, slot in ipairs(self.itemsTab.mercenarySlots or { }) do
+		if slot.shown() then
+			t_insert(slotTables, { slotName = slot.slotName, displayName = "Merc. "..slot.mercenarySlotName })
 		end
 	end
 	local activeSocketList = { }
@@ -778,8 +785,13 @@ end
 -- Method to evaluate a result by getting it's output and weight
 function TradeQueryClass:GetResultEvaluation(row_idx, result_index, calcFunc, baseOutput)
 	local result = self.resultTbl[row_idx][result_index]
+	local slotTbl = self.slotTables[row_idx]
+	local jewelNodeId = slotTbl.nodeId or slotTbl.selectedJewelNodeId
+	local slotName = jewelNodeId and "Jewel " .. tostring(jewelNodeId) or slotTbl.fullName or slotTbl.slotName
 	if not calcFunc then -- Always evaluate when calcFunc is given
-		calcFunc, baseOutput = self.itemsTab.build.calcsTab:GetMiscCalculator()
+		local actorOutputs
+		calcFunc, baseOutput, actorOutputs = self.itemsTab.build.calcsTab:GetMiscCalculator()
+		baseOutput = MercenaryTools.comparisonBaseOutput(baseOutput, actorOutputs, slotName)
 		local onlyWeightedBaseOutput = self:ReduceOutput(baseOutput)
 		if not self.onlyWeightedBaseOutput[row_idx] then
 			self.onlyWeightedBaseOutput[row_idx] = { }
@@ -794,9 +806,6 @@ function TradeQueryClass:GetResultEvaluation(row_idx, result_index, calcFunc, ba
 		self.onlyWeightedBaseOutput[row_idx][result_index] = onlyWeightedBaseOutput
 		self.lastComparedWeightList[row_idx][result_index] = self.statSortSelectionList
 	end
-	local slotTbl = self.slotTables[row_idx]
-	local jewelNodeId = slotTbl.nodeId or slotTbl.selectedJewelNodeId
-	local slotName = jewelNodeId and "Jewel " .. tostring(jewelNodeId) or slotTbl.slotName
 	if slotName == "Megalomaniac" then
 		local addedNodes = {}
 		for nodeName in (result.item_string.."\r\n"):gmatch("1 Added Passive Skill is (.-)\r?\n") do
@@ -999,7 +1008,7 @@ function TradeQueryClass:PriceItemRowDisplay(row_idx, top_pane_alignment_ref, ro
 		return selectedNodeId and self.itemsTab.sockets[selectedNodeId] or activeSlot
 	end
 	local nameColor = slotTbl.unique and colorCodes.UNIQUE or "^7"
-	controls["name" .. row_idx] = new("LabelControl", top_pane_alignment_ref, { 0, row_idx * (row_height + row_vertical_padding), 135, row_height - 4 }, nameColor .. slotTbl.slotName)
+	controls["name" .. row_idx] = new("LabelControl", top_pane_alignment_ref, { 0, row_idx * (row_height + row_vertical_padding), 135, row_height - 4 }, nameColor .. (slotTbl.displayName or slotTbl.slotName))
 	controls["bestButton" .. row_idx] = new("ButtonControl", { "LEFT", controls["name" .. row_idx], "LEFT" }, { 135 + 8, 0, 80, row_height }, "Find best", function()
 		self.tradeQueryGenerator:RequestQuery(activeSlot, { slotTbl = slotTbl, controls = controls, row_idx = row_idx }, self.statSortSelectionList, function(context, query, errMsg)
 			if errMsg then

@@ -424,7 +424,7 @@ function buildMode:Init(dbFileName, buildName, buildXML, convertBuild, importLin
 	end
 
 	-- List of display stats
-	self.displayStats, self.minionDisplayStats, self.extraSaveStats = LoadModule("Modules/BuildDisplayStats")
+	self.displayStats, self.minionDisplayStats, self.extraSaveStats, self.mercenaryDisplayStats = LoadModule("Modules/BuildDisplayStats")
 
 	-- Controls: Side bar
 	self.anchorSideBar = new("Control", nil, {4, 60, 0, 0})
@@ -445,22 +445,22 @@ function buildMode:Init(dbFileName, buildName, buildXML, convertBuild, importLin
 		self.viewMode = "CONFIG"
 	end)
 	self.controls.modeConfig.locked = function() return self.viewMode == "CONFIG" end
-	self.controls.modeTree = new("ButtonControl", {"TOPLEFT",self.anchorSideBar,"TOPLEFT"}, {0, 26, 72, 20}, "Tree", function()
+	self.controls.modeTree = new("ButtonControl", {"TOPLEFT",self.anchorSideBar,"TOPLEFT"}, {0, 26, 64, 20}, "Tree", function()
 		self.viewMode = "TREE"
 	end)
 	self.controls.modeTree.locked = function() return self.viewMode == "TREE" end
-	self.controls.modeSkills = new("ButtonControl", {"LEFT",self.controls.modeTree,"RIGHT"}, {4, 0, 72, 20}, "Skills", function()
+	self.controls.modeSkills = new("ButtonControl", {"LEFT",self.controls.modeTree,"RIGHT"}, {4, 0, 64, 20}, "Skills", function()
 		self.viewMode = "SKILLS"
 	end)
 	self.controls.modeSkills.locked = function() return self.viewMode == "SKILLS" end
-	self.controls.modeItems = new("ButtonControl", {"LEFT",self.controls.modeSkills,"RIGHT"}, {4, 0, 72, 20}, "Items", function()
+	self.controls.modeItems = new("ButtonControl", {"LEFT",self.controls.modeSkills,"RIGHT"}, {4, 0, 64, 20}, "Items", function()
 		self.viewMode = "ITEMS"
 	end)
 	self.controls.modeItems.locked = function() return self.viewMode == "ITEMS" end
-	self.controls.modeCalcs = new("ButtonControl", {"LEFT",self.controls.modeItems,"RIGHT"}, {4, 0, 72, 20}, "Calcs", function()
-		self.viewMode = "CALCS"
+	self.controls.modeMercenary = new("ButtonControl", {"LEFT",self.controls.modeItems,"RIGHT"}, {4, 0, 96, 20}, "Mercenary", function()
+		self.viewMode = "MERCENARY"
 	end)
-	self.controls.modeCalcs.locked = function() return self.viewMode == "CALCS" end
+	self.controls.modeMercenary.locked = function() return self.viewMode == "MERCENARY" end
 	self.controls.modeParty = new("ButtonControl", {"TOPLEFT",self.anchorSideBar,"TOPLEFT"}, {0, 52, 72, 20}, "Party", function()
 		self.viewMode = "PARTY"
 	end)
@@ -469,6 +469,10 @@ function buildMode:Init(dbFileName, buildName, buildXML, convertBuild, importLin
 		self.viewMode = "COMPARE"
 	end)
 	self.controls.modeCompare.locked = function() return self.viewMode == "COMPARE" end
+	self.controls.modeCalcs = new("ButtonControl", {"LEFT",self.controls.modeCompare,"RIGHT"}, {4, 0, 72, 20}, "Calcs", function()
+		self.viewMode = "CALCS"
+	end)
+	self.controls.modeCalcs.locked = function() return self.viewMode == "CALCS" end
 	-- Skills
 	self.controls.mainSkillLabel = new("LabelControl", {"TOPLEFT",self.anchorSideBar,"TOPLEFT"}, {0, 80, 300, 16}, "^7Main Skill:")
 	self.controls.mainSocketGroup = new("DropDownControl", {"TOPLEFT",self.controls.mainSkillLabel,"BOTTOMLEFT"}, {0, 2, 300, 18}, nil, function(index, value)
@@ -602,6 +606,7 @@ function buildMode:Init(dbFileName, buildName, buildXML, convertBuild, importLin
 	self.itemsTab = new("ItemsTab", self)
 	self.treeTab = new("TreeTab", self)
 	self.skillsTab = new("SkillsTab", self)
+	self.mercenaryTab = new("MercenaryTab", self)
 	self.calcsTab = new("CalcsTab", self)
 	self.compareTab = new("CompareTab", self)
 	-- Used for pined calcs panes
@@ -616,6 +621,7 @@ function buildMode:Init(dbFileName, buildName, buildXML, convertBuild, importLin
 		["TreeView"] = self.treeTab.viewer,
 		["Items"] = self.itemsTab,
 		["Skills"] = self.skillsTab,
+		["Mercenary"] = self.mercenaryTab,
 		["Calcs"] = self.calcsTab,
 		["Import"] = self.importTab,
 	}
@@ -1181,6 +1187,8 @@ function buildMode:OnFrame(inputEvents)
 					self.viewMode = "NOTES"
 				elseif event.key == "7" then
 					self.viewMode = "PARTY"
+				elseif event.key == "8" then
+					self.viewMode = "MERCENARY"
 				end
 			end
 		end
@@ -1283,6 +1291,8 @@ function buildMode:OnFrame(inputEvents)
 		self.skillsTab:Draw(tabViewPort, inputEvents)
 	elseif self.viewMode == "ITEMS" then
 		self.itemsTab:Draw(tabViewPort, inputEvents)
+	elseif self.viewMode == "MERCENARY" then
+		self.mercenaryTab:Draw(tabViewPort, inputEvents)
 	elseif self.viewMode == "CALCS" then
 		self.calcsTab:Draw(tabViewPort, inputEvents)
 	elseif self.viewMode == "COMPARE" then
@@ -1296,7 +1306,7 @@ function buildMode:OnFrame(inputEvents)
 		end
 	end
 
-	self.unsaved = self.modFlag or self.notesTab.modFlag or self.partyTab.modFlag or self.configTab.modFlag or self.treeTab.modFlag or self.treeTab.searchFlag or self.spec.modFlag or self.skillsTab.modFlag or self.itemsTab.modFlag or self.calcsTab.modFlag
+	self.unsaved = self.modFlag or self.notesTab.modFlag or self.partyTab.modFlag or self.configTab.modFlag or self.treeTab.modFlag or self.treeTab.searchFlag or self.spec.modFlag or self.skillsTab.modFlag or self.itemsTab.modFlag or self.mercenaryTab.modFlag or self.calcsTab.modFlag
 
 	SetDrawLayer(5)
 
@@ -1859,6 +1869,14 @@ function buildMode:RefreshStatList()
 		end
 		self:AddDisplayStatList(self.minionDisplayStats, self.calcsTab.mainEnv.minion)
 		t_insert(statBoxList, { height = 10 })
+		if not self.calcsTab.mainEnv.mercenary then
+			t_insert(statBoxList, { height = 18, "^7Player:" })
+		end
+	end
+	if self.calcsTab.mainEnv.mercenary then
+		t_insert(statBoxList, { height = 18, "^7Mercenary Stats:" })
+		self:AddDisplayStatList(self.mercenaryDisplayStats, self.calcsTab.mainEnv.mercenary)
+		t_insert(statBoxList, { height = 10 })
 		t_insert(statBoxList, { height = 18, "^7Player:" })
 	end
 	if self.calcsTab.mainEnv.player.mainSkill.skillFlags.disable then
@@ -1917,8 +1935,11 @@ end
 -- Compare values of all display stats between the two output tables, and add any changed stats to the tooltip
 -- Adds the provided header line before the first stat line, if any are added
 -- Returns the number of stat lines added
-function buildMode:AddStatComparesToTooltip(tooltip, baseOutput, compareOutput, header, nodeCount)
+function buildMode:AddStatComparesToTooltip(tooltip, baseOutput, compareOutput, header, nodeCount, actor)
 	local count = 0
+	if actor == "MERCENARY" and self.calcsTab.mainEnv.mercenary then
+		return self:CompareStatList(tooltip, self.mercenaryDisplayStats, self.calcsTab.mainEnv.mercenary, baseOutput, compareOutput, header, nodeCount)
+	end
 	if self.calcsTab.mainEnv.player.mainSkill.minion and baseOutput.Minion and compareOutput.Minion then
 		count = count + self:CompareStatList(tooltip, self.minionDisplayStats, self.calcsTab.mainEnv.minion, baseOutput.Minion, compareOutput.Minion, header.."\n^7Minion:", nodeCount)
 		if count > 0 then

@@ -19,13 +19,35 @@ end
 
 local MAX_WARRANT_BYTES = 256 * 1024
 local MAX_SKILLS = 6
-local MAX_SUPPORTS = 5
-local contains
 
-local function supportLimit(mercenaryData, skill)
-	local count = skill and mercenaryData.supportCounts and mercenaryData.supportCounts[skill.supportCountId]
-	return count and count.maximum or MAX_SUPPORTS
+function MercenaryTools.contains(values, wanted)
+	for _, value in ipairs(values or { }) do
+		if value == wanted then
+			return true
+		end
+	end
+	return false
 end
+local contains = MercenaryTools.contains
+
+-- How many supports a skill accepts, and the largest limit any skill accepts. Both
+-- come from the hand-authored `supportCounts` policy attached to the Mercenary data.
+function MercenaryTools.supportLimit(mercenaryData, skill)
+	local count = skill and mercenaryData.supportCounts[skill.supportCountId]
+	if not count then
+		return 0
+	end
+	return count.maximum
+end
+
+function MercenaryTools.maxSupportLimit(mercenaryData)
+	local maximum = 0
+	for _, count in pairs(mercenaryData.supportCounts) do
+		maximum = math.max(maximum, count.maximum)
+	end
+	return maximum
+end
+local supportLimit = MercenaryTools.supportLimit
 
 local function hashMatches(index, hash)
 	return index[tostring(hash)] or { }
@@ -69,34 +91,109 @@ local function resolveSupport(mercenaryData, hash, tier, allowed)
 	return tierMatches[1]
 end
 
-contains = function(values, wanted)
-	for _, value in ipairs(values or { }) do
-		if value == wanted then
-			return true
+local function listProducesSkillData(mods, key)
+	for _, modOrGroup in ipairs(mods or { }) do
+		for _, mod in ipairs(modOrGroup.name and { modOrGroup } or modOrGroup) do
+			if mod.name == "SkillData" and type(mod.value) == "table" and mod.value.key == key then
+				return true
+			end
 		end
 	end
 	return false
 end
 
+local function producesSkillData(grantedEffect, key)
+	if listProducesSkillData(grantedEffect.baseMods, key) then
+		return true
+	end
+	local function statProduces(statId)
+		local map = grantedEffect.statMap[statId]
+		return map ~= nil and listProducesSkillData(map, key)
+	end
+	for _, statId in ipairs(grantedEffect.stats or { }) do
+		if statProduces(statId) then return true end
+	end
+	for _, stat in ipairs(grantedEffect.constantStats or { }) do
+		if statProduces(stat[1]) then return true end
+	end
+	-- Quality stats are deliberately not consulted: a Mercenary skill is not a gem and
+	-- always has quality 0, so anything only a quality stat produces stays nil.
+	return false
+end
+
+-- Which declared inputs of the base skill's `preDamageFunc` this Mercenary skill cannot
+-- populate from its own stats, or nil when the base declares no inputs at all.
+function MercenaryTools.missingPreDamageFuncInputs(grantedEffect, baseSkillId, mercenaryStatData)
+	local declared = mercenaryStatData.preDamageFuncInputs[baseSkillId]
+	if not declared then
+		return nil
+	end
+	local missing = { }
+	for _, key in ipairs(declared) do
+		if not producesSkillData(grantedEffect, key) then table.insert(missing, key) end
+	end
+	return missing
+end
+
+-- Report every declared input of an inherited `preDamageFunc` that the Mercenary
+-- skill's own stats cannot populate. Without this the function reads nil, which
+-- either errors or reports the missing damage component as zero.
+-- A Mercenary skill that overrides `preDamageFunc` itself is not checked, because that
+-- function was written against the stats the Mercenary version actually has.
+function MercenaryTools.preDamageFuncErrors(grantedEffect, baseEffect, mercenaryStatData)
+	if not grantedEffect.preDamageFunc or not grantedEffect.inheritedFrom
+	  or grantedEffect.preDamageFunc ~= (baseEffect and baseEffect.preDamageFunc) then
+		return nil
+	end
+	local missing = MercenaryTools.missingPreDamageFuncInputs(grantedEffect, grantedEffect.inheritedFrom, mercenaryStatData)
+	if not missing then
+		return { "Undeclared preDamageFunc inputs for "..grantedEffect.inheritedFrom.." (inherited by "..grantedEffect.id..")" }
+	end
+	local errors
+	for _, key in ipairs(missing) do
+		errors = errors or { }
+		table.insert(errors, "Mercenary skill "..grantedEffect.id.." has no stat for "..key..", required by the "..grantedEffect.inheritedFrom.." preDamageFunc")
+	end
+	return errors
+end
+
+-- A Mercenary is as strong as the area it was found in, and levels up with the areas
+-- it is taken to, but stops gaining levels past the level of the highest-level
+-- non-endgame area (GGG patch notes: "up to a maximum of level 68"). Found-area
+-- level itself is not limited by that ceiling — map Mercenaries keep their high
+-- found-area level — but monster damage/armour/evasion tables only exist for 1–100.
+local MERCENARY_AREA_SCALING_CAP = 68
+local MERCENARY_LEVEL_MAX = 100
+-- A Mercenary can equip an item requiring up to this fraction more than the level
+-- of the area it was found in.
+local FOUND_AREA_LEVEL_REQUIREMENT_RATIO = 0.7
+
 function MercenaryTools.effectiveLevel(foundAreaLevel, currentAreaLevel)
-	return math.max(tonumber(foundAreaLevel) or 1, math.min(tonumber(currentAreaLevel) or 1, 68))
+	local found = math.max(1, math.min(tonumber(foundAreaLevel) or 1, MERCENARY_LEVEL_MAX))
+	local current = math.max(1, math.min(tonumber(currentAreaLevel) or 1, MERCENARY_AREA_SCALING_CAP))
+	return math.max(found, current)
 end
 
 function MercenaryTools.requiredFoundAreaLevel(requiredLevel)
-	return math.ceil((tonumber(requiredLevel) or 0) * 0.7)
+	return math.ceil((tonumber(requiredLevel) or 0) * FOUND_AREA_LEVEL_REQUIREMENT_RATIO)
 end
 
-function MercenaryTools.monsterLifeTable(data, scaling)
-	return scaling == "AltLife1" and data.monsterLifeTable2 or scaling == "AltLife2" and data.monsterLifeTable3 or data.monsterAllyLifeTable
-end
+-- MercenaryBuildExtraStats gives three values per passive with no levels attached.
+-- The breakpoints are therefore an assumption: the three values are treated as the
+-- value at the minimum level (1), the midpoint (50) and the level cap (100), so
+-- that Value3 is actually reachable. Values are truncated because every consumer of
+-- a passive stat is an integer mod value; if the game rounds instead, every passive
+-- is low by up to 1.
+MercenaryTools.PASSIVE_STAT_LEVELS = { 1, 50, 100 }
 
 function MercenaryTools.passiveStatValue(values, level)
-	local scaledLevel = math.max(0, math.min((tonumber(level) or 1) - 1, 100))
+	local levels = MercenaryTools.PASSIVE_STAT_LEVELS
+	local clampedLevel = math.max(levels[1], math.min(tonumber(level) or levels[1], levels[3]))
 	local first, second, third = tonumber(values and values[1]) or 0, tonumber(values and values[2]) or 0, tonumber(values and values[3]) or 0
-	if scaledLevel <= 50 then
-		return math.floor(first + (second - first) * scaledLevel / 50)
+	if clampedLevel <= levels[2] then
+		return math.floor(first + (second - first) * (clampedLevel - levels[1]) / (levels[2] - levels[1]))
 	end
-	return math.floor(second + (third - second) * (scaledLevel - 50) / 50)
+	return math.floor(second + (third - second) * (clampedLevel - levels[2]) / (levels[3] - levels[2]))
 end
 
 function MercenaryTools.importWarrant(jsonText, mercenaryData, classId)
@@ -220,8 +317,8 @@ function MercenaryTools.validateProfile(profile, mercenaryData)
 				break
 			end
 		end
-		local maxSupports = supportLimit(mercenaryData, skill)
-		if #(selected.supports or { }) > maxSupports then
+		local maxSupports = skill and supportLimit(mercenaryData, skill)
+		if maxSupports and #(selected.supports or { }) > maxSupports then
 			table.insert(errors, "Skill "..tostring(selected.id).." has more than "..maxSupports.." supports")
 		end
 		local seenSupports, seenFamilies = { }, { }

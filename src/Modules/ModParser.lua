@@ -5037,11 +5037,11 @@ local specialModList = {
 		mod("Armour", "INC", num, { type = "Multiplier", var = "StationarySeconds", limit = tonumber(limit / num) }, { type = "Condition", var = "Stationary" }),
 	} end,
 	["(%d+)%% of damage from hits is taken from your r?a?i?s?e?d? ?spectres' life before you"] = function(num) return { mod("takenFromSpectresBeforeYou", "BASE", num) } end,
-	["you can hire a mercenary permanently"] = {
-		flag("CanHirePermanentMercenary"),
-		mod("MercenaryModifier", "LIST", { mod = mod("Damage", "MORE", -30, "Noble Blood") }),
-		mod("MercenaryMinionModifier", "LIST", { mod = mod("Damage", "MORE", -30, "Noble Blood") }),
-	},
+	-- The damage penalty this node's reminder text describes is not stated on the
+	-- node, so it is applied unconditionally to the Mercenary actor by
+	-- `calcs.initMercenary` rather than sourced from here. See
+	-- `MercenaryStatMap.permanentMercenary`.
+	["you can hire a mercenary permanently"] = { flag("CanHirePermanentMercenary") },
 	["your mercenary and their minions have (%d+)%% increased maximum life"] = function(num) return {
 		mod("MercenaryModifier", "LIST", { mod = mod("Life", "INC", num) }),
 		mod("MercenaryMinionModifier", "LIST", { mod = mod("Life", "INC", num) }),
@@ -5065,8 +5065,6 @@ local specialModList = {
 		mod("MercenaryModifier", "LIST", { mod = mod("Damage", "MORE", num, { type = "Multiplier", var = "UniqueItem" }) }),
 		mod("MercenaryMinionModifier", "LIST", { mod = mod("Damage", "MORE", num, { type = "Multiplier", var = "UniqueItem" }) }),
 	} end,
-	["link skills have infinite attachment duration"] = { flag("MercenaryLinkInfiniteDuration") },
-	["if your linked mercenary dies, the link owner does not also die"] = { flag("MercenaryLinkOwnerSurvives") },
 	["increases and reductions to light radius also apply to effect of your link skill buffs on your mercenary"] = { flag("LightRadiusAppliesToMercenaryLinkEffect") },
 	["if your mercenary's life is higher than your own, (%d+)%% of damage from hits is taken from your mercenary's life before you"] = function(num) return { mod("LoyalBodyguardRedirect", "BASE", num) } end,
 	["if your mercenary's life is lower than your own, (%d+)%% of damage they take is recouped as life"] = function(num) return { mod("MercenaryLifeRecoup", "BASE", num) } end,
@@ -5990,6 +5988,11 @@ local unsupportedModList = {
 	["properties are doubled while in a breach"] = true,
 	["mirrored"] = true,
 	["split"] = true,
+	-- Link Skill buffs are modelled as always applied, so PoB has no attachment
+	-- duration for this to remove.
+	["link skills have infinite attachment duration"] = true,
+	-- PoB does not model either actor dying, so it has no death to prevent.
+	["if your linked mercenary dies, the link owner does not also die"] = true,
 }
 
 -- Special lookups used for various modifier forms

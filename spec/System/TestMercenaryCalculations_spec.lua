@@ -83,7 +83,7 @@ describe("Permanent Mercenary calculations", function()
 		assert.is_table(env.mercenary)
 		assert.are.equal("Mercenary", env.mercenary.type)
 		assert.are.equal(68, env.mercenary.level)
-		assert.are.equal(2266, env.mercenary.output.Life)
+		assert.are.equal(2278, env.mercenary.output.Life)
 		assert.is_true(env.mercenary.output.CombinedDPS > 0)
 		assert.are.equal(1, env.mercenary.output.TrapThrowCount)
 		for _, stat in ipairs({ "FullDPS", "EnergyShield", "Armour", "Evasion", "FireResist", "ColdResist", "LightningResist", "ChaosResist", "LifeRegenRecovery", "EnergyShieldRegenRecovery", "EffectiveMovementSpeedMod", "LootRarity" }) do
@@ -91,14 +91,9 @@ describe("Permanent Mercenary calculations", function()
 		end
 		assert.are.equal(-90, env.mercenary.modDB:Sum("INC", nil, "DamageTaken"))
 		assert.are.near(0.2, env.mercenary.modDB:More({ flags = ModFlag.Dot }, "DamageTaken"), 10 ^ -9)
-		local nobleBloodPenalty
-		for _, value in ipairs(env.player.modDB:List(nil, "MercenaryModifier")) do
-			if value.mod.name == "Damage" and value.mod.type == "MORE" and value.mod.value == -30 then
-				nobleBloodPenalty = value.mod.value
-				break
-			end
-		end
-		assert.are.equal(-30, nobleBloodPenalty)
+		-- The permanent-hire Damage penalty belongs to the Mercenary, not to the node
+		-- that allows hiring one, so it applies whatever the character has allocated.
+		assert.are.near(0.7, env.mercenary.modDB:More(nil, "Damage"), 10 ^ -9)
 		assert.are.near(env.mercenary.output.CombinedDPS * 2, env.mercenary.output.FullDPS, 10 ^ -6)
 		assert.are.near(env.mercenary.output.FullDPS, build.calcsTab.mainOutput.FullDPS, 10 ^ -6)
 		assert.is_table(env.mercenary.output.SkillDPS)
@@ -130,7 +125,7 @@ describe("Permanent Mercenary calculations", function()
 		build.mercenaryTab.profile.skills[1].enabled = false
 		local env = calculate()
 		assert.is_nil(env.mercenary)
-		assert.matches("No usable enabled Mercenary skill", table.concat(build.mercenaryTab.calculationErrors, "\n"))
+		assert.matches("No usable enabled Mercenary skill", table.concat(env.mercenaryCalculationErrors, "\n"))
 	end)
 
 	it("scales up to the current area without downscaling high-level Mercenaries", function()
@@ -141,6 +136,22 @@ describe("Permanent Mercenary calculations", function()
 		assert.are.equal(68, calculate(68).mercenary.level)
 		build.mercenaryTab.profile.foundAreaLevel = 80
 		assert.are.equal(80, calculate(90).mercenary.level)
+	end)
+
+	it("calculates unarmed damage at found-area level 100", function()
+		configure("TrapsMinesShadow", "TrapsMinesShadowLightning", "LightningTrapMercenary", { foundAreaLevel = 100 })
+		local env = calculate(85)
+		assert.are.equal(100, env.mercenary.level)
+		assert.is_number(env.mercenary.averageDamage)
+		assert.is_true(env.mercenary.averageDamage > 0)
+	end)
+
+	it("clamps found-area levels above 100 to the monster damage tables", function()
+		configure("TrapsMinesShadow", "TrapsMinesShadowLightning", "LightningTrapMercenary", { foundAreaLevel = 101 })
+		local env = assert(calculate(85).mercenary)
+		assert.are.equal(100, env.level)
+		assert.is_number(env.averageDamage)
+		assert.is_true(env.averageDamage > 0)
 	end)
 
 	it("uses base gem behavior and both Mercenary and inherent skill levels for base spell damage", function()
@@ -240,12 +251,12 @@ describe("Permanent Mercenary calculations", function()
 		configure("MeleeAOEMarauder", "MeleeAOEMarauderFireSlam", "InfernalCryMercenary")
 		local mercenary = assert(calculate(83).mercenary)
 		assert.are.near(298.29000854492, mercenary.averageDamage, 10 ^ -9)
-		assert.are.equal(3639, mercenary.output.Life)
-		assert.are.equal(60.7, mercenary.output.LifeRegen)
-		assert.are.equal(167, mercenary.modDB:Sum("INC", nil, "Life"))
-		assert.are.equal(117, mercenary.modDB:Sum("INC", nil, "Armour"))
-		assert.are.equal(318, mercenary.modDB:Sum("INC", nil, "Damage"))
-		assert.are.equal(279, mercenary.modDB:Sum("BASE", nil, "Str"))
+		assert.are.equal(3658, mercenary.output.Life)
+		assert.are.equal(61, mercenary.output.LifeRegen)
+		assert.are.equal(168, mercenary.modDB:Sum("INC", nil, "Life"))
+		assert.are.equal(118, mercenary.modDB:Sum("INC", nil, "Armour"))
+		assert.are.equal(320, mercenary.modDB:Sum("INC", nil, "Damage"))
+		assert.are.equal(283, mercenary.modDB:Sum("BASE", nil, "Str"))
 		assert.are.equal(28, mercenary.modDB:Sum("BASE", nil, "Dex"))
 		assert.are.equal(28, mercenary.modDB:Sum("BASE", nil, "Int"))
 		assert.are.near(0.7, mercenary.modDB:More(nil, "Damage"), 10 ^ -9)
@@ -267,7 +278,7 @@ describe("Permanent Mercenary calculations", function()
 		assert.is_true(mercenary.mainSkill.skillData.explodeCorpse)
 		assert.are.equal("Fire", mercenary.mainSkill.skillData.corpseExplosionDamageType)
 		assert.are.near(0.08, mercenary.mainSkill.skillData.corpseExplosionLifeMultiplier, 10 ^ -9)
-		assert.are.near(1793, mercenary.output.AverageHit, 10 ^ -9)
+		assert.are.near(1801.5, mercenary.output.AverageHit, 10 ^ -9)
 	end)
 
 	it("uses the compared slot actor while sharing the active item set", function()
@@ -353,7 +364,6 @@ describe("Permanent Mercenary calculations", function()
 				lifeComparison = "AUTO",
 				skills = { { id = skillId, enabled = true, includeInFullDPS = true, count = 1, supports = { } } },
 			}
-			build.mercenaryTab.calculationErrors = nil
 			build.spec.modFlag = true
 			build.buildFlag = true
 			local ok, errorMessage = xpcall(function() build.calcsTab:BuildOutput() end, debug.traceback)
@@ -560,8 +570,13 @@ describe("Permanent Mercenary calculations", function()
 		local baseDPS = env.mercenary.output.CombinedDPS
 		local baseFullDPS = env.mercenary.output.FullDPS
 		assert.is_true(env.mercenary.modDB.conditions.AffectedByLink)
-		assert.is_true(env.player.modDB:Flag(nil, "MercenaryLinkInfiniteDuration"))
-		assert.is_true(env.player.modDB:Flag(nil, "MercenaryLinkOwnerSurvives"))
+		-- Neither Link node modifier changes a number PoB calculates, so both are
+		-- recognised as unsupported rather than parsed into an unread flag.
+		for _, modLine in ipairs({ "Link Skills have infinite Attachment Duration", "If your Linked Mercenary dies, the Link owner does not also die" }) do
+			local mods, unsupported = modLib.parseMod(modLine)
+			assert.are.equal(0, #mods, modLine)
+			assert.are.equal(modLine, unsupported)
+		end
 		assert.are.near(0.5, env.player.mainSkill.skillModList:More(env.player.mainSkill.skillCfg, "Cost"), 10 ^ -9)
 
 		linkGroup.enabled = false
@@ -781,7 +796,7 @@ describe("Permanent Mercenary calculations", function()
 			if class.name == "Marauder" then build.spec:SelectClass(classId) break end
 		end
 		assert.is_table(calculate(83).mercenary)
-		assert.matches("Scion Luminary", table.concat(build.mercenaryTab:GetErrors(), "\n"))
+		assert.matches("Scion's Luminary", table.concat(build.mercenaryTab:GetErrors(), "\n"))
 		assert.are.equal("TrapsMinesShadowLightning", build.mercenaryTab.profile.buildId)
 	end)
 
@@ -873,17 +888,20 @@ describe("Permanent Mercenary calculations", function()
 			skillMinionSkill = 2,
 			supports = { { id = "AddedLightningHigh", tier = 3 } },
 		})
-		local beforeImport = build.mercenaryTab:SerializeState()
+		local function savedState()
+			local saved = { elem = "Mercenary", attrib = { } }
+			build.mercenaryTab:Save(saved)
+			return saved
+		end
+		local beforeImport = savedState()
 		build.mercenaryTab.controls.warrant:SetText("{")
 		build.mercenaryTab:ImportWarrant()
-		assert.are.equal(beforeImport, build.mercenaryTab:SerializeState())
+		assert.are.same(beforeImport, savedState())
 		assert.matches("Invalid Warrant JSON", build.mercenaryTab.importError)
-		local saved = { elem = "Mercenary", attrib = { } }
-		build.mercenaryTab:Save(saved)
-		local expected = build.mercenaryTab:SerializeState()
+		local saved = savedState()
 		build.mercenaryTab:Reset()
 		build.mercenaryTab:Load(saved)
-		assert.are.equal(expected, build.mercenaryTab:SerializeState())
+		assert.are.same(saved, savedState())
 
 		build.calcsTab:Load({ { elem = "Input", attrib = { name = "showMinion", boolean = "true" } } })
 		assert.are.equal("PLAYER_MINION", build.calcsTab.input.actor)

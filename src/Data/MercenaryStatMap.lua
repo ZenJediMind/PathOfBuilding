@@ -11,6 +11,16 @@ local allyWarcry = { type = "GlobalEffect", effectType = "Warcry", unscalable = 
 local selfBuff = { type = "GlobalEffect", effectType = "Buff" }
 local enemyDebuff = { type = "GlobalEffect", effectType = "Debuff" }
 
+local scorchingRayTotemStages = {
+	["fire_beam_additional_stack_damage_+%_final"] = {
+		mod("Damage", "MORE", nil, 0, 0, { type = "Multiplier", var = "ScorchingRayTotemStageAfterFirst" }),
+		base = 100,
+	},
+	["display_max_fire_beam_stacks"] = {
+		mod("Multiplier:ScorchingRayTotemMaxStages", "BASE", nil),
+	},
+}
+
 local function calculateCorruptedBlood(activeSkill, output)
 	local skillData = activeSkill.skillData
 	skillData.PhysicalDot = activeSkill.actor.averageDamage * (skillData.corruptedBloodDamagePercent or 0) / 6000
@@ -676,6 +686,108 @@ return {
 		traps_explode_on_timeout = true,
 		traps_invulnerable_for_duration_ms = true,
 	},
+	-- MercenarySkills references one of four support counts by name, and
+	-- MercenarySupportCounts holds nothing but those names — the numbers are not in
+	-- GGG's data at all. These maximums are hand-authored from in-game observation.
+	-- (Distribution across the 272 skill rows: High 151, Low 49, None 46, Medium 26.)
+	supportCounts = {
+		None = { maximum = 0 },
+		Low = { maximum = 2 },
+		Medium = { maximum = 3 },
+		High = { maximum = 5 },
+	},
+	-- Builds whose weapon configuration includes a shield that the build does not
+	-- require. Nothing in MercenaryBuilds distinguishes "can hold a shield" from
+	-- "needs a shield", so this list is hand-authored from in-game observation and
+	-- read at export time to decide `weaponConfiguration.offHandRequired`.
+	optionalShieldBuilds = {
+		AurasMinionsTemplarSpectres = true,
+		AurasMinionsTemplarSpectresNoble = true,
+		Crit1HShadowPhysSpell = true,
+		Crit1HShadowPhysSpellNoble = true,
+		ElementalWitchCold = true,
+		ElementalWitchColdNoble = true,
+		ElementalWitchFire = true,
+		ElementalWitchLightning = true,
+		ElementalWitchLightningNoble = true,
+		MeleeStrikesMarauderFire = true,
+	},
+	-- Figures the Mercenary actor needs that no exported table states. All of them
+	-- are hand-authored from in-game observation or the community datamine, and none
+	-- has been confirmed against the game.
+	permanentMercenary = {
+		-- Noble Blood's reminder text says a permanently hired Mercenary and its
+		-- Minions deal less Damage than a temporarily hired one without quantifying
+		-- it. Applied unconditionally, because every Mercenary PoB builds is a
+		-- permanently hired one.
+		damageMore = -30,
+		-- Damage over Time the Mercenary itself takes.
+		damageOverTimeTakenMore = -80,
+		-- A Taunted enemy deals less Damage to anyone other than whoever Taunted it,
+		-- so the character and their Minions take less Damage while the Mercenary is
+		-- holding the Taunt.
+		tauntedDamageTakenMore = -10,
+	},
+	-- A Mercenary skill reuses the `preDamageFunc` of the player skill it was
+	-- derived from, and with it that function's inputs. GGG's data does not always
+	-- give the Mercenary variant the stats that populate them, which would leave
+	-- the function reading nil. Every base whose function is inherited therefore
+	-- lists the skill-data keys it reads without its own fallback, and validation
+	-- rejects both a Mercenary skill that cannot populate one and a newly
+	-- inherited function that has no entry here at all.
+	preDamageFuncInputs = {
+		BallLightningAltX = { "duration", "strikeInterval" },
+		BallLightningAltY = { "duration", "strikeInterval" },
+		Barrage = { },
+		BarrageAltX = { },
+		BladeVortex = { "hitFrequency", "hitFrequencyPerBlade" },
+		BladefallAltZ = { "hitFrequency", "incVolleyFrequency" },
+		BlastRain = { },
+		Bodyswap = { "selfFireExplosionLifeMultiplier" },
+		ChargedDash = { },
+		DarkPact = { "ChaosMax", "ChaosMin", "lifeDealtAsChaos" },
+		DivineIre = { },
+		Earthquake = { "duration" },
+		EyeOfWinter = { },
+		Flameblast = { },
+		ForbiddenRite = { "ChaosMax", "ChaosMin", "SelfDamageTakenES", "SelfDamageTakenLife", "energyShieldDealtAsChaos", "lifeDealtAsChaos" },
+		HeraldOfAsh = { "hoaMoreBurn", "hoaOverkillPercent" },
+		InfernalBlowAltX = { },
+		LancingSteel = { },
+		LightningSpireTrap = { "duration", "radius", "repeatInterval" },
+		MoltenShell = { "moltenShellReflect" },
+		-- Reads the ball, chain-minimum and chain-maximum radii through the area of
+		-- effect output rather than any stat of its own.
+		MoltenStrike = { "radius", "radiusSecondary", "radiusTertiary" },
+		OrbOfStorms = { "hitFrequency" },
+		Perforate = { },
+		ShrapnelBallista = { },
+		Spark = { "duration" },
+		StaticStrike = { "repeatFrequency" },
+		StormRain = { "hitFrequency" },
+		TornadoAltY = { "damageInterval" },
+		TornadoShot = { },
+		ToxicRain = { },
+		VaalLightningArrow = { },
+		VoidSphere = { "repeatFrequency" },
+		VoltaxicBurst = { "duration" },
+		Vortex = { },
+		WaveOfConviction = { },
+		WaveOfConvictionAltY = { },
+	},
+	-- Mercenary skills that GGG's data gives none of the stats their base skill's
+	-- `preDamageFunc` reads, because the Mercenary version does not have that
+	-- damage component at all. Dropping the inherited function keeps the missing
+	-- component out of the numbers instead of reporting it as zero.
+	droppedPreDamageFuncs = {
+		-- Explodes the targeted corpse (`corpse_explosion_monster_life_permillage_fire`,
+		-- handled by `explodeCorpse`) and has no self-explosion Life multiplier.
+		BodyswapMercenary = "no self-explosion Life multiplier stat",
+		-- Has none of Molten Shell's
+		-- `molten_shell_%_of_absorbed_damage_dealt_as_reflected_fire`, so the
+		-- Mercenary version deals no reflected Fire damage.
+		MoltenShellMercenary = "no reflected Fire damage stat",
+	},
 	supportTemplates = {
 		ArrowNovaHigh = "SupportArrowNova",
 		TrapChargeGenHigh = "SupportChargedTraps",
@@ -759,11 +871,28 @@ return {
 				skill("showAverage", true),
 			},
 		},
+		-- Scorching Ray's stages are implemented per skill name, and the Spectre skill
+		-- this inherits from leaves them out, so the Mercenary version restates the
+		-- player mapping under its own name. Unlike the player skill there is no
+		-- "Maximum Stages" part to select, so the stage cap is not tied to a part: a
+		-- Totem channels its target continuously and ramps to the cap on its own.
+		ScorchingRayTotemMercenary = { statMap = scorchingRayTotemStages },
+		ScorchingRayTotemMercenaryEncounter = { statMap = scorchingRayTotemStages },
 		TemporalAnomalyMercenary = {
 			statMap = {
 				["action_speed_-%"] = {
 					mod("ActionSpeed", "INC", nil, 0, 0, enemyDebuff),
 					mult = -1,
+				},
+			},
+		},
+		-- Vaal Flameblast's 15 maximum stages are a base mod on the player skill instead
+		-- of a stat, so nothing implements the stat that the Mercenary's Maximum Stages
+		-- support grants. Stage counts add, the way Flameblast's own stat does.
+		VaalFlameblastMercenary = {
+			statMap = {
+				["flameblast_maximum_stages"] = {
+					mod("Multiplier:VaalFlameblastMaxStages", "BASE", nil),
 				},
 			},
 		},

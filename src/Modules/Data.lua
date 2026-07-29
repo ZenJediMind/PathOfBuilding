@@ -1053,6 +1053,38 @@ local orderedSkillIds = { }
 for skillId in pairs(data.skills) do t_insert(orderedSkillIds, skillId) end
 table.sort(orderedSkillIds)
 
+-- Mercenary Granted Effects are exported as data only. Each one records the
+-- player skill it was derived from, and reuses that skill's implementation for
+-- anything GGG's data does not state directly. Inheriting from exactly the one
+-- recorded skill is what keeps a display-name rename or a new transfigured
+-- variant from silently changing Mercenary behaviour.
+for _, skillId in ipairs(orderedSkillIds) do
+	local grantedEffect = data.skills[skillId]
+	if grantedEffect.mercenary then
+		for _, statId in ipairs(grantedEffect.stats or { }) do
+			if statId == "base_is_projectile" then grantedEffect.baseFlags.projectile = true end
+			if statId == "is_area_damage" then grantedEffect.baseFlags.area = true end
+			if statId:match("^spell_minimum_base_.*_damage$") then grantedEffect.baseFlags.hit = true end
+		end
+		local base = grantedEffect.inheritedFrom and data.skills[grantedEffect.inheritedFrom]
+		if grantedEffect.inheritedFrom and not base then
+			error("Missing base skill mapping: "..grantedEffect.inheritedFrom.." for "..skillId)
+		end
+		for key, value in pairs(base or { }) do
+			if grantedEffect[key] == nil then
+				grantedEffect[key] = type(value) == "table" and copyTable(value, true) or value
+			elseif key == "baseFlags" then
+				for flagName, enabled in pairs(value) do
+					if grantedEffect.baseFlags[flagName] == nil then grantedEffect.baseFlags[flagName] = enabled end
+				end
+			end
+		end
+		if data.mercenaryStatData.droppedPreDamageFuncs[skillId] then
+			grantedEffect.preDamageFunc = nil
+		end
+	end
+end
+
 -- Some mechanics are mapped on a specific player skill instead of the global
 -- stat map. Reuse those mappings only when every existing implementation is
 -- identical; conflicting meanings must receive an explicit Mercenary override.
@@ -1136,11 +1168,11 @@ data.knownUncalculatedSkillStats = data.mercenaryStatData.knownUncalculatedStats
 data.mercenarySupportStatMap = { }
 for statId, map in pairs(data.skillStatMap) do data.mercenarySupportStatMap[statId] = map end
 for statId, map in pairs(data.mercenaryStatMap) do data.mercenarySupportStatMap[statId] = map end
-for _, skillId in ipairs(orderedSkillIds) do
-	for statId, map in pairs(data.skills[skillId].statMap) do
-		if type(statId) == "string" and statId ~= "_grantedEffect" and not data.mercenarySupportStatMap[statId] then
-			data.mercenarySupportStatMap[statId] = map
-		end
+-- Per-skill implementations are only borrowed where they are unambiguous, to the
+-- same standard as the Mercenary skill fallback above.
+for statId, map in pairs(sharedSkillStatMap) do
+	if not data.mercenarySupportStatMap[statId] then
+		data.mercenarySupportStatMap[statId] = map
 	end
 end
 
@@ -1218,6 +1250,9 @@ end
 -- Load minions
 data.minions = LoadModule("Data/Minions")(makeSkillMod, makeFlagMod)
 data.mercenaries = LoadModule("Data/Mercenaries")
+-- How many supports each support-count name allows is not in GGG's data, so the
+-- limits are hand-authored alongside the other Mercenary policy.
+data.mercenaries.supportCounts = data.mercenaryStatData.supportCounts
 local function addMercenaryMinionStatMods(minion, stat)
 	local map = data.mercenarySupportStatMap[stat.id]
 	if not map then return end

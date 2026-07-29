@@ -4,6 +4,7 @@
 return {
 	baseStats={
 		accuracyPerLevel=3,
+		disableDefaultMonsterStats=true,
 		lifePerLevel=18,
 		manaPerLevel=9
 	},
@@ -29809,24 +29810,6 @@ return {
 		SSMVollMercenary="Metadata/Monsters/Voll/VollMapBossStandalone_Mercenary",
 		SSMVollMercenaryEncounter="Metadata/Monsters/Voll/VollMapBossStandalone_Mercenary"
 	},
-	supportCounts={
-		High={
-			maximum=5,
-			minimum=3
-		},
-		Low={
-			maximum=2,
-			minimum=1
-		},
-		Medium={
-			maximum=3,
-			minimum=2
-		},
-		None={
-			maximum=0,
-			minimum=0
-		}
-	},
 	supportFamilies={
 		AddedChaos={
 			id="AddedChaos"
@@ -34775,6 +34758,5 @@ return {
 		["987"]={
 			[1]="AttackSpeedMid"
 		}
-	},
-	version=2
+	}
 }

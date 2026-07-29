@@ -42,23 +42,22 @@ describe("Mercenary tools", function()
 		assert.is_nil(err)
 		assert.same({ id = "support_t2", tier = 2 }, imported.skills[1].supports[1])
 		assert.are.equal(68, tools.effectiveLevel(50, 84))
+		assert.are.equal(100, tools.effectiveLevel(100, 85))
+		assert.are.equal(100, tools.effectiveLevel(150, 85))
+		assert.are.equal(1, tools.effectiveLevel(0, 0))
 		assert.are.equal(48, tools.requiredFoundAreaLevel(68))
 	end)
 
-	it("interpolates exported passive stats from zero-based level breakpoints", function()
+	it("interpolates exported passive stats between the level 1, 50 and 100 anchors", function()
 		local values = { 60, 120, 160 }
 		assert.are.equal(60, tools.passiveStatValue(values, 1))
-		assert.are.equal(118, tools.passiveStatValue(values, 50))
-		assert.are.equal(120, tools.passiveStatValue(values, 51))
-		assert.are.equal(133, tools.passiveStatValue(values, 68))
-		assert.are.equal(159, tools.passiveStatValue(values, 100))
-	end)
-
-	it("selects exported alternate monster Life scaling", function()
-		local tables = { monsterAllyLifeTable = { "ally" }, monsterLifeTable2 = { "alt1" }, monsterLifeTable3 = { "alt2" } }
-		assert.are.equal("ally", tools.monsterLifeTable(tables)[1])
-		assert.are.equal("alt1", tools.monsterLifeTable(tables, "AltLife1")[1])
-		assert.are.equal("alt2", tools.monsterLifeTable(tables, "AltLife2")[1])
+		assert.are.equal(89, tools.passiveStatValue(values, 25))
+		assert.are.equal(120, tools.passiveStatValue(values, 50))
+		assert.are.equal(134, tools.passiveStatValue(values, 68))
+		assert.are.equal(160, tools.passiveStatValue(values, 100))
+		-- Levels outside the anchor range clamp to the end values.
+		assert.are.equal(60, tools.passiveStatValue(values, 0))
+		assert.are.equal(160, tools.passiveStatValue(values, 120))
 	end)
 
 	it("rejects invalid data without returning a partial profile", function()
@@ -186,7 +185,6 @@ describe("Generated Mercenary data", function()
 			for _, value in ipairs(values) do if value == wanted then return true end end
 			return false
 		end
-		assert.are.equal(2, mercenaries.version)
 		assert.are.equal(13, #mercenaries.classOrder)
 		for index = 2, #mercenaries.classOrder do
 			assert.is_true(mercenaries.classOrder[index - 1] < mercenaries.classOrder[index])
@@ -220,7 +218,17 @@ describe("Generated Mercenary data", function()
 			for _, stat in ipairs(support.stats) do
 				assert.are.equal("string", type(stat.id), supportId)
 				assert.are.equal("number", type(stat.value), supportId..": "..stat.id)
-				assert.is_table(data.mercenarySupportStatMap[stat.id], supportId..": "..stat.id)
+			end
+		end
+		-- A support stat is implemented by the skill it supports or, where its meaning
+		-- is the same everywhere, by the shared map. This is the order
+		-- `mercenarySupportEffect` resolves them in.
+		for skillId, skill in pairs(mercenaries.skills) do
+			local grantedEffect = data.skills[skillId]
+			for _, supportId in ipairs(skill.possibleSupportIds) do
+				for _, stat in ipairs(mercenaries.supports[supportId].stats) do
+					assert.is_true(grantedEffect.statMap[stat.id] ~= nil or data.mercenarySupportStatMap[stat.id] ~= nil, skillId.." + "..supportId..": "..stat.id)
+				end
 			end
 		end
 		local seenKnownUncalculated = { }
@@ -248,6 +256,71 @@ describe("Generated Mercenary data", function()
 			assert.is_table(data.skills[templateId], templateId)
 		end
 		assert.are.equal(5, mercenaries.supportCounts.High.maximum)
+	end)
+
+	it("populates every input of an inherited preDamageFunc", function()
+		local tools = require("Modules/MercenaryTools")
+		local statData = data.mercenaryStatData
+		local problems = { }
+		local declarationUsedBy = { }
+		for skillId, grantedEffect in pairs(data.skills) do
+			if grantedEffect.mercenary then
+				local baseEffect = grantedEffect.inheritedFrom and data.skills[grantedEffect.inheritedFrom]
+				for _, message in ipairs(tools.preDamageFuncErrors(grantedEffect, baseEffect, statData) or { }) do
+					table.insert(problems, message)
+				end
+				if grantedEffect.inheritedFrom then
+					assert.is_table(baseEffect, skillId)
+					if grantedEffect.preDamageFunc == baseEffect.preDamageFunc then
+						declarationUsedBy[grantedEffect.inheritedFrom] = skillId
+					end
+				end
+			end
+		end
+		table.sort(problems)
+		assert.are.equal("", table.concat(problems, "\n"))
+		-- Dropping an inherited function is only justified while the Mercenary skill still
+		-- lacks the stats that function reads.
+		for skillId, reason in pairs(statData.droppedPreDamageFuncs) do
+			local grantedEffect = assert(data.skills[skillId], skillId)
+			assert.is_true(grantedEffect.mercenary, skillId)
+			assert.is_string(reason)
+			assert.is_nil(grantedEffect.preDamageFunc, skillId)
+			assert.is_function(assert(data.skills[grantedEffect.inheritedFrom], skillId).preDamageFunc, skillId)
+			local missing = assert(tools.missingPreDamageFuncInputs(grantedEffect, grantedEffect.inheritedFrom, statData), skillId)
+			assert.is_true(#missing > 0, "no longer needs to drop its preDamageFunc: "..skillId)
+			declarationUsedBy[grantedEffect.inheritedFrom] = skillId
+		end
+		for baseSkillId in pairs(statData.preDamageFuncInputs) do
+			assert.is_function(assert(data.skills[baseSkillId], baseSkillId).preDamageFunc, baseSkillId)
+			assert.is_string(declarationUsedBy[baseSkillId], "stale preDamageFunc input declaration: "..baseSkillId)
+		end
+	end)
+
+	it("inherits from the skill gem version of a skill rather than an NPC copy", function()
+		local gemSkills = { }
+		for _, gem in pairs(data.gems) do
+			if not gem.support then
+				for _, skillId in ipairs({ gem.grantedEffectId, gem.secondaryGrantedEffectId }) do
+					if skillId then gemSkills[skillId] = true end
+				end
+			end
+		end
+		local gemSkillByName = { }
+		for skillId in pairs(gemSkills) do
+			local name = data.skills[skillId].name
+			if name and (not gemSkillByName[name] or skillId < gemSkillByName[name]) then
+				gemSkillByName[name] = skillId
+			end
+		end
+		for skillId, grantedEffect in pairs(data.skills) do
+			local base = grantedEffect.mercenary and grantedEffect.inheritedFrom
+			if base and not gemSkills[base] then
+				-- NPC and monster copies of a skill share its name but not its
+				-- implementation, so the gem is the base whenever one exists.
+				assert.is_nil(gemSkillByName[data.skills[base].name], skillId.." inherits from "..base)
+			end
+		end
 	end)
 
 	it("does not replace canonical item-granted skills with Mercenary variants", function()

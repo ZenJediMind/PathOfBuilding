@@ -7602,6 +7602,50 @@ return {
 			width=500
 		}
 	},
+	mercenarybuildextrastats={
+		[1]={
+			list=false,
+			name="Id",
+			refTo="",
+			type="String",
+			width=220
+		},
+		[2]={
+			list=false,
+			name="Stat",
+			refTo="Stats",
+			type="Key",
+			width=280
+		},
+		[3]={
+			list=false,
+			name="Value1",
+			refTo="",
+			type="Int",
+			width=80
+		},
+		[4]={
+			list=false,
+			name="Value2",
+			refTo="",
+			type="Int",
+			width=80
+		},
+		[5]={
+			list=false,
+			name="Value3",
+			refTo="",
+			type="Int",
+			width=80
+		},
+		[6]={
+			list=false,
+			name="Category",
+			refTo="MercenaryBuildStatsCategories",
+			type="Key",
+			width=160
+		}
+	},
 	mercenarybuilds={
 		[1]={
 			list=false,
@@ -7756,50 +7800,6 @@ return {
 			refTo="MercenaryBuildExtraStats",
 			type="Key",
 			width=400
-		}
-	},
-	mercenarybuildextrastats={
-		[1]={
-			list=false,
-			name="Id",
-			refTo="",
-			type="String",
-			width=220
-		},
-		[2]={
-			list=false,
-			name="Stat",
-			refTo="Stats",
-			type="Key",
-			width=280
-		},
-		[3]={
-			list=false,
-			name="Value1",
-			refTo="",
-			type="Int",
-			width=80
-		},
-		[4]={
-			list=false,
-			name="Value2",
-			refTo="",
-			type="Int",
-			width=80
-		},
-		[5]={
-			list=false,
-			name="Value3",
-			refTo="",
-			type="Int",
-			width=80
-		},
-		[6]={
-			list=false,
-			name="Category",
-			refTo="MercenaryBuildStatsCategories",
-			type="Key",
-			width=160
 		}
 	},
 	mercenarybuildstatscategories={

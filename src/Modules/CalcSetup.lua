@@ -28,7 +28,7 @@ local function mercenarySkillLevel(grantedEffect, actorLevel)
 	return bestLevel
 end
 
-local function mercenarySupportEffect(env, support, errors)
+local function mercenarySupportEffect(env, support, supportedEffect, errors)
 	if not support then
 		t_insert(errors, "Missing exported Mercenary support data")
 		return
@@ -36,7 +36,10 @@ local function mercenarySupportEffect(env, support, errors)
 	local constantStats = { }
 	local statMap = { }
 	for _, stat in ipairs(support.stats or { }) do
-		local implementation = env.data.mercenarySupportStatMap[stat.id] or env.data.skillStatMap[stat.id]
+		-- A support stat means whatever it means on the skill being supported, so that
+		-- skill's own implementation wins over the shared fallback map. The fallback
+		-- only holds stats whose meaning is the same everywhere.
+		local implementation = supportedEffect.statMap[stat.id] or env.data.mercenarySupportStatMap[stat.id]
 		if not implementation then
 			t_insert(errors, "Unsupported Mercenary support stat: "..stat.id)
 		else
@@ -92,6 +95,10 @@ local function validateMercenarySkillStats(env, grantedEffect, errors)
 	end
 	for _, statId in ipairs(grantedEffect.stats or { }) do validate(statId) end
 	for _, stat in ipairs(grantedEffect.constantStats or { }) do validate(stat[1]) end
+	local baseEffect = grantedEffect.inheritedFrom and env.data.skills[grantedEffect.inheritedFrom]
+	for _, message in ipairs(MercenaryTools.preDamageFuncErrors(grantedEffect, baseEffect, env.data.mercenaryStatData) or { }) do
+		t_insert(errors, message)
+	end
 end
 
 local function recordMercenaryAuxiliarySkill(env, auxiliarySkills, statId, selectedSkill)
@@ -166,7 +173,7 @@ local function addMercenaryMonsterStats(env, mercenary, monster, errors)
 	mercenary.modDB:NewMod("ManaRegen", "BASE", (rawStats.base_mana_regeneration_rate_per_minute or 0) / 60, "Mercenary")
 	mercenary.modDB:NewMod("TotemLife", "MORE", rawStats["set_totem_life_+%_final"] or 0, "Mercenary")
 	mercenary.modDB:NewMod("DamageTaken", "INC", rawStats["set_minion_damage_taken_+%"] or 0, "Mercenary")
-	mercenary.modDB:NewMod("DamageTaken", "MORE", -80, "Mercenary", ModFlag.Dot)
+	mercenary.modDB:NewMod("DamageTaken", "MORE", env.data.mercenaryStatData.permanentMercenary.damageOverTimeTakenMore, "Mercenary", ModFlag.Dot)
 	-- Rarity stats correct engine rarity bonuses; this normalized actor applies neither side.
 	if monster.damageFixup then
 		mercenary.modDB:NewMod("Damage", "MORE", -100 * monster.damageFixup, "Damage Fixup", ModFlag.Attack)
@@ -200,11 +207,9 @@ end
 
 function calcs.initMercenary(env)
 	local tab = env.build.mercenaryTab
-	env.actors = { player = env.player }
 	env.mercenary = nil
+	env.mercenaryCalculationErrors = nil
 	if not tab or not tab.profile.buildId then return end
-	tab.calculationErrors = nil
-	tab:RefreshErrors()
 
 	local profile = tab.profile
 	local mercenaryBuild = env.data.mercenaries.builds[profile.buildId]
@@ -213,8 +218,7 @@ function calcs.initMercenary(env)
 	local monster = mercenaryClass and mercenaryClass.monster
 	local calculationErrors = { }
 	if not monster then
-		tab.calculationErrors = { "Selected Mercenary has no allied MonsterVariety data" }
-		tab:RefreshErrors()
+		env.mercenaryCalculationErrors = { "Selected Mercenary has no allied MonsterVariety data" }
 		return
 	end
 
@@ -238,10 +242,11 @@ function calcs.initMercenary(env)
 	local baseStats = env.data.mercenaries.baseStats
 	mercenary.modDB:NewMod("Life", "BASE", baseStats.lifePerLevel * mercenary.level, "Base")
 	mercenary.modDB:NewMod("Mana", "BASE", env.data.monsterConstants.base_maximum_mana + baseStats.manaPerLevel * mercenary.level, "Base")
-	mercenary.modDB:NewMod("EnergyShield", "BASE", 0, "Base")
-	mercenary.modDB:NewMod("Armour", "BASE", round(env.data.monsterArmourTable[mercenary.level] * monster.armour), "Base")
-	mercenary.modDB:NewMod("Evasion", "BASE", round(env.data.monsterEvasionTable[mercenary.level] * monster.evasion), "Base")
 	mercenary.modDB:NewMod("Accuracy", "BASE", baseStats.accuracyPerLevel * mercenary.level, "Base")
+	if not baseStats.disableDefaultMonsterStats then
+		mercenary.modDB:NewMod("Armour", "BASE", round(env.data.monsterArmourTable[mercenary.level] * monster.armour), "Base")
+		mercenary.modDB:NewMod("Evasion", "BASE", round(env.data.monsterEvasionTable[mercenary.level] * monster.evasion), "Base")
+	end
 	mercenary.modDB:NewMod("CritMultiplier", "BASE", env.data.characterConstants["base_critical_strike_multiplier"] - 100, "Base")
 	mercenary.modDB:NewMod("DotMultiplier", "BASE", env.data.characterConstants["critical_ailment_dot_multiplier_+"], "Base", { type = "Condition", var = "CriticalStrike" })
 	mercenary.modDB:NewMod("FireResist", "BASE", monster.fireResist, "Base")
@@ -258,6 +263,7 @@ function calcs.initMercenary(env)
 	mercenary.modDB:NewMod("MineThrowCount", "BASE", 1, "Base")
 	mercenary.modDB:NewMod("TrapThrowCount", "BASE", 1, "Base")
 	mercenary.modDB:NewMod("MaximumFortification", "BASE", env.data.characterConstants["base_max_fortification"], "Base")
+	mercenary.modDB:NewMod("Damage", "MORE", env.data.mercenaryStatData.permanentMercenary.damageMore, "Permanent Mercenary")
 	addMercenaryMonsterStats(env, mercenary, monster, calculationErrors)
 	addMercenaryPassiveStats(mercenary, mercenaryBuild, calculationErrors)
 	for _, value in ipairs(env.modDB:List(nil, "MercenaryModifier")) do
@@ -299,6 +305,9 @@ function calcs.initMercenary(env)
 	end
 
 	local attackTime = monster.attackTime
+	-- Only reached while a weapon slot is empty. `disable_default_monster_stats` has
+	-- no per-level replacement for damage, so an unarmed Mercenary keeps the same
+	-- allied-monster damage model PoB uses for minions.
 	mercenary.averageDamage = env.data.monsterAllyDamageTable[mercenary.level] * monster.damage
 	local damage = mercenary.averageDamage
 	if not monster.baseDamageIgnoresAttackSpeed then damage = damage * attackTime end
@@ -312,6 +321,12 @@ function calcs.initMercenary(env)
 	}
 	mercenary.weaponData2 = mercenary.itemList["Weapon 2"] and mercenary.itemList["Weapon 2"].weaponData and mercenary.itemList["Weapon 2"].weaponData[2] or { }
 
+	-- Skill building reads `env.player` and `env.modDB` for the actor that owns the
+	-- skill. This proxy environment presents the Mercenary as that actor while
+	-- everything else still falls through to the real environment, which is the
+	-- invariant `calcs.buildActiveSkillModList`, `calcs.mirages` and the Mercenary
+	-- branches of `CalcPerform` rely on: `mercenaryEnv.player` is the Mercenary, and
+	-- `env.player` is always the character.
 	local mercenaryEnv = setmetatable({ modDB = mercenary.modDB, player = mercenary }, { __index = env })
 	mercenary.calcEnv = mercenaryEnv
 	local function addActiveSkill(selectedSkill, grantedEffect, supports, isPrimary, sourceItem)
@@ -363,7 +378,7 @@ function calcs.initMercenary(env)
 				local supports = { }
 				for _, selectedSupport in ipairs(selectedSkill.supports or { }) do
 					local support = env.data.mercenaries.supports[selectedSupport.id]
-					local supportEffect = mercenarySupportEffect(env, support, calculationErrors)
+					local supportEffect = mercenarySupportEffect(env, support, grantedEffect, calculationErrors)
 					if supportEffect then t_insert(supports, supportEffect) end
 					for _, stat in ipairs(support and support.stats or { }) do
 						recordMercenaryAuxiliarySkill(env, auxiliarySkills, stat.id, selectedSkill)
@@ -391,13 +406,10 @@ function calcs.initMercenary(env)
 		t_insert(calculationErrors, "No usable enabled Mercenary skill is configured")
 	end
 	if #calculationErrors > 0 then
-		tab.calculationErrors = calculationErrors
-		tab:RefreshErrors()
+		env.mercenaryCalculationErrors = calculationErrors
 		return
 	end
-	tab.calculationErrors = nil
 	env.mercenary = mercenary
-	env.actors.mercenary = mercenary
 end
 
 -- Initialise modifier database with stats and conditions common to all actors

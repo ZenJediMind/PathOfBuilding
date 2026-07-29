@@ -65,6 +65,38 @@ local function getOTStats(objectType, stats, visited)
 	end
 end
 
+-- The `Monster { }` block of an object template holds engine flags rather than
+-- stats, so it needs its own pass.
+local function getOTMonsterProperties(objectType, properties, visited)
+	if not objectType or objectType == "" or objectType == "Metadata/Monsters/Monster" or objectType == "nothing" then
+		return
+	end
+	visited = visited or { }
+	if visited[objectType] then
+		return
+	end
+	visited[objectType] = true
+	local text = getFile(objectType..".ot")
+	if not text then
+		error("Missing Mercenary object template: "..objectType..".ot")
+	end
+	text = convertUTF16to8(text)
+	getOTMonsterProperties(text:match('extends "([^"]+)"'), properties, visited)
+	local inMonster = false
+	for line in text:gmatch("[^\r\n]+") do
+		if line:match("^Monster") then
+			inMonster = true
+		elseif inMonster and line:match("^}") then
+			inMonster = false
+		elseif inMonster and line:find("=") and not line:find("//") then
+			local id, value = line:gsub("%s+", ""):match("^([^=]+)=(.+)$")
+			if id then
+				properties[id] = tonumber(value) or value == "true" or value
+			end
+		end
+	end
+end
+
 local function appendModStats(mods, stats)
 	for _, modRow in ipairs(mods or { }) do
 		for index = 1, 6 do
@@ -149,27 +181,48 @@ local passiveStatFormats = {
 	["base_spell_block_%"] = { format = "+%s%% Chance to Block Spell Damage" },
 }
 
-local optionalShieldBuilds = {
-	AurasMinionsTemplarSpectres = true,
-	AurasMinionsTemplarSpectresNoble = true,
-	Crit1HShadowPhysSpell = true,
-	Crit1HShadowPhysSpellNoble = true,
-	ElementalWitchCold = true,
-	ElementalWitchColdNoble = true,
-	ElementalWitchFire = true,
-	ElementalWitchLightning = true,
-	ElementalWitchLightningNoble = true,
-	MeleeStrikesMarauderFire = true,
+-- Hand-authored Mercenary policy lives with the rest of the hand-authored data
+-- rather than in the extraction path. Only the policy tables are read here, so the
+-- stat map's mod constructors do not need real implementations, but its mod flags
+-- are still evaluated as the file loads.
+dofile("../Data/Global.lua")
+local function stubMod() return { } end
+local mercenaryStatData = LoadModule("../Data/MercenaryStatMap.lua", stubMod, stubMod, stubMod)
+local optionalShieldBuilds = mercenaryStatData.optionalShieldBuilds
+local supportCounts = mercenaryStatData.supportCounts
+
+-- Every stat a permanent Mercenary gains from its object template is either
+-- exported or listed here with the reason it is not, so that a stat GGG adds later
+-- fails the export instead of disappearing.
+local mercenaryAdditionStatUses = {
+	life_per_level = true,
+	mana_per_level = true,
+	accuracy_rating_per_level = true,
+	-- Cancels the Life a monster gains from being Rare. PoB models the Mercenary as
+	-- a normalized actor that never receives that bonus, so applying the correction
+	-- on its own would remove Life the actor never had.
+	["monster_life_+%_final_from_rarity"] = false,
+	-- Only governs whether kills by the Mercenary grant experience and drops.
+	eligible_to_grant_kill_bonuses = false,
 }
 
 local mercenaryAdditionStats = { }
 getOTStats("Metadata/Monsters/Mercenaries/MercenaryAdditions", mercenaryAdditionStats)
 local mercenaryAdditionStatsById = { }
 for _, stat in ipairs(mercenaryAdditionStats) do
+	if mercenaryAdditionStatUses[stat.id] == nil then
+		error("Unhandled permanent Mercenary base stat: "..stat.id)
+	end
 	mercenaryAdditionStatsById[stat.id] = stat.value
 end
-for _, statId in ipairs({ "life_per_level", "mana_per_level", "accuracy_rating_per_level" }) do
-	if not mercenaryAdditionStatsById[statId] then error("Missing permanent Mercenary base stat: "..statId) end
+for statId, exported in pairs(mercenaryAdditionStatUses) do
+	if exported and not mercenaryAdditionStatsById[statId] then error("Missing permanent Mercenary base stat: "..statId) end
+end
+
+local mercenaryAdditionProperties = { }
+getOTMonsterProperties("Metadata/Monsters/Mercenaries/MercenaryAdditions", mercenaryAdditionProperties)
+if mercenaryAdditionProperties.disable_default_monster_stats ~= true then
+	error("Permanent Mercenaries no longer disable the default monster stats")
 end
 
 for row in dat("MercenaryBuildExtraStats"):Rows() do
@@ -186,13 +239,20 @@ local function exportMonster(variety)
 	appendModStats(variety.Mods, stats)
 	appendModStats(variety.SpecialMods, stats)
 	getOTStats(variety.ObjectType, stats)
+	-- Sort by stat id, then by the mod or object template that granted it, so that a
+	-- stat granted twice keeps a stable order across re-exports.
 	table.sort(stats, function(a, b)
-		return a.id == b.id and tostring(a.source) < tostring(b.source) or a.id < b.id
+		if a.id ~= b.id then
+			return a.id < b.id
+		end
+		return tostring(a.source) < tostring(b.source)
 	end)
 	local monster = {
 		id = variety.Id,
 		name = variety.Name,
 		life = variety.LifeMultiplier / 100,
+		-- Monsters get 40% of the Energy Shield their type states; `minions.lua` applies
+		-- the same conversion when exporting Spectres.
 		energyShield = variety.Type.EnergyShield == 0 and 0 or 0.4 * variety.Type.EnergyShield / 100,
 		armour = variety.Type.Armour / 100,
 		evasion = variety.Type.Evasion / 100,
@@ -233,11 +293,15 @@ local function constantStatValue(grantedEffect, wantedStatId)
 end
 
 local mercenaries = {
-	version = 2,
 	baseStats = {
 		lifePerLevel = mercenaryAdditionStatsById.life_per_level,
 		manaPerLevel = mercenaryAdditionStatsById.mana_per_level,
 		accuracyPerLevel = mercenaryAdditionStatsById.accuracy_rating_per_level,
+		-- MercenaryAdditions sets `disable_default_monster_stats`, so Life, Mana and
+		-- Accuracy come from the per-level grants above rather than the monster level
+		-- tables. Armour, Evasion and Energy Shield have no per-level replacement,
+		-- which leaves the Mercenary with none of them until it equips items.
+		disableDefaultMonsterStats = true,
 	},
 	classes = { },
 	classOrder = { },
@@ -249,12 +313,6 @@ local mercenaries = {
 	summonedMinions = { },
 	skillFamilies = { },
 	supportFamilies = { },
-	supportCounts = {
-		None = { minimum = 0, maximum = 0 },
-		Low = { minimum = 1, maximum = 2 },
-		Medium = { minimum = 2, maximum = 3 },
-		High = { minimum = 3, maximum = 5 },
-	},
 	skillsByHash = { },
 	supportsByHash = { },
 }
@@ -292,7 +350,7 @@ for _, row in ipairs(sortedRows("MercenarySkills", function(value) return rowId(
 	local id = rowId(row.Id)
 	local familyId = rowId(row.SkillFamily)
 	local supportCountId = rowId(row.SupportCount)
-	if row.HASH16 == nil or not mercenaries.supportCounts[supportCountId] then
+	if row.HASH16 == nil or not supportCounts[supportCountId] then
 		error("Mercenary skill is missing hash or support-count data: "..tostring(id))
 	end
 	mercenaries.skills[id] = {
@@ -438,6 +496,13 @@ end
 
 for _, class in pairs(mercenaries.classes) do
 	class.skillIds = uniqueSorted(class.skillIds)
+end
+-- The optional-shield list is keyed to build ids, so a renamed or removed build has
+-- to fail rather than quietly making its shield mandatory again.
+for buildId in pairs(optionalShieldBuilds) do
+	if not mercenaries.builds[buildId] then
+		error("Optional-shield policy references missing Mercenary build: "..buildId)
+	end
 end
 for _, ids in pairs(mercenaries.skillsByHash) do
 	table.sort(ids)

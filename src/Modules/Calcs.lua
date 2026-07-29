@@ -392,7 +392,7 @@ function calcs.calcFullDPS(build, mode, override, specEnv)
 			end
 			local actorOutputs = { {
 				output = usedEnv.mercenary.output,
-				name = "Mercenary: "..activeSkill.activeEffect.grantedEffect.name,
+				name = activeSkill.activeEffect.grantedEffect.name,
 				source = "Mercenary",
 				count = directCount,
 				skillPart = activeSkill.minion and activeSkill.infoMessage2 or activeSkill.skillPartName,
@@ -400,7 +400,7 @@ function calcs.calcFullDPS(build, mode, override, specEnv)
 			if activeSkill.minion and usedEnv.mercenaryMinion then
 				t_insert(actorOutputs, 1, {
 					output = usedEnv.mercenaryMinion.output,
-					name = "Mercenary Minion: "..usedEnv.mercenaryMinion.minionData.name..": "..activeSkill.activeEffect.grantedEffect.name,
+					name = usedEnv.mercenaryMinion.minionData.name..": "..activeSkill.activeEffect.grantedEffect.name,
 					source = "Mercenary Minion",
 					count = count,
 					skillPart = activeSkill.skillPartName,
@@ -409,7 +409,7 @@ function calcs.calcFullDPS(build, mode, override, specEnv)
 			if activeSkill.mirage then
 				t_insert(actorOutputs, {
 					output = activeSkill.mirage.output,
-					name = "Mercenary: "..activeSkill.mirage.name.." (Mirage)",
+					name = activeSkill.mirage.name.." (Mirage)",
 					source = "Mercenary Mirage",
 					count = (activeSkill.mirage.count or 1) * directCount,
 					skillPart = activeSkill.mirage.skillPartName,

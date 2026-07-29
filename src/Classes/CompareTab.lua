@@ -16,13 +16,6 @@ local buildListHelpers = LoadModule("Modules/BuildListHelpers")
 local itemSlotHelper = LoadModule("Modules/ItemSlotHelper")
 local configVisibility = LoadModule("Modules/ConfigVisibility")
 
-local calculationActorList = {
-	{ label = "Player", actorId = "PLAYER" },
-	{ label = "Player Minion", actorId = "PLAYER_MINION" },
-	{ label = "Mercenary", actorId = "MERCENARY" },
-	{ label = "Mercenary Minion", actorId = "MERCENARY_MINION" },
-}
-
 -- Node IDs below this value are normal passive tree nodes; IDs at or above are cluster jewel nodes
 local CLUSTER_NODE_OFFSET = 65536
 
@@ -550,7 +543,7 @@ function CompareTabClass:InitControls()
 	end)
 	self.controls.primCalcsMineCount.shown = false
 
-	self.controls.primCalcsShowMinion = new("DropDownControl", nil, {0, 0, 140, 18}, calculationActorList, function(index, value)
+	self.controls.primCalcsShowMinion = new("DropDownControl", nil, {0, 0, 140, 18}, calcLib.calculationActorList, function(index, value)
 		self.primaryBuild.calcsTab.input.actor = value.actorId
 		self.primaryBuild.buildFlag = true
 	end)
@@ -667,7 +660,7 @@ function CompareTabClass:InitControls()
 	end)
 	self.controls.cmpCalcsMineCount.shown = false
 
-	self.controls.cmpCalcsShowMinion = new("DropDownControl", nil, {0, 0, 140, 18}, calculationActorList, function(index, value)
+	self.controls.cmpCalcsShowMinion = new("DropDownControl", nil, {0, 0, 140, 18}, calcLib.calculationActorList, function(index, value)
 		local entry = self:GetActiveCompare()
 		if entry then
 			entry.calcsTab.input.actor = value.actorId

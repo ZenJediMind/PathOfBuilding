@@ -2,42 +2,11 @@
 -- Mercenary skill data (c) Grinding Gear Games
 
 local skills, mod, flag, skill = ...
-
-local existingSkills = { }
-for skillId in pairs(skills) do existingSkills[skillId] = true end
-
-local function inheritSkillData(skillId, baseSkillId)
-	local target, base = skills[skillId], skills[baseSkillId]
-	if not base then error("Missing base skill mapping: "..baseSkillId.." for "..skillId) end
-	local function inherit(source)
-		for key, value in pairs(source) do
-			if target[key] == nil then
-				target[key] = type(value) == "table" and copyTable(value, true) or value
-			elseif key == "baseFlags" then
-				for flag, enabled in pairs(value) do if target.baseFlags[flag] == nil then target.baseFlags[flag] = enabled end end
-			end
-		end
-	end
-	local matchingSkillIds = { }
-	for candidateId, candidate in pairs(skills) do
-		local sameSkill = candidate.name == target.name or target.description and target.description ~= "" and candidate.description == target.description
-		if candidateId ~= skillId and candidateId ~= baseSkillId and candidate.baseTypeName and not candidate.hidden and sameSkill then
-			table.insert(matchingSkillIds, candidateId)
-		end
-	end
-	table.sort(matchingSkillIds, function(leftId, rightId)
-		local left, right = skills[leftId], skills[rightId]
-		local leftPriority = left.name == target.name and 0 or 1
-		local rightPriority = right.name == target.name and 0 or 1
-		return leftPriority == rightPriority and leftId < rightId or leftPriority < rightPriority
-	end)
-	for _, candidateId in ipairs(matchingSkillIds) do inherit(skills[candidateId]) end
-	inherit(base)
-end
-
 skills["ABTTArmourEleMercenary"] = {
 	name = "Prismplate",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "ABTTAzmeriTurtleInvulnerability",
 	color = 4,
 	skillTypes = { [SkillType.Buff] = true, [SkillType.Duration] = true, [SkillType.Spell] = true, },
 	statDescriptionScope = "skill_stat_descriptions",
@@ -55,11 +24,12 @@ skills["ABTTArmourEleMercenary"] = {
 		[1] = { cooldown = 15, levelRequirement = 1, storedUses = 1, },
 	},
 }
-inheritSkillData("ABTTArmourEleMercenary", "ABTTAzmeriTurtleInvulnerability")
 
 skills["ABTTExtraImpaleMercenary"] = {
 	name = "Brutal Teachings",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "ABTTAzmeriTurtleInvulnerability",
 	color = 4,
 	skillTypes = { [SkillType.Buff] = true, [SkillType.Duration] = true, [SkillType.Spell] = true, },
 	statDescriptionScope = "skill_stat_descriptions",
@@ -77,11 +47,12 @@ skills["ABTTExtraImpaleMercenary"] = {
 		[1] = { cooldown = 15, levelRequirement = 1, storedUses = 1, },
 	},
 }
-inheritSkillData("ABTTExtraImpaleMercenary", "ABTTAzmeriTurtleInvulnerability")
 
 skills["ABTTInvulnBubbleMercenary"] = {
 	name = "Impenetrable Bastion",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "ABTTAzmeriTurtleInvulnerability",
 	color = 4,
 	skillTypes = { [SkillType.Buff] = true, [SkillType.Duration] = true, [SkillType.Spell] = true, },
 	statDescriptionScope = "skill_stat_descriptions",
@@ -99,11 +70,12 @@ skills["ABTTInvulnBubbleMercenary"] = {
 		[1] = { cooldown = 30, levelRequirement = 1, storedUses = 1, },
 	},
 }
-inheritSkillData("ABTTInvulnBubbleMercenary", "ABTTAzmeriTurtleInvulnerability")
 
 skills["ABTTPhysEnrageMercenary"] = {
 	name = "Bloodthirst",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "ABTTAzmeriTurtleInvulnerability",
 	color = 4,
 	skillTypes = { [SkillType.Buff] = true, [SkillType.Duration] = true, [SkillType.Spell] = true, },
 	statDescriptionScope = "skill_stat_descriptions",
@@ -121,11 +93,12 @@ skills["ABTTPhysEnrageMercenary"] = {
 		[1] = { cooldown = 15, levelRequirement = 1, storedUses = 1, },
 	},
 }
-inheritSkillData("ABTTPhysEnrageMercenary", "ABTTAzmeriTurtleInvulnerability")
 
 skills["AbsolutionMercenary"] = {
 	name = "Absolution",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "Absolution",
 	color = 1,
 	baseEffectiveness = 2.8499999046326,
 	incrementalEffectiveness = 0.043200001120567,
@@ -203,11 +176,12 @@ skills["AbsolutionMercenary"] = {
 		[40] = { 0.80000001192093, 1.2000000476837, 100, 11, critChance = 6, damageEffectiveness = 2, levelRequirement = 100, statInterpolation = { 3, 3, 1, 1, }, },
 	},
 }
-inheritSkillData("AbsolutionMercenary", "Absolution")
 
 skills["AbsolutionMercenaryEncounter"] = {
 	name = "Absolution",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "Absolution",
 	color = 1,
 	baseEffectiveness = 2.0499999523163,
 	incrementalEffectiveness = 0.042500000447035,
@@ -286,11 +260,11 @@ skills["AbsolutionMercenaryEncounter"] = {
 		[40] = { 0.80000001192093, 1.2000000476837, 100, 11, critChance = 6, damageEffectiveness = 2, levelRequirement = 100, statInterpolation = { 3, 3, 1, 1, }, },
 	},
 }
-inheritSkillData("AbsolutionMercenaryEncounter", "Absolution")
 
 skills["AbyssalCryMercenary"] = {
 	name = "Abyssal Cry",
 	hidden = true,
+	mercenary = true,
 	color = 1,
 	description = "Performs a warcry, Hindering nearby enemies and causing them to explode when killed. The Hinder effect is proportional to the number of surrounding enemies. Taunts all nearby enemies to attack the user. Shares a cooldown with other Warcry skills.",
 	skillTypes = { [SkillType.Area] = true, [SkillType.Duration] = true, [SkillType.Chaos] = true, [SkillType.Damage] = true, [SkillType.Warcry] = true, [SkillType.Cooldown] = true, },
@@ -348,6 +322,8 @@ skills["AbyssalCryMercenary"] = {
 skills["ActionSpeedAuraMercenary"] = {
 	name = "Trarthan Agility",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "ABTTAzmeriTurtleInvulnerability",
 	color = 4,
 	skillTypes = { [SkillType.Buff] = true, [SkillType.Duration] = true, [SkillType.Spell] = true, },
 	statDescriptionScope = "skill_stat_descriptions",
@@ -366,11 +342,12 @@ skills["ActionSpeedAuraMercenary"] = {
 		[1] = { cooldown = 20, levelRequirement = 1, storedUses = 1, },
 	},
 }
-inheritSkillData("ActionSpeedAuraMercenary", "ABTTAzmeriTurtleInvulnerability")
 
 skills["AlchemistsMarkMercenary"] = {
 	name = "Alchemist's Mark",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "AlchemistsMark",
 	color = 2,
 	baseEffectiveness = 0,
 	description = "Curses a single enemy, granting flask charges when you hit them and creating Burning Ground under them if your hit Ignites them, and Caustic Ground if it Poisons them. Damage modifiers do not apply to these ground effects. You can only have one Mark at a time.",
@@ -434,11 +411,12 @@ skills["AlchemistsMarkMercenary"] = {
 		[40] = { 31, 99, cooldown = 6, levelRequirement = 100, storedUses = 1, statInterpolation = { 1, 1, }, },
 	},
 }
-inheritSkillData("AlchemistsMarkMercenary", "AlchemistsMark")
 
 skills["AngerMercenary"] = {
 	name = "Anger",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "Anger",
 	color = 1,
 	baseEffectiveness = 2.25,
 	incrementalEffectiveness = 0.023000000044703,
@@ -505,11 +483,12 @@ skills["AngerMercenary"] = {
 		[40] = { 0.34999999403954, 0.5, 0.34999999403954, 0.5, 34, cooldown = 1.2, levelRequirement = 100, storedUses = 1, statInterpolation = { 3, 3, 3, 3, 1, }, },
 	},
 }
-inheritSkillData("AngerMercenary", "Anger")
 
 skills["ArcAltMercenary"] = {
 	name = "[DNT] Unused",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "ArcAltX",
 	color = 3,
 	baseEffectiveness = 3.0499999523163,
 	incrementalEffectiveness = 0.039500001817942,
@@ -577,11 +556,12 @@ skills["ArcAltMercenary"] = {
 		[40] = { 0.30000001192093, 1.7000000476837, 11, critChance = 6, damageEffectiveness = 2.3, levelRequirement = 100, statInterpolation = { 3, 3, 1, }, cost = { Mana = 31, }, },
 	},
 }
-inheritSkillData("ArcAltMercenary", "ArcAltX")
 
 skills["ArcMercenary"] = {
 	name = "Arc",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "Arc",
 	color = 3,
 	baseEffectiveness = 1.584900021553,
 	incrementalEffectiveness = 0.039500001817942,
@@ -650,11 +630,12 @@ skills["ArcMercenary"] = {
 		[40] = { 0.30000001192093, 1.7000000476837, 11, critChance = 6, damageEffectiveness = 1.2, levelRequirement = 100, statInterpolation = { 3, 3, 1, }, cost = { Mana = 31, }, },
 	},
 }
-inheritSkillData("ArcMercenary", "Arc")
 
 skills["ArcMercenaryEncounter"] = {
 	name = "Arc",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "Arc",
 	color = 3,
 	incrementalEffectiveness = 0.050000000745058,
 	description = "An arc of lightning reaches from the caster to a targeted enemy and chains to other enemies, but not immediately back. Each time the arc chains, it will also chain a secondary arc to another enemy that the main arc has not already hit, which cannot chain further.",
@@ -720,11 +701,12 @@ skills["ArcMercenaryEncounter"] = {
 		[40] = { 0.5, 1.5, 11, critChance = 6, damageEffectiveness = 1.2, levelRequirement = 100, statInterpolation = { 3, 3, 1, }, cost = { Mana = 31, }, },
 	},
 }
-inheritSkillData("ArcMercenaryEncounter", "Arc")
 
 skills["ArcticArmourMercenary"] = {
 	name = "Arctic Armour",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "ArcticArmour",
 	color = 2,
 	incrementalEffectiveness = 0.029999999329448,
 	description = "Conjures an icy barrier that chills enemies when they hit you. You drop chilled ground while moving, and take less Fire and Physical damage while stationary.",
@@ -791,11 +773,12 @@ skills["ArcticArmourMercenary"] = {
 		[40] = { -28, -28, 5900, cooldown = 1.2, levelRequirement = 100, storedUses = 1, statInterpolation = { 1, 1, 1, }, },
 	},
 }
-inheritSkillData("ArcticArmourMercenary", "ArcticArmour")
 
 skills["ArtilleryBallistaMercenary"] = {
 	name = "Artillery Ballista",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "ArtilleryBallista",
 	color = 2,
 	description = "Summons a ballista totem that propels a sequence of fiery arrows into the air. The arrows impact the ground in a line, each dealing area damage to enemies around it. Requires a Bow.",
 	skillTypes = { [SkillType.Attack] = true, [SkillType.RangedAttack] = true, [SkillType.Trappable] = true, [SkillType.Mineable] = true, [SkillType.SummonsTotem] = true, [SkillType.Area] = true, [SkillType.Fire] = true, [SkillType.ProjectileNumber] = true, [SkillType.ProjectileSpeed] = true, [SkillType.AttackInPlaceIsDefault] = true, [SkillType.TotemsAreBallistae] = true, },
@@ -870,11 +853,12 @@ skills["ArtilleryBallistaMercenary"] = {
 		[40] = { 4, baseMultiplier = 0.768, cooldown = 4, damageEffectiveness = 0.768, levelRequirement = 100, storedUses = 2, statInterpolation = { 1, }, },
 	},
 }
-inheritSkillData("ArtilleryBallistaMercenary", "ArtilleryBallista")
 
 skills["AspectOfTheSpiderMercenary"] = {
 	name = "Aspect of the Spider",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "AspectOfTheSpider",
 	color = 4,
 	description = "While active, periodically applies a Spider's Web debuff to nearby Enemies, and Hinders them. Each Spider's Web on an Enemy increases the Damage they take. Hinder reduces their movement speed.",
 	skillTypes = { [SkillType.Buff] = true, [SkillType.Spell] = true, [SkillType.HasReservation] = true, [SkillType.Duration] = true, [SkillType.Instant] = true, [SkillType.InstantNoRepeatWhenHeld] = true, [SkillType.InstantShiftAttackForLeftMouse] = true, [SkillType.Cooldown] = true, },
@@ -896,11 +880,12 @@ skills["AspectOfTheSpiderMercenary"] = {
 		[1] = { 3, cooldown = 1.2, levelRequirement = 1, storedUses = 1, statInterpolation = { 1, }, },
 	},
 }
-inheritSkillData("AspectOfTheSpiderMercenary", "AspectOfTheSpider")
 
 skills["AssassinsMarkMercenary"] = {
 	name = "Assassin's Mark",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "AssassinsMark",
 	color = 3,
 	baseEffectiveness = 0,
 	description = "Curses a single enemy, making them more vulnerable to Critical Strikes. Killing the cursed enemy will grant life and mana, and a power charge. You can only have one Mark at a time.",
@@ -963,11 +948,12 @@ skills["AssassinsMarkMercenary"] = {
 		[40] = { 64, 948, 115, levelRequirement = 100, statInterpolation = { 1, 1, 1, }, },
 	},
 }
-inheritSkillData("AssassinsMarkMercenary", "AssassinsMark")
 
 skills["BallLightningAltMercenary"] = {
 	name = "Ball Lightning of Static",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "BallLightningAltY",
 	color = 3,
 	baseEffectiveness = 0.97000002861023,
 	incrementalEffectiveness = 0.044300001114607,
@@ -1035,11 +1021,12 @@ skills["BallLightningAltMercenary"] = {
 		[40] = { 0.10000000149012, 1.8999999761581, cooldown = 1.5, critChance = 5, damageEffectiveness = 0.9, levelRequirement = 100, storedUses = 3, statInterpolation = { 3, 3, }, cost = { Mana = 31, }, },
 	},
 }
-inheritSkillData("BallLightningAltMercenary", "BallLightningAltY")
 
 skills["BallLightningAltMercenaryEncounter"] = {
 	name = "Ball Lightning of Static",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "BallLightningAltY",
 	color = 3,
 	baseEffectiveness = 0.40000000596046,
 	incrementalEffectiveness = 0.044300001114607,
@@ -1108,11 +1095,12 @@ skills["BallLightningAltMercenaryEncounter"] = {
 		[40] = { 0.5, 1.5, cooldown = 1.5, critChance = 5, damageEffectiveness = 0.9, levelRequirement = 100, storedUses = 3, statInterpolation = { 3, 3, }, },
 	},
 }
-inheritSkillData("BallLightningAltMercenaryEncounter", "BallLightningAltY")
 
 skills["BallLightningAltTrapMercenary"] = {
 	name = "Ball Lightning of Orbiting Trap",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "BallLightningAltX",
 	color = 3,
 	baseEffectiveness = 0.46999999880791,
 	incrementalEffectiveness = 0.044300001114607,
@@ -1188,11 +1176,12 @@ skills["BallLightningAltTrapMercenary"] = {
 		[40] = { 0.10000000149012, 1.8999999761581, critChance = 5, damageEffectiveness = 0.5, levelRequirement = 100, statInterpolation = { 3, 3, }, },
 	},
 }
-inheritSkillData("BallLightningAltTrapMercenary", "BallLightningAltX")
 
 skills["BaneMercenary"] = {
 	name = "Bane",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "Bane",
 	color = 3,
 	baseEffectiveness = 6.3354997634888,
 	incrementalEffectiveness = 0.045299999415874,
@@ -1259,11 +1248,12 @@ skills["BaneMercenary"] = {
 		[40] = { 16.666667039196, 6, 53, levelRequirement = 100, statInterpolation = { 3, 1, 1, }, },
 	},
 }
-inheritSkillData("BaneMercenary", "Bane")
 
 skills["BaneMercenaryEncounter"] = {
 	name = "Bane",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "Bane",
 	color = 3,
 	baseEffectiveness = 3.0999999046326,
 	incrementalEffectiveness = 0.04450000077486,
@@ -1330,11 +1320,12 @@ skills["BaneMercenaryEncounter"] = {
 		[40] = { 16.666667039196, 6, 30, levelRequirement = 100, statInterpolation = { 3, 1, 1, }, },
 	},
 }
-inheritSkillData("BaneMercenaryEncounter", "Bane")
 
 skills["BarrageAltMercenary"] = {
 	name = "Barrage of Volley Fire",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "BarrageAltX",
 	color = 2,
 	description = "After a short preparation time, you fire projectiles repeatedly with a Bow or Wand. These projectiles have a small randomised spread. This skill cannot be Triggered.",
 	skillTypes = { [SkillType.Attack] = true, [SkillType.RangedAttack] = true, [SkillType.MirageArcherCanUse] = true, [SkillType.Projectile] = true, [SkillType.ProjectilesFromUser] = true, [SkillType.Totemable] = true, [SkillType.Trappable] = true, [SkillType.Mineable] = true, [SkillType.WandAttack] = true, },
@@ -1400,11 +1391,12 @@ skills["BarrageAltMercenary"] = {
 		[40] = { baseMultiplier = 0.679, damageEffectiveness = 0.679, levelRequirement = 100, },
 	},
 }
-inheritSkillData("BarrageAltMercenary", "BarrageAltX")
 
 skills["BarrageMercenary"] = {
 	name = "Barrage",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "Barrage",
 	color = 2,
 	description = "After a short preparation time, you fire individual projectiles repeatedly with a Bow or Wand. These projectiles have a small randomised spread. This skill cannot be Triggered.",
 	skillTypes = { [SkillType.Attack] = true, [SkillType.RangedAttack] = true, [SkillType.MirageArcherCanUse] = true, [SkillType.Projectile] = true, [SkillType.ProjectilesFromUser] = true, [SkillType.Totemable] = true, [SkillType.Trappable] = true, [SkillType.Mineable] = true, [SkillType.WandAttack] = true, },
@@ -1470,11 +1462,12 @@ skills["BarrageMercenary"] = {
 		[40] = { baseMultiplier = 0.606, damageEffectiveness = 0.61, levelRequirement = 100, },
 	},
 }
-inheritSkillData("BarrageMercenary", "Barrage")
 
 skills["BattlemagesCryMercenary"] = {
 	name = "Battlemage's Cry",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "BattlemagesCry",
 	color = 1,
 	description = "Performs a warcry, taunting nearby enemies to attack the user and exerting subsequent attacks. The user and nearby allies gain a buff that boosts critical strike chance.",
 	skillTypes = { [SkillType.Buff] = true, [SkillType.Area] = true, [SkillType.Duration] = true, [SkillType.Warcry] = true, [SkillType.Cooldown] = true, },
@@ -1544,11 +1537,12 @@ skills["BattlemagesCryMercenary"] = {
 		[40] = { 54, 4200, cooldown = 8, levelRequirement = 100, storedUses = 1, statInterpolation = { 1, 1, }, },
 	},
 }
-inheritSkillData("BattlemagesCryMercenary", "BattlemagesCry")
 
 skills["BearTrapMercenary"] = {
 	name = "Bear Trap",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "BearTrap",
 	color = 2,
 	baseEffectiveness = 2.8499999046326,
 	incrementalEffectiveness = 0.042500000447035,
@@ -1627,11 +1621,12 @@ skills["BearTrapMercenary"] = {
 		[40] = { 1, 1.3999999761581, cooldown = 6, critChance = 6, damageEffectiveness = 3, levelRequirement = 100, storedUses = 1, statInterpolation = { 3, 3, }, },
 	},
 }
-inheritSkillData("BearTrapMercenary", "BearTrap")
 
 skills["BladeTrapMercenary"] = {
 	name = "Blade Trap",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "BladeTrap",
 	color = 2,
 	description = "Throws a trap which, once triggered, swings two copies of your equipped Dagger, Claw or One Handed Sword around it in circles, each repeatedly damaging enemies it spins through.",
 	skillTypes = { [SkillType.Attack] = true, [SkillType.Damage] = true, [SkillType.Mineable] = true, [SkillType.Area] = true, [SkillType.Trapped] = true, [SkillType.Area] = true, },
@@ -1707,11 +1702,12 @@ skills["BladeTrapMercenary"] = {
 		[40] = { 11, baseMultiplier = 1.404, damageEffectiveness = 1.404, levelRequirement = 100, statInterpolation = { 1, }, },
 	},
 }
-inheritSkillData("BladeTrapMercenary", "BladeTrap")
 
 skills["BladeVortexAltMercenary"] = {
 	name = "Corrupted Blade Vortex of the Scythe",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "BladeVortexAltX",
 	color = 2,
 	baseEffectiveness = 2.1624999046326,
 	incrementalEffectiveness = 0.042899999767542,
@@ -1786,11 +1782,12 @@ skills["BladeVortexAltMercenary"] = {
 		[40] = { 0.80000001192093, 1.2000000476837, 27, 618, cooldown = 1, critChance = 10, damageEffectiveness = 2, levelRequirement = 100, storedUses = 1, statInterpolation = { 3, 3, 1, 1, }, },
 	},
 }
-inheritSkillData("BladeVortexAltMercenary", "BladeVortexAltX")
 
 skills["BladeVortexAltMercenaryEncounter"] = {
 	name = "Corrupted Blade Vortex of the Scythe",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "BladeVortexAltX",
 	color = 2,
 	baseEffectiveness = 2.1500000953674,
 	incrementalEffectiveness = 0.030999999493361,
@@ -1827,11 +1824,12 @@ skills["BladeVortexAltMercenaryEncounter"] = {
 		[2] = { 0.80000001192093, 1.2000000476837, 100, 65, cooldown = 1, critChance = 10, damageEffectiveness = 1.5, levelRequirement = 100, storedUses = 1, statInterpolation = { 3, 3, 2, 2, }, },
 	},
 }
-inheritSkillData("BladeVortexAltMercenaryEncounter", "BladeVortexAltX")
 
 skills["BladeVortexMercenary"] = {
 	name = "Blade Vortex",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "BladeVortex",
 	color = 2,
 	baseEffectiveness = 0.33660000562668,
 	incrementalEffectiveness = 0.042899999767542,
@@ -1909,11 +1907,12 @@ skills["BladeVortexMercenary"] = {
 		[40] = { 0.80000001192093, 1.2000000476837, 4, critChance = 10, damageEffectiveness = 0.3, levelRequirement = 100, statInterpolation = { 3, 3, 1, }, },
 	},
 }
-inheritSkillData("BladeVortexMercenary", "BladeVortex")
 
 skills["BladefallAltMercenary"] = {
 	name = "Bladefall of Trarthus",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "BladefallAltZ",
 	color = 2,
 	baseEffectiveness = 0.72079998254776,
 	incrementalEffectiveness = 0.045499999076128,
@@ -1989,11 +1988,12 @@ skills["BladefallAltMercenary"] = {
 		[40] = { 0.80000001192093, 1.2000000476837, 10, cooldown = 1.2, critChance = 10, damageEffectiveness = 1.2, levelRequirement = 100, storedUses = 1, statInterpolation = { 3, 3, 1, }, },
 	},
 }
-inheritSkillData("BladefallAltMercenary", "BladefallAltZ")
 
 skills["BladefallMercenary"] = {
 	name = "Bladefall",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "Bladefall",
 	color = 2,
 	baseEffectiveness = 1.2013000249863,
 	incrementalEffectiveness = 0.045499999076128,
@@ -2064,11 +2064,12 @@ skills["BladefallMercenary"] = {
 		[40] = { 0.80000001192093, 1.2000000476837, critChance = 10, damageEffectiveness = 1.4, levelRequirement = 100, statInterpolation = { 3, 3, }, },
 	},
 }
-inheritSkillData("BladefallMercenary", "Bladefall")
 
 skills["BladestormMercenary"] = {
 	name = "Bladestorm",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "Bladestorm",
 	color = 1,
 	description = "Perform a spinning attack, damaging enemies around you and creating a bladestorm matching your stance. The bladestorm repeatedly damages enemies, based on your weapon damage and attack time, for a duration. Blood bladestorms are stationary and cause Bleeding, while Sand bladestorms move slowly forwards and Blind enemies. Requires a Sword or Axe. You are in Blood Stance by default.",
 	skillTypes = { [SkillType.Attack] = true, [SkillType.Melee] = true, [SkillType.Area] = true, [SkillType.Duration] = true, [SkillType.Multistrikeable] = true, },
@@ -2143,11 +2144,12 @@ skills["BladestormMercenary"] = {
 		[40] = { 15, 44, 138, baseMultiplier = 4.81, damageEffectiveness = 4.81, levelRequirement = 100, statInterpolation = { 1, 1, 1, }, },
 	},
 }
-inheritSkillData("BladestormMercenary", "Bladestorm")
 
 skills["BlastRainAltMercenary"] = {
 	name = "Blast Rain of Trarthus",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "BlastRainAltX",
 	color = 2,
 	baseEffectiveness = 2.4500000476837,
 	incrementalEffectiveness = 0.054000001400709,
@@ -2225,11 +2227,12 @@ skills["BlastRainAltMercenary"] = {
 		[40] = { 80.833333550642, attackSpeedMultiplier = -20, baseMultiplier = 1.168, damageEffectiveness = 1.168, levelRequirement = 100, statInterpolation = { 3, }, },
 	},
 }
-inheritSkillData("BlastRainAltMercenary", "BlastRainAltX")
 
 skills["BlastRainAltMercenaryEncounter"] = {
 	name = "Blast Rain of Trarthus",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "BlastRainAltX",
 	color = 2,
 	baseEffectiveness = 2.2000000476837,
 	incrementalEffectiveness = 0.03999999910593,
@@ -2307,11 +2310,12 @@ skills["BlastRainAltMercenaryEncounter"] = {
 		[40] = { 16.666667039196, attackSpeedMultiplier = -20, baseMultiplier = 1.168, damageEffectiveness = 1.168, levelRequirement = 100, statInterpolation = { 3, }, },
 	},
 }
-inheritSkillData("BlastRainAltMercenaryEncounter", "BlastRainAltX")
 
 skills["BlastRainColdMercenary"] = {
 	name = "Icicle Rain",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "BlastRain",
 	color = 2,
 	description = "Fires arrows up in the air, to rain down in an area. Each arrow deals area damage around where it lands, and they will all overlap on the targeted location.",
 	skillTypes = { [SkillType.Attack] = true, [SkillType.RangedAttack] = true, [SkillType.Fire] = true, [SkillType.MirageArcherCanUse] = true, [SkillType.Area] = true, [SkillType.ProjectileSpeed] = true, [SkillType.ProjectileNumber] = true, [SkillType.Totemable] = true, [SkillType.Trappable] = true, [SkillType.Mineable] = true, [SkillType.Triggerable] = true, [SkillType.Rain] = true, },
@@ -2377,11 +2381,12 @@ skills["BlastRainColdMercenary"] = {
 		[40] = { baseMultiplier = 0.4, damageEffectiveness = 0.4, levelRequirement = 100, },
 	},
 }
-inheritSkillData("BlastRainColdMercenary", "BanditChampionBlastRainSpectre")
 
 skills["BlightMercenary"] = {
 	name = "Blight",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "Blight",
 	color = 3,
 	baseEffectiveness = 5.4704999923706,
 	incrementalEffectiveness = 0.033399999141693,
@@ -2451,11 +2456,12 @@ skills["BlightMercenary"] = {
 		[40] = { 16.666667039196, 11, levelRequirement = 100, statInterpolation = { 3, 1, }, },
 	},
 }
-inheritSkillData("BlightMercenary", "Blight")
 
 skills["BlightMercenaryEncounter"] = {
 	name = "Blight",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "Blight",
 	color = 3,
 	baseEffectiveness = 2.25,
 	incrementalEffectiveness = 0.027499999850988,
@@ -2525,11 +2531,12 @@ skills["BlightMercenaryEncounter"] = {
 		[40] = { 16.666667039196, 9, levelRequirement = 100, statInterpolation = { 3, 1, }, },
 	},
 }
-inheritSkillData("BlightMercenaryEncounter", "Blight")
 
 skills["BlinkArrowMercenary"] = {
 	name = "Blink Arrow",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "BlinkArrow",
 	color = 2,
 	description = "Fires an arrow at the target destination. When the arrow lands, you are teleported to it and a clone is summoned at your old location. The clone is a minion that uses your bow and quiver.",
 	skillTypes = { [SkillType.ProjectileSpeed] = true, [SkillType.Attack] = true, [SkillType.Minion] = true, [SkillType.RangedAttack] = true, [SkillType.MinionsCanExplode] = true, [SkillType.Duration] = true, [SkillType.Totemable] = true, [SkillType.Trappable] = true, [SkillType.Mineable] = true, [SkillType.Movement] = true, [SkillType.Triggerable] = true, [SkillType.CreatesMinion] = true, [SkillType.Travel] = true, [SkillType.Cooldown] = true, [SkillType.Rain] = true, },
@@ -2605,11 +2612,12 @@ skills["BlinkArrowMercenary"] = {
 		[40] = { 100, 85, 102, cooldown = 3, levelRequirement = 100, storedUses = 1, statInterpolation = { 1, 1, 1, }, },
 	},
 }
-inheritSkillData("BlinkArrowMercenary", "BlinkArrow")
 
 skills["BloodMortarMercenary"] = {
 	name = "Blood Mortar",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "BirdmanBloodProjectileMortar",
 	color = 4,
 	description = "Generic monster mortar skill. Like Monster Projectile but has an impact effect.",
 	skillTypes = { [SkillType.Projectile] = true, [SkillType.ProjectilesFromUser] = true, [SkillType.Attack] = true, [SkillType.Damage] = true, [SkillType.Area] = true, [SkillType.Trappable] = true, [SkillType.Totemable] = true, [SkillType.Mineable] = true, [SkillType.Multicastable] = true, [SkillType.Triggerable] = true, },
@@ -2635,11 +2643,12 @@ skills["BloodMortarMercenary"] = {
 		[1] = { levelRequirement = 1, },
 	},
 }
-inheritSkillData("BloodMortarMercenary", "BirdmanBloodProjectileMortar")
 
 skills["BodyswapMercenary"] = {
 	name = "Bodyswap",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "Bodyswap",
 	color = 3,
 	baseEffectiveness = 0.40259999036789,
 	incrementalEffectiveness = 0.046300001442432,
@@ -2710,11 +2719,12 @@ skills["BodyswapMercenary"] = {
 		[40] = { 0.80000001192093, 1.2000000476837, 94, 4, critChance = 6, levelRequirement = 100, statInterpolation = { 3, 3, 1, 1, }, },
 	},
 }
-inheritSkillData("BodyswapMercenary", "Bodyswap")
 
 skills["BoneOfferingMercenary"] = {
 	name = "Bone Offering",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "BoneOffering",
 	color = 3,
 	description = "Consumes a corpse, granting all of your minions the power to block both attacks and spells. The skill consumes other nearby corpses, increasing the duration for each corpse consumed.",
 	skillTypes = { [SkillType.Spell] = true, [SkillType.Buff] = true, [SkillType.Duration] = true, [SkillType.Triggerable] = true, [SkillType.Minion] = true, [SkillType.Trappable] = true, [SkillType.Mineable] = true, [SkillType.Totemable] = true, [SkillType.Offering] = true, },
@@ -2778,11 +2788,11 @@ skills["BoneOfferingMercenary"] = {
 		[40] = { 42, 42, cooldown = 10, levelRequirement = 100, storedUses = 1, statInterpolation = { 1, 1, }, },
 	},
 }
-inheritSkillData("BoneOfferingMercenary", "BoneOffering")
 
 skills["BonePrison"] = {
 	name = "BonePrison",
 	hidden = true,
+	mercenary = true,
 	color = 4,
 	skillTypes = { [SkillType.Spell] = true, [SkillType.Triggerable] = true, },
 	statDescriptionScope = "skill_stat_descriptions",
@@ -2804,6 +2814,8 @@ skills["BonePrison"] = {
 skills["BoneshatterMercenary"] = {
 	name = "Boneshatter",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "Boneshatter",
 	color = 1,
 	baseEffectiveness = 0.18279999494553,
 	incrementalEffectiveness = 0.053700000047684,
@@ -2881,11 +2893,12 @@ skills["BoneshatterMercenary"] = {
 		[40] = { 1.2000000476837, 0.57599997520447, 0.86400002241135, 8, baseMultiplier = 4.297, damageEffectiveness = 4.297, levelRequirement = 100, statInterpolation = { 3, 3, 3, 1, }, },
 	},
 }
-inheritSkillData("BoneshatterMercenary", "Boneshatter")
 
 skills["BurningArrowMercenary"] = {
 	name = "Burning Arrow",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "BurningArrow",
 	color = 2,
 	description = "Fires a burning arrow that deals fire damage and has a chance to ignite.",
 	skillTypes = { [SkillType.Attack] = true, [SkillType.RangedAttack] = true, [SkillType.MirageArcherCanUse] = true, [SkillType.Projectile] = true, [SkillType.ProjectilesFromUser] = true, [SkillType.Totemable] = true, [SkillType.Trappable] = true, [SkillType.Mineable] = true, [SkillType.Fire] = true, [SkillType.ThresholdJewelArea] = true, [SkillType.Triggerable] = true, },
@@ -2948,11 +2961,12 @@ skills["BurningArrowMercenary"] = {
 		[40] = { baseMultiplier = 5.305, damageEffectiveness = 5.305, levelRequirement = 100, },
 	},
 }
-inheritSkillData("BurningArrowMercenary", "BurningArrow")
 
 skills["BurningArrowMercenaryEncounter"] = {
 	name = "Burning Arrow",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "BurningArrow",
 	color = 2,
 	description = "Fires a burning arrow that deals fire damage and has a chance to ignite.",
 	skillTypes = { [SkillType.Attack] = true, [SkillType.RangedAttack] = true, [SkillType.MirageArcherCanUse] = true, [SkillType.Projectile] = true, [SkillType.ProjectilesFromUser] = true, [SkillType.Totemable] = true, [SkillType.Trappable] = true, [SkillType.Mineable] = true, [SkillType.Fire] = true, [SkillType.ThresholdJewelArea] = true, [SkillType.Triggerable] = true, },
@@ -2976,11 +2990,11 @@ skills["BurningArrowMercenaryEncounter"] = {
 		[1] = { baseMultiplier = 2.25, damageEffectiveness = 2.25, levelRequirement = 0, },
 	},
 }
-inheritSkillData("BurningArrowMercenaryEncounter", "BurningArrow")
 
 skills["BurrowMercenary"] = {
 	name = "Burrow",
 	hidden = true,
+	mercenary = true,
 	color = 1,
 	skillTypes = { [SkillType.Attack] = true, [SkillType.Area] = true, },
 	statDescriptionScope = "skill_stat_descriptions",
@@ -3000,6 +3014,8 @@ skills["BurrowMercenary"] = {
 skills["CGEBloodGroundMercenary"] = {
 	name = "Boiling Blood",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "CGEFaridunWarlockSwarmGround",
 	color = 4,
 	baseEffectiveness = 1.6599999666214,
 	incrementalEffectiveness = 0.036660000681877,
@@ -3023,11 +3039,12 @@ skills["CGEBloodGroundMercenary"] = {
 		[1] = { 25.000000558794, levelRequirement = 0, statInterpolation = { 3, }, },
 	},
 }
-inheritSkillData("CGEBloodGroundMercenary", "CGEFaridunWarlockSwarmGround")
 
 skills["CGEOilGroundSlowMercenary"] = {
 	name = "Oil Slick",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "CGEFaridunWarlockSwarmGround",
 	color = 4,
 	skillTypes = { [SkillType.Spell] = true, [SkillType.Area] = true, [SkillType.Damage] = true, [SkillType.Triggerable] = true, [SkillType.Duration] = true, [SkillType.AreaSpell] = true, },
 	statDescriptionScope = "skill_stat_descriptions",
@@ -3048,11 +3065,12 @@ skills["CGEOilGroundSlowMercenary"] = {
 		[1] = { cooldown = 5, levelRequirement = 0, storedUses = 1, },
 	},
 }
-inheritSkillData("CGEOilGroundSlowMercenary", "CGEFaridunWarlockSwarmGround")
 
 skills["CallOfSteelMercenary"] = {
 	name = "Call of Steel",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "CallOfSteel",
 	color = 1,
 	description = "Calls impale debuffs from enemies, alive or dead, in a large area around you to gain steel shards. Deals reflected damage in a smaller area around each such enemy based on the impales removed from them. Continues to grant shards over time until you reach maximum or spend them.",
 	skillTypes = { [SkillType.Cooldown] = true, [SkillType.Area] = true, [SkillType.Steel] = true, },
@@ -3072,11 +3090,12 @@ skills["CallOfSteelMercenary"] = {
 		[1] = { baseMultiplier = 1.3, damageEffectiveness = 1.3, levelRequirement = 1, },
 	},
 }
-inheritSkillData("CallOfSteelMercenary", "CallOfSteel")
 
 skills["CausticArrowMercenary"] = {
 	name = "Caustic Arrow",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "CausticArrow",
 	color = 2,
 	baseEffectiveness = 8.1670999526978,
 	incrementalEffectiveness = 0.050299998372793,
@@ -3151,11 +3170,12 @@ skills["CausticArrowMercenary"] = {
 		[40] = { 16.666667039196, 12, baseMultiplier = 0.743, damageEffectiveness = 0.74, levelRequirement = 100, statInterpolation = { 3, 1, }, },
 	},
 }
-inheritSkillData("CausticArrowMercenary", "CausticArrow")
 
 skills["CausticArrowMercenaryEncounter"] = {
 	name = "Caustic Arrow",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "CausticArrow",
 	color = 2,
 	baseEffectiveness = 4,
 	incrementalEffectiveness = 0.050000000745058,
@@ -3230,11 +3250,12 @@ skills["CausticArrowMercenaryEncounter"] = {
 		[40] = { 12.500000279397, 12, baseMultiplier = 0.743, damageEffectiveness = 0.74, levelRequirement = 100, statInterpolation = { 3, 1, }, },
 	},
 }
-inheritSkillData("CausticArrowMercenaryEncounter", "CausticArrow")
 
 skills["ChainHookAltMercenary"] = {
 	name = "Chain Hook of Trarthus",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "ChainHookAltY",
 	color = 1,
 	description = "Throws chains ahead of you, attaching them to targets hit. Enemies chained to you will grant rage when hit. When chains are broken, they snap and deal attack damage in an area around the target they were attached to. Requires a One Handed Mace, Sceptre, Sword or Axe.",
 	skillTypes = { [SkillType.Attack] = true, [SkillType.Area] = true, [SkillType.Damage] = true, [SkillType.Melee] = true, [SkillType.Multistrikeable] = true, },
@@ -3305,11 +3326,12 @@ skills["ChainHookAltMercenary"] = {
 		[40] = { baseMultiplier = 7.654, damageEffectiveness = 7.654, levelRequirement = 100, },
 	},
 }
-inheritSkillData("ChainHookAltMercenary", "ChainHookAltY")
 
 skills["ChaosGlacialCascadeMercenary"] = {
 	name = "Profane Cascade",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "GlacialCascade",
 	color = 3,
 	baseEffectiveness = 0.57099997997284,
 	incrementalEffectiveness = 0.046399999409914,
@@ -3379,11 +3401,12 @@ skills["ChaosGlacialCascadeMercenary"] = {
 		[40] = { 0.60000002384186, 1, critChance = 5, damageEffectiveness = 0.65, levelRequirement = 100, statInterpolation = { 3, 3, }, },
 	},
 }
-inheritSkillData("ChaosGlacialCascadeMercenary", "AxisCasterGlacialCascade")
 
 skills["ChargedDashSpellScalingMercenary"] = {
 	name = "Charged Dash of the Arcane",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "ChargedDash",
 	color = 2,
 	description = "Channel to project an illusion which you steer. You gain stages while it moves, until it stops at a maximum total distance. Waves of area damage frequently pulse along its path, based on your attack speed. Stop channelling to teleport to the illusion, dealing a final wave of damage. Requires a Melee Weapon.",
 	skillTypes = { [SkillType.Movement] = true, [SkillType.Area] = true, [SkillType.Damage] = true, [SkillType.Channel] = true, [SkillType.Attack] = true, [SkillType.Melee] = true, [SkillType.Lightning] = true, },
@@ -3464,11 +3487,12 @@ skills["ChargedDashSpellScalingMercenary"] = {
 		[40] = { baseMultiplier = 4.359, cooldown = 5, damageEffectiveness = 4.359, levelRequirement = 100, storedUses = 1, },
 	},
 }
-inheritSkillData("ChargedDashSpellScalingMercenary", "ChargedDash")
 
 skills["ClarityMercenary"] = {
 	name = "Clarity",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "Clarity",
 	color = 3,
 	description = "Casts an aura that grants mana regeneration to you and your allies.",
 	skillTypes = { [SkillType.Spell] = true, [SkillType.Area] = true, [SkillType.Buff] = true, [SkillType.HasReservation] = true, [SkillType.TotemCastsAlone] = true, [SkillType.Totemable] = true, [SkillType.Aura] = true, [SkillType.Instant] = true, [SkillType.AreaSpell] = true, [SkillType.CanHaveBlessing] = true, [SkillType.InstantNoRepeatWhenHeld] = true, [SkillType.InstantShiftAttackForLeftMouse] = true, [SkillType.Cooldown] = true, },
@@ -3530,11 +3554,12 @@ skills["ClarityMercenary"] = {
 		[40] = { 2884, 34, cooldown = 1.2, levelRequirement = 100, storedUses = 1, statInterpolation = { 1, 1, }, },
 	},
 }
-inheritSkillData("ClarityMercenary", "AzmeriPhantasmClarity")
 
 skills["CleaveMercenary"] = {
 	name = "Cleave",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "Cleave",
 	color = 1,
 	description = "The character swings their weapon (or both weapons if dual wielding) in an arc, damaging monsters in an area in front of them. Only works with Axes and Swords.",
 	skillTypes = { [SkillType.Attack] = true, [SkillType.Area] = true, [SkillType.Multistrikeable] = true, [SkillType.Melee] = true, [SkillType.ThresholdJewelArea] = true, },
@@ -3607,11 +3632,12 @@ skills["CleaveMercenary"] = {
 		[40] = { 18, baseMultiplier = 16.0402, damageEffectiveness = 16.0402, levelRequirement = 100, statInterpolation = { 1, }, },
 	},
 }
-inheritSkillData("CleaveMercenary", "BreachCleave")
 
 skills["CleaveMercenaryEncounter"] = {
 	name = "Cleave",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "Cleave",
 	color = 1,
 	description = "The character swings their weapon (or both weapons if dual wielding) in an arc, damaging monsters in an area in front of them. Only works with Axes and Swords.",
 	skillTypes = { [SkillType.Attack] = true, [SkillType.Area] = true, [SkillType.Multistrikeable] = true, [SkillType.Melee] = true, [SkillType.ThresholdJewelArea] = true, },
@@ -3684,11 +3710,12 @@ skills["CleaveMercenaryEncounter"] = {
 		[40] = { 18, baseMultiplier = 11.743, damageEffectiveness = 11.743, levelRequirement = 100, statInterpolation = { 1, }, },
 	},
 }
-inheritSkillData("CleaveMercenaryEncounter", "BreachCleave")
 
 skills["CobraLashMercenary"] = {
 	name = "Cobra Lash",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "CobraLash",
 	color = 2,
 	description = "Fires a poisonous projectile based on your weapon that will chain between enemies. Requires a Dagger or Claw.",
 	skillTypes = { [SkillType.Attack] = true, [SkillType.RangedAttack] = true, [SkillType.Projectile] = true, [SkillType.ProjectilesFromUser] = true, [SkillType.Damage] = true, [SkillType.Triggerable] = true, [SkillType.Chaos] = true, },
@@ -3758,11 +3785,12 @@ skills["CobraLashMercenary"] = {
 		[40] = { 7, attackSpeedMultiplier = 20, baseMultiplier = 2.682, damageEffectiveness = 2.682, levelRequirement = 100, statInterpolation = { 1, }, },
 	},
 }
-inheritSkillData("CobraLashMercenary", "CobraLash")
 
 skills["ConductivityMercenary"] = {
 	name = "Conductivity",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "Conductivity",
 	color = 3,
 	description = "Curses all targets in an area, lowering their lightning resistance and giving them a chance to be shocked when hit.",
 	skillTypes = { [SkillType.Spell] = true, [SkillType.Area] = true, [SkillType.Duration] = true, [SkillType.Trappable] = true, [SkillType.Totemable] = true, [SkillType.Mineable] = true, [SkillType.Multicastable] = true, [SkillType.Triggerable] = true, [SkillType.Lightning] = true, [SkillType.Cascadable] = true, [SkillType.AppliesCurse] = true, [SkillType.CanRapidFire] = true, [SkillType.AreaSpell] = true, [SkillType.InstantNoRepeatWhenHeld] = true, [SkillType.InstantShiftAttackForLeftMouse] = true, [SkillType.Hex] = true, },
@@ -3830,11 +3858,12 @@ skills["ConductivityMercenary"] = {
 		[40] = { 14800, 17, -51, cooldown = 10, levelRequirement = 100, storedUses = 1, statInterpolation = { 1, 1, 1, }, },
 	},
 }
-inheritSkillData("ConductivityMercenary", "Conductivity")
 
 skills["ConflagrationMercenary"] = {
 	name = "Conflagration",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "Conflagration",
 	color = 2,
 	baseEffectiveness = 3.3840000629425,
 	incrementalEffectiveness = 0.054000001400709,
@@ -3920,11 +3949,12 @@ skills["ConflagrationMercenary"] = {
 		[40] = { 49.500001583248, 25, baseMultiplier = 0.4, damageEffectiveness = 0.4, levelRequirement = 100, statInterpolation = { 3, 1, }, },
 	},
 }
-inheritSkillData("ConflagrationMercenary", "Conflagration")
 
 skills["ConsecratedPathMercenary"] = {
 	name = "Consecrated Path",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "ConsecratedPath",
 	color = 1,
 	description = "Slams the ground at a targeted location. If an enemy is near where you target, you'll teleport to it from a short distance away, slam, and create an area of consecrated ground. Can't be supported by Multistrike, and requires a Sword, Axe, Mace, Sceptre, Staff or Unarmed.",
 	skillTypes = { [SkillType.Melee] = true, [SkillType.Attack] = true, [SkillType.Area] = true, [SkillType.Movement] = true, [SkillType.Triggerable] = true, [SkillType.Damage] = true, [SkillType.Duration] = true, [SkillType.Fire] = true, [SkillType.Slam] = true, [SkillType.Totemable] = true, },
@@ -4002,11 +4032,12 @@ skills["ConsecratedPathMercenary"] = {
 		[40] = { baseMultiplier = 6.882, damageEffectiveness = 6.882, levelRequirement = 100, },
 	},
 }
-inheritSkillData("ConsecratedPathMercenary", "ConsecratedPath")
 
 skills["CreepingFrostTrapMercenary"] = {
 	name = "Creeping Frost Trap",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "CreepingFrost",
 	color = 3,
 	baseEffectiveness = 1.1953999996185,
 	incrementalEffectiveness = 0.047100000083447,
@@ -4086,11 +4117,12 @@ skills["CreepingFrostTrapMercenary"] = {
 		[40] = { 0.68999999761581, 1.0299999713898, 223.00000689179, critChance = 6, damageEffectiveness = 1.3, levelRequirement = 100, statInterpolation = { 3, 3, 3, }, },
 	},
 }
-inheritSkillData("CreepingFrostTrapMercenary", "CreepingFrost")
 
 skills["CreepingFrostTrapMercenaryEncounter"] = {
 	name = "Creeping Frost Trap",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "CreepingFrost",
 	color = 3,
 	baseEffectiveness = 1.1000000238419,
 	incrementalEffectiveness = 0.03999999910593,
@@ -4170,11 +4202,12 @@ skills["CreepingFrostTrapMercenaryEncounter"] = {
 		[40] = { 0.80000001192093, 1.2000000476837, 66.666668156783, critChance = 6, damageEffectiveness = 1.3, levelRequirement = 100, statInterpolation = { 3, 3, 3, }, },
 	},
 }
-inheritSkillData("CreepingFrostTrapMercenaryEncounter", "CreepingFrost")
 
 skills["CurseNova"] = {
 	name = "Elemental Warding",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "ElementalWarding",
 	color = 4,
 	baseEffectiveness = 4.6556000709534,
 	incrementalEffectiveness = 0.050000000745058,
@@ -4214,11 +4247,12 @@ skills["CurseNova"] = {
 		[1] = { 0.80000001192093, 1.2000000476837, 0.64999997615814, 0.98000001907349, 0.89999997615814, 1.3500000238419, cooldown = 10, levelRequirement = 68, storedUses = 1, statInterpolation = { 3, 3, 3, 3, 3, 3, }, },
 	},
 }
-inheritSkillData("CurseNova", "ElementalWarding")
 
 skills["CycloneReverseKnockbackMercenary"] = {
 	name = "Cyclone of the Empire",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "Cyclone",
 	color = 2,
 	description = "Channel this skill to move towards a targeted location while spinning constantly attacking enemies in an area around you. While channelling this skill, you cannot be knocked back.",
 	skillTypes = { [SkillType.Attack] = true, [SkillType.Area] = true, [SkillType.Melee] = true, [SkillType.Movement] = true, [SkillType.Channel] = true, },
@@ -4298,11 +4332,12 @@ skills["CycloneReverseKnockbackMercenary"] = {
 		[40] = { baseMultiplier = 1.835, damageEffectiveness = 1.835, levelRequirement = 100, },
 	},
 }
-inheritSkillData("CycloneReverseKnockbackMercenary", "Cyclone")
 
 skills["DarkPactMercenary"] = {
 	name = "Dark Bargain",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "DarkPact",
 	color = 3,
 	baseEffectiveness = 1.6000000238419,
 	incrementalEffectiveness = 0.035000000149012,
@@ -4333,11 +4368,12 @@ skills["DarkPactMercenary"] = {
 		[1] = { 0.80000001192093, 1.2000000476837, critChance = 7, levelRequirement = 1, statInterpolation = { 3, 3, }, },
 	},
 }
-inheritSkillData("DarkPactMercenary", "DarkPact")
 
 skills["DashMercenary"] = {
 	name = "Dash",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "Dash",
 	color = 2,
 	description = "Performs a series of quick teleports towards a targeted location. If using the \"Attack in Place\" option, the direction is reversed. Shares a cooldown with other Blink skills.",
 	skillTypes = { [SkillType.Spell] = true, [SkillType.Movement] = true, [SkillType.Travel] = true, [SkillType.Blink] = true, [SkillType.Cooldown] = true, [SkillType.FixedCastTime] = true, },
@@ -4402,11 +4438,12 @@ skills["DashMercenary"] = {
 		[40] = { 34, 102, cooldown = 2.5, levelRequirement = 100, storedUses = 1, statInterpolation = { 1, 1, }, },
 	},
 }
-inheritSkillData("DashMercenary", "Dash")
 
 skills["DeceleratingProjectileMercenary"] = {
 	name = "Chaotic Shot",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "DeceleratingProjectileAzmeriCasterDemon",
 	color = 4,
 	skillTypes = { [SkillType.Spell] = true, [SkillType.Projectile] = true, [SkillType.Triggerable] = true, },
 	statDescriptionScope = "skill_stat_descriptions",
@@ -4435,11 +4472,12 @@ skills["DeceleratingProjectileMercenary"] = {
 		[84] = { 100, baseMultiplier = 1.25, damageEffectiveness = 1.25, levelRequirement = 84, statInterpolation = { 2, }, },
 	},
 }
-inheritSkillData("DeceleratingProjectileMercenary", "DeceleratingProjectileAzmeriCasterDemon")
 
 skills["DeceleratingProjectileMercenaryExplode"] = {
 	name = "Chaotic Burst",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "AfflictionMinionPhysSlamCircleBig",
 	color = 4,
 	baseEffectiveness = 1.75,
 	incrementalEffectiveness = 0.029999999329448,
@@ -4465,11 +4503,12 @@ skills["DeceleratingProjectileMercenaryExplode"] = {
 		[84] = { 50, baseMultiplier = 1.6, damageEffectiveness = 1.6, levelRequirement = 84, statInterpolation = { 2, }, },
 	},
 }
-inheritSkillData("DeceleratingProjectileMercenaryExplode", "AfflictionMinionPhysSlamCircleBig")
 
 skills["DecoyTotemMercenary"] = {
 	name = "Decoy Totem",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "DecoyTotem",
 	color = 1,
 	description = "Summons a totem that taunts nearby monsters to attack it.",
 	skillTypes = { [SkillType.Spell] = true, [SkillType.Trappable] = true, [SkillType.Mineable] = true, [SkillType.Area] = true, [SkillType.SummonsTotem] = true, [SkillType.Multicastable] = true, [SkillType.AreaSpell] = true, [SkillType.Cooldown] = true, },
@@ -4536,11 +4575,12 @@ skills["DecoyTotemMercenary"] = {
 		[40] = { 136, cooldown = 8, levelRequirement = 100, storedUses = 1, statInterpolation = { 1, }, },
 	},
 }
-inheritSkillData("DecoyTotemMercenary", "DecoyTotem")
 
 skills["DesecrateMercenary"] = {
 	name = "Desecrate",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "Desecrate",
 	color = 2,
 	baseEffectiveness = 1.6000000238419,
 	incrementalEffectiveness = 0.046500001102686,
@@ -4606,11 +4646,12 @@ skills["DesecrateMercenary"] = {
 		[40] = { 16.666667039196, 100, cooldown = 3, levelRequirement = 100, storedUses = 1, statInterpolation = { 3, 1, }, },
 	},
 }
-inheritSkillData("DesecrateMercenary", "Desecrate")
 
 skills["DespairMercenary"] = {
 	name = "Despair",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "Despair",
 	color = 3,
 	description = "Curses all targets in an area, lowering their chaos resistance.",
 	skillTypes = { [SkillType.Spell] = true, [SkillType.Area] = true, [SkillType.Duration] = true, [SkillType.Trappable] = true, [SkillType.Totemable] = true, [SkillType.Mineable] = true, [SkillType.Multicastable] = true, [SkillType.Triggerable] = true, [SkillType.Cascadable] = true, [SkillType.Chaos] = true, [SkillType.AppliesCurse] = true, [SkillType.CanRapidFire] = true, [SkillType.AreaSpell] = true, [SkillType.InstantNoRepeatWhenHeld] = true, [SkillType.InstantShiftAttackForLeftMouse] = true, [SkillType.Hex] = true, },
@@ -4675,11 +4716,12 @@ skills["DespairMercenary"] = {
 		[40] = { 14800, 17, -41, levelRequirement = 100, statInterpolation = { 1, 1, 1, }, },
 	},
 }
-inheritSkillData("DespairMercenary", "Despair")
 
 skills["DeterminationMercenary"] = {
 	name = "Determination",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "Determination",
 	color = 1,
 	description = "Casts an aura that grants armour to you and your allies.",
 	skillTypes = { [SkillType.Spell] = true, [SkillType.Area] = true, [SkillType.Buff] = true, [SkillType.HasReservation] = true, [SkillType.TotemCastsAlone] = true, [SkillType.Totemable] = true, [SkillType.Aura] = true, [SkillType.Instant] = true, [SkillType.AreaSpell] = true, [SkillType.Physical] = true, [SkillType.CanHaveBlessing] = true, [SkillType.InstantNoRepeatWhenHeld] = true, [SkillType.InstantShiftAttackForLeftMouse] = true, [SkillType.Cooldown] = true, },
@@ -4742,11 +4784,12 @@ skills["DeterminationMercenary"] = {
 		[40] = { 57, 2133, 34, cooldown = 1.2, levelRequirement = 100, storedUses = 1, statInterpolation = { 1, 1, 1, }, },
 	},
 }
-inheritSkillData("DeterminationMercenary", "AzmeriTurtleDetermination")
 
 skills["DisciplineMercenary"] = {
 	name = "Discipline",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "Discipline",
 	color = 3,
 	description = "Casts an aura that grants additional energy shield and increased energy shield recharge rate to you and your allies.",
 	skillTypes = { [SkillType.Spell] = true, [SkillType.Area] = true, [SkillType.Buff] = true, [SkillType.HasReservation] = true, [SkillType.TotemCastsAlone] = true, [SkillType.Totemable] = true, [SkillType.Aura] = true, [SkillType.Instant] = true, [SkillType.AreaSpell] = true, [SkillType.CanHaveBlessing] = true, [SkillType.InstantNoRepeatWhenHeld] = true, [SkillType.InstantShiftAttackForLeftMouse] = true, [SkillType.Cooldown] = true, },
@@ -4811,11 +4854,12 @@ skills["DisciplineMercenary"] = {
 		[40] = { 356, 34, cooldown = 1.2, levelRequirement = 100, storedUses = 1, statInterpolation = { 1, 1, }, },
 	},
 }
-inheritSkillData("DisciplineMercenary", "AzmeriGoddessDiscipline")
 
 skills["DivineIreMercenary"] = {
 	name = "Divine Ire",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "DivineIre",
 	color = 3,
 	baseEffectiveness = 0.49039998650551,
 	incrementalEffectiveness = 0.04280000180006,
@@ -4890,11 +4934,12 @@ skills["DivineIreMercenary"] = {
 		[40] = { 0.80000001192093, 1.2000000476837, 6, critChance = 6, damageEffectiveness = 0.45, levelRequirement = 100, statInterpolation = { 3, 3, 1, }, },
 	},
 }
-inheritSkillData("DivineIreMercenary", "DivineIre")
 
 skills["DivineRetributionMercenary"] = {
 	name = "Divine Retribution",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "DivineRetribution",
 	color = 3,
 	baseEffectiveness = 4.0999999046326,
 	incrementalEffectiveness = 0.043200001120567,
@@ -4966,11 +5011,11 @@ skills["DivineRetributionMercenary"] = {
 		[40] = { 0.80000001192093, 1.2000000476837, 6, cooldown = 10, critChance = 6, damageEffectiveness = 3.9, levelRequirement = 100, storedUses = 1, statInterpolation = { 3, 3, 1, }, },
 	},
 }
-inheritSkillData("DivineRetributionMercenary", "DivineRetribution")
 
 skills["DoLiterallyNothing"] = {
 	name = "Do Nothing",
 	hidden = true,
+	mercenary = true,
 	color = 4,
 	baseEffectiveness = 0,
 	skillTypes = { },
@@ -4988,6 +5033,8 @@ skills["DoLiterallyNothing"] = {
 skills["DominatingBlowMercenary"] = {
 	name = "Dominating Blow",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "DominatingBlow",
 	color = 1,
 	description = "Attacks enemies with a melee strike, applying a debuff for a short duration. If a non-unique enemy dies while affected by the debuff, the enemy's corpse will be consumed and a Sentinel of Dominance with the same rarity, prefix and suffix modifiers will be summoned for a longer secondary duration.",
 	skillTypes = { [SkillType.Attack] = true, [SkillType.Minion] = true, [SkillType.Duration] = true, [SkillType.MinionsCanExplode] = true, [SkillType.MeleeSingleTarget] = true, [SkillType.Multistrikeable] = true, [SkillType.Melee] = true, [SkillType.CreatesMinion] = true, [SkillType.CreatesSentinelMinion] = true, },
@@ -5069,11 +5116,12 @@ skills["DominatingBlowMercenary"] = {
 		[40] = { baseMultiplier = 7.571, damageEffectiveness = 7.571, levelRequirement = 100, },
 	},
 }
-inheritSkillData("DominatingBlowMercenary", "DominatingBlow")
 
 skills["DonutBladesMercenary"] = {
 	name = "Triggerblades",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "AfflictionMinionPhysSlamCircleBig",
 	color = 2,
 	skillTypes = { [SkillType.Triggerable] = true, [SkillType.Attack] = true, },
 	statDescriptionScope = "skill_stat_descriptions",
@@ -5093,11 +5141,11 @@ skills["DonutBladesMercenary"] = {
 		[2] = { 120, baseMultiplier = 0.6, levelRequirement = 84, statInterpolation = { 2, }, },
 	},
 }
-inheritSkillData("DonutBladesMercenary", "AfflictionMinionPhysSlamCircleBig")
 
 skills["DonutCircleMercenary"] = {
 	name = "Seismic Crush",
 	hidden = true,
+	mercenary = true,
 	color = 4,
 	baseEffectiveness = 4,
 	incrementalEffectiveness = 0.03999999910593,
@@ -5128,6 +5176,8 @@ skills["DonutCircleMercenary"] = {
 skills["DoryanisTouchMercenary"] = {
 	name = "Touch of God",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "DoryanisTouch",
 	color = 1,
 	description = "The character uses their fist to slam the ground in front of them, with less attack speed, but more damage. This attack deals Lightning Damage to enemies in a large area, with a chance to Shock them. Cannot be used while wielding a Weapon. Cannot be Evaded.",
 	skillTypes = { [SkillType.Attack] = true, [SkillType.Area] = true, [SkillType.Lightning] = true, [SkillType.Melee] = true, [SkillType.Multistrikeable] = true, [SkillType.Slam] = true, [SkillType.Totemable] = true, },
@@ -5192,11 +5242,11 @@ skills["DoryanisTouchMercenary"] = {
 		[40] = { attackSpeedMultiplier = -45, cooldown = 10, damageEffectiveness = 10, levelRequirement = 100, storedUses = 1, },
 	},
 }
-inheritSkillData("DoryanisTouchMercenary", "DoryanisTouch")
 
 skills["DropArrowMercenary"] = {
 	name = "Molten Well",
 	hidden = true,
+	mercenary = true,
 	color = 2,
 	baseEffectiveness = 4,
 	incrementalEffectiveness = 0.050000000745058,
@@ -5271,6 +5321,7 @@ skills["DropArrowMercenary"] = {
 skills["DropArrowMercenaryEncounter"] = {
 	name = "Molten Well",
 	hidden = true,
+	mercenary = true,
 	color = 2,
 	baseEffectiveness = 3,
 	incrementalEffectiveness = 0.03999999910593,
@@ -5345,6 +5396,8 @@ skills["DropArrowMercenaryEncounter"] = {
 skills["DualStrikeMercenary"] = {
 	name = "Dual Strike",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "DualStrike",
 	color = 2,
 	baseEffectiveness = 0,
 	description = "Attacks with both weapons, dealing the damage of both in one strike. Dual wield only. Does not work with wands.",
@@ -5415,11 +5468,12 @@ skills["DualStrikeMercenary"] = {
 		[40] = { attackSpeedMultiplier = -30, baseMultiplier = 10.162, damageEffectiveness = 10.162, levelRequirement = 100, },
 	},
 }
-inheritSkillData("DualStrikeMercenary", "AzmeriDualStrikeDemonDualStrike")
 
 skills["EASRitualDaemonChaosProjectileRuckus"] = {
 	name = "EASRitualDaemonChaosProjectileRuckus",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "EmptyActionSpellWarlordGrandmaster",
 	color = 4,
 	skillTypes = { [SkillType.Spell] = true, },
 	statDescriptionScope = "skill_stat_descriptions",
@@ -5433,11 +5487,12 @@ skills["EASRitualDaemonChaosProjectileRuckus"] = {
 		[1] = { cooldown = 6, levelRequirement = 0, storedUses = 1, },
 	},
 }
-inheritSkillData("EASRitualDaemonChaosProjectileRuckus", "EmptyActionSpellWarlordGrandmaster")
 
 skills["EarthquakeAltMercenary"] = {
 	name = "Earthquake of Amplification",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "EarthquakeAltX",
 	color = 1,
 	description = "Smashes the ground, dealing damage in an area and cracking the earth. The crack will erupt in a powerful aftershock after a duration. Cracks created before the first one has erupted will not generate their own aftershocks. Requires an Axe, Mace, Sceptre, Staff or Unarmed.",
 	skillTypes = { [SkillType.Attack] = true, [SkillType.Area] = true, [SkillType.Melee] = true, [SkillType.Multistrikeable] = true, [SkillType.Duration] = true, [SkillType.Slam] = true, [SkillType.Triggerable] = true, [SkillType.Totemable] = true, },
@@ -5510,11 +5565,12 @@ skills["EarthquakeAltMercenary"] = {
 		[40] = { baseMultiplier = 3.355, damageEffectiveness = 3.355, levelRequirement = 100, },
 	},
 }
-inheritSkillData("EarthquakeAltMercenary", "EarthquakeAltX")
 
 skills["EarthquakeColdMercenary"] = {
 	name = "Earthquake of Winter",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "Earthquake",
 	color = 1,
 	baseEffectiveness = 1.5,
 	incrementalEffectiveness = 0.023299999535084,
@@ -5588,11 +5644,12 @@ skills["EarthquakeColdMercenary"] = {
 		[40] = { baseMultiplier = 3.355, cooldown = 1.5, damageEffectiveness = 3.355, levelRequirement = 100, storedUses = 1, },
 	},
 }
-inheritSkillData("EarthquakeColdMercenary", "BoneStalkerEarthquake")
 
 skills["ElementalHitColdOnlyMercenary"] = {
 	name = "Elemental Hit of Ice",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "ElementalHit",
 	color = 2,
 	baseEffectiveness = 3.2400000095367,
 	incrementalEffectiveness = 0.035999998450279,
@@ -5675,11 +5732,12 @@ skills["ElementalHitColdOnlyMercenary"] = {
 		[40] = { attackSpeedMultiplier = 20, levelRequirement = 100, },
 	},
 }
-inheritSkillData("ElementalHitColdOnlyMercenary", "ElementalHit")
 
 skills["ElementalHitColdOnlyMercenaryEncounter"] = {
 	name = "Elemental Hit of Ice",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "ElementalHit",
 	color = 2,
 	description = "Each attack with a melee weapon will choose an element at random, and will only be able to deal damage of that element. If the attack hits an enemy, it will deal damage in an area around them, with the radius being larger if that enemy is suffering from an ailment of the chosen element. It will avoid choosing the same element twice in a row.",
 	skillTypes = { [SkillType.Attack] = true, [SkillType.MeleeSingleTarget] = true, [SkillType.Multistrikeable] = true, [SkillType.Melee] = true, [SkillType.Fire] = true, [SkillType.Cold] = true, [SkillType.Lightning] = true, [SkillType.Area] = true, [SkillType.RandomElement] = true, },
@@ -5721,11 +5779,12 @@ skills["ElementalHitColdOnlyMercenaryEncounter"] = {
 		[1] = { baseMultiplier = 1.7, damageEffectiveness = 1.7, levelRequirement = 0, },
 	},
 }
-inheritSkillData("ElementalHitColdOnlyMercenaryEncounter", "ElementalHit")
 
 skills["ElementalWeaknessAuraMapBoss"] = {
 	name = "Elemental Weakness",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "ElementalWeakness",
 	color = 3,
 	baseEffectiveness = 0,
 	description = "Curses all targets in an area, lowering their elemental resistances.",
@@ -5749,11 +5808,12 @@ skills["ElementalWeaknessAuraMapBoss"] = {
 		[1] = { cooldown = 5, levelRequirement = 1, storedUses = 1, cost = { Mana = 50, }, },
 	},
 }
-inheritSkillData("ElementalWeaknessAuraMapBoss", "ElementalWeakness")
 
 skills["ElementalWeaknessMercenary"] = {
 	name = "Elemental Weakness",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "ElementalWeakness",
 	color = 3,
 	baseEffectiveness = 0,
 	description = "Curses all targets in an area, lowering their elemental resistances.",
@@ -5819,11 +5879,12 @@ skills["ElementalWeaknessMercenary"] = {
 		[40] = { 14800, 17, -41, levelRequirement = 100, statInterpolation = { 1, 1, 1, }, },
 	},
 }
-inheritSkillData("ElementalWeaknessMercenary", "ElementalWeakness")
 
 skills["EnduringCryMercenary"] = {
 	name = "Enduring Cry",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "EnduringCry",
 	color = 1,
 	baseEffectiveness = 0,
 	description = "Performs a warcry, taunting all nearby enemies to attack the user and granting a buff to the user and nearby allies. The user and allied players also gain endurance charges.",
@@ -5889,11 +5950,12 @@ skills["EnduringCryMercenary"] = {
 		[40] = { 54, cooldown = 8, levelRequirement = 100, storedUses = 1, statInterpolation = { 1, }, },
 	},
 }
-inheritSkillData("EnduringCryMercenary", "EnduringCry")
 
 skills["EnfeebleAuraMapBoss"] = {
 	name = "Enfeeble",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "Enfeeble",
 	color = 3,
 	baseEffectiveness = 0,
 	description = "Curses all targets in an area, reducing their accuracy and making them deal less damage.",
@@ -5919,11 +5981,12 @@ skills["EnfeebleAuraMapBoss"] = {
 		[1] = { cooldown = 5, levelRequirement = 4, storedUses = 1, cost = { Mana = 50, }, },
 	},
 }
-inheritSkillData("EnfeebleAuraMapBoss", "AxisEnfeeble")
 
 skills["EnfeebleMercenary"] = {
 	name = "Blasphemy Enfeeble",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "Enfeeble",
 	color = 3,
 	baseEffectiveness = 0,
 	description = "Curses all targets in an area, reducing their accuracy and making them deal less damage.",
@@ -5992,11 +6055,11 @@ skills["EnfeebleMercenary"] = {
 		[40] = { 14800, 17, -27, -34, -26, cooldown = 1.2, levelRequirement = 100, storedUses = 1, statInterpolation = { 1, 1, 1, 1, 1, }, },
 	},
 }
-inheritSkillData("EnfeebleMercenary", "AxisEnfeeble")
 
 skills["EnrageMercenary"] = {
 	name = "Enrage",
 	hidden = true,
+	mercenary = true,
 	color = 1,
 	skillTypes = { [SkillType.Spell] = true, },
 	statDescriptionScope = "skill_stat_descriptions",
@@ -6024,6 +6087,8 @@ skills["EnrageMercenary"] = {
 skills["EnsnaringArrowMercenary"] = {
 	name = "Ensnaring Arrow",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "EnsnaringArrow",
 	color = 2,
 	baseEffectiveness = 6.5,
 	incrementalEffectiveness = 0.052000001072884,
@@ -6093,11 +6158,12 @@ skills["EnsnaringArrowMercenary"] = {
 		[40] = { 24, baseMultiplier = 2.026, cooldown = 5, damageEffectiveness = 2.03, levelRequirement = 100, storedUses = 1, statInterpolation = { 1, }, },
 	},
 }
-inheritSkillData("EnsnaringArrowMercenary", "EnsnaringArrow")
 
 skills["EnvyMercenary"] = {
 	name = "Envy",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "Envy",
 	color = 3,
 	baseEffectiveness = 2.0999999046326,
 	incrementalEffectiveness = 0.023000000044703,
@@ -6164,11 +6230,12 @@ skills["EnvyMercenary"] = {
 		[40] = { 0.5, 0.69999998807907, 0.44999998807907, 0.60000002384186, 34, cooldown = 1.2, levelRequirement = 100, storedUses = 1, statInterpolation = { 3, 3, 3, 3, 1, }, },
 	},
 }
-inheritSkillData("EnvyMercenary", "Envy")
 
 skills["EssenceDrainAltMercenary"] = {
 	name = "Essence Drain of Wickedness",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "EssenceDrainAltY",
 	color = 3,
 	baseEffectiveness = 4.0479998588562,
 	incrementalEffectiveness = 0.052700001746416,
@@ -6241,11 +6308,12 @@ skills["EssenceDrainAltMercenary"] = {
 		[40] = { 13.666666852931, 0.34999999403954, 0.52999997138977, critChance = 5, damageEffectiveness = 3.1, levelRequirement = 100, statInterpolation = { 3, 3, 3, }, },
 	},
 }
-inheritSkillData("EssenceDrainAltMercenary", "EssenceDrainAltY")
 
 skills["EssenceDrainAltMercenaryEncounter"] = {
 	name = "Essence Drain of Wickedness",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "EssenceDrainAltY",
 	color = 3,
 	baseEffectiveness = 3.7999999523163,
 	incrementalEffectiveness = 0.047499999403954,
@@ -6318,11 +6386,12 @@ skills["EssenceDrainAltMercenaryEncounter"] = {
 		[40] = { 6.8333334264656, 0.34999999403954, 0.52999997138977, critChance = 5, damageEffectiveness = 3.1, levelRequirement = 100, statInterpolation = { 3, 3, 3, }, },
 	},
 }
-inheritSkillData("EssenceDrainAltMercenaryEncounter", "EssenceDrainAltY")
 
 skills["EtherealKnivesMercenary"] = {
 	name = "Ethereal Knives",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "EtherealKnives",
 	color = 2,
 	baseEffectiveness = 3.0380001068115,
 	incrementalEffectiveness = 0.043600000441074,
@@ -6391,11 +6460,12 @@ skills["EtherealKnivesMercenary"] = {
 		[40] = { 0.80000001192093, 1.2000000476837, 16, critChance = 10, damageEffectiveness = 2.2, levelRequirement = 100, statInterpolation = { 3, 3, 1, }, },
 	},
 }
-inheritSkillData("EtherealKnivesMercenary", "EtherealKnives")
 
 skills["EtherealKnivesMercenaryEncounter"] = {
 	name = "Ethereal Knives",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "EtherealKnives",
 	color = 2,
 	baseEffectiveness = 2.1717000007629,
 	incrementalEffectiveness = 0.043600000441074,
@@ -6464,11 +6534,12 @@ skills["EtherealKnivesMercenaryEncounter"] = {
 		[40] = { 0.80000001192093, 1.2000000476837, 16, critChance = 10, damageEffectiveness = 2.2, levelRequirement = 100, statInterpolation = { 3, 3, 1, }, },
 	},
 }
-inheritSkillData("EtherealKnivesMercenaryEncounter", "EtherealKnives")
 
 skills["ExplosiveArrowBarrageMercenary"] = {
 	name = "Explosive Arrow",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "ExplosiveArrow",
 	color = 2,
 	baseEffectiveness = 1.4859000444412,
 	incrementalEffectiveness = 0.040300000458956,
@@ -6546,11 +6617,12 @@ skills["ExplosiveArrowBarrageMercenary"] = {
 		[40] = { 0.80000001192093, 1.2000000476837, levelRequirement = 100, statInterpolation = { 3, 3, }, },
 	},
 }
-inheritSkillData("ExplosiveArrowBarrageMercenary", "ExplosiveArrow")
 
 skills["ExsanguinateMercenary"] = {
 	name = "Exsanguinate",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "Exsanguinate",
 	color = 1,
 	baseEffectiveness = 1.8999999761581,
 	incrementalEffectiveness = 0.052499998360872,
@@ -6619,11 +6691,12 @@ skills["ExsanguinateMercenary"] = {
 		[40] = { 0.80000001192093, 1.2000000476837, 51.030001191472, 11, critChance = 6, damageEffectiveness = 2.7, levelRequirement = 100, statInterpolation = { 3, 3, 3, 1, }, },
 	},
 }
-inheritSkillData("ExsanguinateMercenary", "Exsanguinate")
 
 skills["ExsanguinateMercenaryEncounter"] = {
 	name = "Exsanguinate",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "Exsanguinate",
 	color = 1,
 	baseEffectiveness = 1.2000000476837,
 	incrementalEffectiveness = 0.029999999329448,
@@ -6693,11 +6766,12 @@ skills["ExsanguinateMercenaryEncounter"] = {
 		[40] = { 0.80000001192093, 1.2000000476837, 25.000000558794, 7, critChance = 6, damageEffectiveness = 2.7, levelRequirement = 100, statInterpolation = { 3, 3, 3, 1, }, },
 	},
 }
-inheritSkillData("ExsanguinateMercenaryEncounter", "Exsanguinate")
 
 skills["EyeOfWinterMercenary"] = {
 	name = "Eye of Winter",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "EyeOfWinter",
 	color = 3,
 	baseEffectiveness = 0.30000001192093,
 	incrementalEffectiveness = 0.050000000745058,
@@ -6767,11 +6841,12 @@ skills["EyeOfWinterMercenary"] = {
 		[40] = { 0.80000001192093, 1.2000000476837, critChance = 6, damageEffectiveness = 0.55, levelRequirement = 100, statInterpolation = { 3, 3, }, },
 	},
 }
-inheritSkillData("EyeOfWinterMercenary", "EyeOfWinter")
 
 skills["FireAegisMercenary"] = {
 	name = "Flame Aegis",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "FireAegis",
 	color = 4,
 	description = "Calls forth a protective aegis which takes fire damage from hits for you until depleted. The aegis will be restored to its full value after a short delay if you stop taking fire damage from hits, or if depleted.",
 	skillTypes = { [SkillType.Spell] = true, [SkillType.Triggerable] = true, [SkillType.Triggered] = true, [SkillType.InbuiltTrigger] = true, [SkillType.Aegis] = true, },
@@ -6832,11 +6907,12 @@ skills["FireAegisMercenary"] = {
 		[40] = { 20927, levelRequirement = 100, statInterpolation = { 1, }, },
 	},
 }
-inheritSkillData("FireAegisMercenary", "FireAegis")
 
 skills["FireAegisMercenaryEncounter"] = {
 	name = "Flame Aegis",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "FireAegis",
 	color = 4,
 	description = "Calls forth a protective aegis which takes fire damage from hits for you until depleted. The aegis will be restored to its full value after a short delay if you stop taking fire damage from hits, or if depleted.",
 	skillTypes = { [SkillType.Spell] = true, [SkillType.Triggerable] = true, [SkillType.Triggered] = true, [SkillType.InbuiltTrigger] = true, [SkillType.Aegis] = true, },
@@ -6897,11 +6973,12 @@ skills["FireAegisMercenaryEncounter"] = {
 		[40] = { 303561, levelRequirement = 100, statInterpolation = { 1, }, },
 	},
 }
-inheritSkillData("FireAegisMercenaryEncounter", "FireAegis")
 
 skills["FireEnrageMercenary"] = {
 	name = "Inflame",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "AzmeriDualStrikeDemonFireEnrage",
 	color = 4,
 	baseEffectiveness = 1.7889000177383,
 	incrementalEffectiveness = 0.034000001847744,
@@ -6923,11 +7000,11 @@ skills["FireEnrageMercenary"] = {
 		[1] = { 30, cooldown = 10, levelRequirement = 1, storedUses = 1, statInterpolation = { 1, }, },
 	},
 }
-inheritSkillData("FireEnrageMercenary", "AzmeriDualStrikeDemonFireEnrage")
 
 skills["FireballAltMercenary"] = {
 	name = "Fireball of Impact",
 	hidden = true,
+	mercenary = true,
 	color = 3,
 	baseEffectiveness = 2.9210000038147,
 	incrementalEffectiveness = 0.047400001436472,
@@ -7001,6 +7078,8 @@ skills["FireballAltMercenary"] = {
 skills["FireballMercenary"] = {
 	name = "Fireball",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "Fireball",
 	color = 3,
 	baseEffectiveness = 2.9210000038147,
 	incrementalEffectiveness = 0.047400001436472,
@@ -7069,11 +7148,11 @@ skills["FireballMercenary"] = {
 		[40] = { 0.80000001192093, 1.2000000476837, 17, critChance = 6, damageEffectiveness = 3.7, levelRequirement = 100, statInterpolation = { 3, 3, 1, }, },
 	},
 }
-inheritSkillData("FireballMercenary", "Fireball")
 
 skills["FissureSlamMercenary"] = {
 	name = "Ashen Fissure",
 	hidden = true,
+	mercenary = true,
 	color = 1,
 	skillTypes = { [SkillType.Attack] = true, [SkillType.Triggerable] = true, },
 	statDescriptionScope = "skill_stat_descriptions",
@@ -7096,6 +7175,8 @@ skills["FissureSlamMercenary"] = {
 skills["FlameDashMercenary"] = {
 	name = "Flame Dash",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "FlameDash",
 	color = 3,
 	baseEffectiveness = 0.80000001192093,
 	incrementalEffectiveness = 0.052499998360872,
@@ -7168,11 +7249,12 @@ skills["FlameDashMercenary"] = {
 		[40] = { 0.80000001192093, 1.2000000476837, 33.333334078391, 34, cooldown = 3.5, critChance = 5, damageEffectiveness = 1.4, levelRequirement = 100, storedUses = 3, statInterpolation = { 3, 3, 3, 1, }, },
 	},
 }
-inheritSkillData("FlameDashMercenary", "FemaleCannibalBossFlameDash")
 
 skills["FlameLinkMercenary"] = {
 	name = "Flame Link",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "FlameLink",
 	color = 1,
 	baseEffectiveness = 0.52499997615814,
 	incrementalEffectiveness = 0.039000000804663,
@@ -7236,11 +7318,12 @@ skills["FlameLinkMercenary"] = {
 		[40] = { 0.80000001192093, 1.2000000476837, 11450, cooldown = 15, levelRequirement = 100, storedUses = 1, statInterpolation = { 3, 3, 1, }, },
 	},
 }
-inheritSkillData("FlameLinkMercenary", "FlameLink")
 
 skills["FlameSurgeMercenary"] = {
 	name = "Flame Surge",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "BreachLightningWhip",
 	color = 3,
 	baseEffectiveness = 2.7952001094818,
 	incrementalEffectiveness = 0.037799999117851,
@@ -7313,11 +7396,12 @@ skills["FlameSurgeMercenary"] = {
 		[40] = { 0.80000001192093, 1.2000000476837, 118, 17, critChance = 5, damageEffectiveness = 1.9, levelRequirement = 100, statInterpolation = { 3, 3, 1, 1, }, },
 	},
 }
-inheritSkillData("FlameSurgeMercenary", "BreachLightningWhip")
 
 skills["FlameWallMercenary"] = {
 	name = "Flame Wall",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "FlameWall",
 	color = 3,
 	baseEffectiveness = 4.3292999267578,
 	incrementalEffectiveness = 0.0625,
@@ -7393,11 +7477,12 @@ skills["FlameWallMercenary"] = {
 		[40] = { 5.0000003104409, 16.666667039196, 192, 287, 2790, 74, 6400, cooldown = 4.5, levelRequirement = 100, storedUses = 1, statInterpolation = { 3, 3, 1, 1, 1, 1, 1, }, },
 	},
 }
-inheritSkillData("FlameWallMercenary", "FlameWall")
 
 skills["FlameWallMercenaryEncounter"] = {
 	name = "Flame Wall",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "FlameWall",
 	color = 3,
 	baseEffectiveness = 2.1600000858307,
 	incrementalEffectiveness = 0.030999999493361,
@@ -7473,11 +7558,12 @@ skills["FlameWallMercenaryEncounter"] = {
 		[40] = { 5.0000003104409, 16.666667039196, 192, 287, 2790, 74, 6400, cooldown = 4.5, levelRequirement = 100, storedUses = 1, statInterpolation = { 3, 3, 1, 1, 1, 1, 1, }, },
 	},
 }
-inheritSkillData("FlameWallMercenaryEncounter", "FlameWall")
 
 skills["FlameblastMercenary"] = {
 	name = "Flameblast",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "Flameblast",
 	color = 3,
 	baseEffectiveness = 0.86769998073578,
 	incrementalEffectiveness = 0.044599998742342,
@@ -7548,11 +7634,12 @@ skills["FlameblastMercenary"] = {
 		[40] = { 0.80000001192093, 1.2000000476837, critChance = 5, damageEffectiveness = 0.9, levelRequirement = 100, statInterpolation = { 3, 3, }, },
 	},
 }
-inheritSkillData("FlameblastMercenary", "Flameblast")
 
 skills["FlammabilityBlasphemyMercenary"] = {
 	name = "Blasphemy Flammability",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "Flammability",
 	color = 3,
 	description = "Curses all targets in an area, lowering their fire resistance and giving them a chance to be ignited when hit.",
 	skillTypes = { [SkillType.Spell] = true, [SkillType.Area] = true, [SkillType.Duration] = true, [SkillType.Trappable] = true, [SkillType.Totemable] = true, [SkillType.Mineable] = true, [SkillType.Multicastable] = true, [SkillType.Triggerable] = true, [SkillType.Fire] = true, [SkillType.Cascadable] = true, [SkillType.AppliesCurse] = true, [SkillType.CanRapidFire] = true, [SkillType.AreaSpell] = true, [SkillType.InstantNoRepeatWhenHeld] = true, [SkillType.InstantShiftAttackForLeftMouse] = true, [SkillType.Hex] = true, },
@@ -7622,11 +7709,12 @@ skills["FlammabilityBlasphemyMercenary"] = {
 		[40] = { 14800, 17, -51, cooldown = 1.2, levelRequirement = 100, storedUses = 1, statInterpolation = { 1, 1, 1, }, },
 	},
 }
-inheritSkillData("FlammabilityBlasphemyMercenary", "Flammability")
 
 skills["FlammabilityMercenary"] = {
 	name = "Flammability",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "Flammability",
 	color = 3,
 	description = "Curses all targets in an area, lowering their fire resistance and giving them a chance to be ignited when hit.",
 	skillTypes = { [SkillType.Spell] = true, [SkillType.Area] = true, [SkillType.Duration] = true, [SkillType.Trappable] = true, [SkillType.Totemable] = true, [SkillType.Mineable] = true, [SkillType.Multicastable] = true, [SkillType.Triggerable] = true, [SkillType.Fire] = true, [SkillType.Cascadable] = true, [SkillType.AppliesCurse] = true, [SkillType.CanRapidFire] = true, [SkillType.AreaSpell] = true, [SkillType.InstantNoRepeatWhenHeld] = true, [SkillType.InstantShiftAttackForLeftMouse] = true, [SkillType.Hex] = true, },
@@ -7694,11 +7782,12 @@ skills["FlammabilityMercenary"] = {
 		[40] = { 14800, 17, -51, levelRequirement = 100, statInterpolation = { 1, 1, 1, }, },
 	},
 }
-inheritSkillData("FlammabilityMercenary", "Flammability")
 
 skills["FleshOfferingMercenary"] = {
 	name = "Flesh Offering",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "FleshOffering",
 	color = 3,
 	description = "Consumes a corpse, which temporarily empowers your minions with swiftness. The skill consumes other nearby corpses, increasing the duration for each corpse consumed.",
 	skillTypes = { [SkillType.Spell] = true, [SkillType.Buff] = true, [SkillType.Duration] = true, [SkillType.Triggerable] = true, [SkillType.Minion] = true, [SkillType.Trappable] = true, [SkillType.Mineable] = true, [SkillType.Totemable] = true, [SkillType.Offering] = true, },
@@ -7762,11 +7851,12 @@ skills["FleshOfferingMercenary"] = {
 		[40] = { 37, 37, 37, cooldown = 10, levelRequirement = 100, storedUses = 1, statInterpolation = { 1, 1, 1, }, },
 	},
 }
-inheritSkillData("FleshOfferingMercenary", "FleshOffering")
 
 skills["FlickerStrikeMercenary"] = {
 	name = "Flicker Strike",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "FlickerStrike",
 	color = 2,
 	description = "Teleports the character to a nearby monster and attacks with a melee weapon. If no specific monster is targeted, one is picked at random. Grants a buff that increases movement speed for a duration. The cooldown can be bypassed by expending a Frenzy Charge.",
 	skillTypes = { [SkillType.Attack] = true, [SkillType.Melee] = true, [SkillType.MeleeSingleTarget] = true, [SkillType.Multistrikeable] = true, [SkillType.Movement] = true, [SkillType.Duration] = true, [SkillType.Cooldown] = true, },
@@ -7844,11 +7934,12 @@ skills["FlickerStrikeMercenary"] = {
 		[40] = { baseMultiplier = 7.96, damageEffectiveness = 7.96, levelRequirement = 100, },
 	},
 }
-inheritSkillData("FlickerStrikeMercenary", "CrucibleVendigoFlickerStrike")
 
 skills["ForbiddenRiteTotemMercenary"] = {
 	name = "Forbidden Rite Totem",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "ForbiddenRite",
 	color = 3,
 	baseEffectiveness = 1.0389000177383,
 	incrementalEffectiveness = 0.045000001788139,
@@ -7928,11 +8019,12 @@ skills["ForbiddenRiteTotemMercenary"] = {
 		[40] = { 0.80000001192093, 1.2000000476837, 8, cooldown = 10, critChance = 6, damageEffectiveness = 1.1, levelRequirement = 100, storedUses = 1, statInterpolation = { 3, 3, 1, }, },
 	},
 }
-inheritSkillData("ForbiddenRiteTotemMercenary", "ForbiddenRite")
 
 skills["FrenzyMercenary"] = {
 	name = "Frenzy",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "Frenzy",
 	color = 2,
 	baseEffectiveness = 0,
 	description = "Performs an attack with a ranged weapon that gives the character a frenzy charge if it hits. Frenzy charges increase your attack speed.",
@@ -7998,11 +8090,12 @@ skills["FrenzyMercenary"] = {
 		[40] = { baseMultiplier = 1.508, damageEffectiveness = 1.51, levelRequirement = 100, },
 	},
 }
-inheritSkillData("FrenzyMercenary", "Frenzy")
 
 skills["FrostBladesMercenary"] = {
 	name = "Frost Blades",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "FrostBlades",
 	color = 2,
 	description = "Attack enemies with increased range, releasing icy blades from the first enemy hit which fly at other enemies. Requires a Melee Weapon.",
 	skillTypes = { [SkillType.Attack] = true, [SkillType.Projectile] = true, [SkillType.MeleeSingleTarget] = true, [SkillType.Multistrikeable] = true, [SkillType.Melee] = true, [SkillType.Cold] = true, [SkillType.RangedAttack] = true, [SkillType.ProjectilesNotFromUser] = true, },
@@ -8079,11 +8172,12 @@ skills["FrostBladesMercenary"] = {
 		[40] = { 11, 24, baseMultiplier = 9.41, damageEffectiveness = 9.41, levelRequirement = 100, statInterpolation = { 1, 1, }, },
 	},
 }
-inheritSkillData("FrostBladesMercenary", "FrostBlades")
 
 skills["FrostBladesMercenaryEncounter"] = {
 	name = "Frost Blades",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "FrostBlades",
 	color = 2,
 	description = "Attack enemies with increased range, releasing icy blades from the first enemy hit which fly at other enemies. Requires a Melee Weapon.",
 	skillTypes = { [SkillType.Attack] = true, [SkillType.Projectile] = true, [SkillType.MeleeSingleTarget] = true, [SkillType.Multistrikeable] = true, [SkillType.Melee] = true, [SkillType.Cold] = true, [SkillType.RangedAttack] = true, [SkillType.ProjectilesNotFromUser] = true, },
@@ -8121,11 +8215,12 @@ skills["FrostBladesMercenaryEncounter"] = {
 		[1] = { 6, 19, baseMultiplier = 1.7, damageEffectiveness = 1.7, levelRequirement = 0, statInterpolation = { 1, 1, }, },
 	},
 }
-inheritSkillData("FrostBladesMercenaryEncounter", "FrostBlades")
 
 skills["FrostBombMercenary"] = {
 	name = "Frost Bomb",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "FrostBomb",
 	color = 3,
 	baseEffectiveness = 2.25,
 	incrementalEffectiveness = 0.050000000745058,
@@ -8198,11 +8293,12 @@ skills["FrostBombMercenary"] = {
 		[40] = { 0.80000001192093, 1.2000000476837, 13, cooldown = 2.5, critChance = 7.5, damageEffectiveness = 3.1, levelRequirement = 100, storedUses = 1, statInterpolation = { 3, 3, 1, }, },
 	},
 }
-inheritSkillData("FrostBombMercenary", "FrostBomb")
 
 skills["FrostShieldMercenary"] = {
 	name = "Frost Shield",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "FrostShield",
 	color = 3,
 	description = "Place a Frost Shield that drains your energy shield for one second or until you run out, gaining stages while this drain occurs. The Frost Shield takes some damage from hits in place of you and allies while in its area. Enemies in the area are Chilled. You can only have one Frost Shield active at once.",
 	skillTypes = { [SkillType.Spell] = true, [SkillType.Area] = true, [SkillType.Duration] = true, [SkillType.Trappable] = true, [SkillType.Mineable] = true, [SkillType.Triggerable] = true, [SkillType.AreaSpell] = true, [SkillType.Cooldown] = true, [SkillType.Cold] = true, [SkillType.Totemable] = true, [SkillType.ChillingArea] = true, [SkillType.NonHitChill] = true, [SkillType.ElementalStatus] = true, [SkillType.TotemCastsAlone] = true, },
@@ -8268,11 +8364,12 @@ skills["FrostShieldMercenary"] = {
 		[40] = { 3020, 144600, 61, cooldown = 5, levelRequirement = 100, storedUses = 1, statInterpolation = { 1, 1, 1, }, },
 	},
 }
-inheritSkillData("FrostShieldMercenary", "FrostShield")
 
 skills["FrostWallMercenary"] = {
 	name = "Frost Wall",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "FrostWall",
 	color = 3,
 	baseEffectiveness = 2,
 	incrementalEffectiveness = 0.033300001174212,
@@ -8341,11 +8438,12 @@ skills["FrostWallMercenary"] = {
 		[40] = { 0.80000001192093, 1.2000000476837, 6400, 94, cooldown = 4, levelRequirement = 100, storedUses = 2, statInterpolation = { 3, 3, 1, 1, }, },
 	},
 }
-inheritSkillData("FrostWallMercenary", "FrostWall")
 
 skills["FrostbiteMercenary"] = {
 	name = "Frostbite",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "Frostbite",
 	color = 3,
 	description = "Curses all targets in an area, lowering their cold resistance and giving them a chance to be frozen when hit.",
 	skillTypes = { [SkillType.Spell] = true, [SkillType.Area] = true, [SkillType.Duration] = true, [SkillType.Trappable] = true, [SkillType.Totemable] = true, [SkillType.Mineable] = true, [SkillType.Multicastable] = true, [SkillType.Triggerable] = true, [SkillType.Cold] = true, [SkillType.Cascadable] = true, [SkillType.AppliesCurse] = true, [SkillType.CanRapidFire] = true, [SkillType.AreaSpell] = true, [SkillType.InstantNoRepeatWhenHeld] = true, [SkillType.InstantShiftAttackForLeftMouse] = true, [SkillType.Hex] = true, },
@@ -8413,11 +8511,12 @@ skills["FrostbiteMercenary"] = {
 		[40] = { 14800, 17, -51, cooldown = 10, levelRequirement = 100, storedUses = 1, statInterpolation = { 1, 1, 1, }, },
 	},
 }
-inheritSkillData("FrostbiteMercenary", "Frostbite")
 
 skills["FrostblinkMercenary"] = {
 	name = "Frostblink",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "Frostblink",
 	color = 3,
 	baseEffectiveness = 2.0243999958038,
 	incrementalEffectiveness = 0.047499999403954,
@@ -8491,11 +8590,12 @@ skills["FrostblinkMercenary"] = {
 		[40] = { 0.80000001192093, 1.2000000476837, 23, 114, 68, 6, cooldown = 2.3, critChance = 7.5, damageEffectiveness = 2.5, levelRequirement = 100, storedUses = 1, statInterpolation = { 3, 3, 1, 1, 1, 1, }, },
 	},
 }
-inheritSkillData("FrostblinkMercenary", "Frostblink")
 
 skills["FrostboltMercenary"] = {
 	name = "Frostbolt",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "FrostBolt",
 	color = 3,
 	baseEffectiveness = 2.8582999706268,
 	incrementalEffectiveness = 0.0472999997437,
@@ -8560,11 +8660,12 @@ skills["FrostboltMercenary"] = {
 		[40] = { 0.80000001192093, 1.2000000476837, critChance = 7.5, damageEffectiveness = 3.6, levelRequirement = 100, statInterpolation = { 3, 3, }, },
 	},
 }
-inheritSkillData("FrostboltMercenary", "FrostBolt")
 
 skills["GSRitualChaosPulse"] = {
 	name = "GSRitualChaosPulse",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "AtlasExileCrusaderMageguardBombExplodeSpectre",
 	color = 4,
 	baseEffectiveness = 2.5,
 	incrementalEffectiveness = 0.03999999910593,
@@ -8587,11 +8688,12 @@ skills["GSRitualChaosPulse"] = {
 		[1] = { 0.80000001192093, 1.2000000476837, critChance = 5, levelRequirement = 1, statInterpolation = { 3, 3, }, },
 	},
 }
-inheritSkillData("GSRitualChaosPulse", "AtlasExileCrusaderMageguardBombExplodeSpectre")
 
 skills["GalvanicArrowMercenary"] = {
 	name = "Galvanic Arrow",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "GalvanicArrow",
 	color = 2,
 	description = "Fire a trio of electrical arrows that quickly dissipate, vanishing shortly after being loosed. The arrows are fired with such force that they create a burst of lightning, damaging enemies in a cone in front of you.",
 	skillTypes = { [SkillType.Attack] = true, [SkillType.Projectile] = true, [SkillType.ProjectilesFromUser] = true, [SkillType.Area] = true, [SkillType.Totemable] = true, [SkillType.Trappable] = true, [SkillType.Mineable] = true, [SkillType.Lightning] = true, [SkillType.RangedAttack] = true, [SkillType.MirageArcherCanUse] = true, [SkillType.Triggerable] = true, },
@@ -8662,11 +8764,12 @@ skills["GalvanicArrowMercenary"] = {
 		[40] = { 10, baseMultiplier = 1.311, damageEffectiveness = 1.311, levelRequirement = 100, statInterpolation = { 1, }, },
 	},
 }
-inheritSkillData("GalvanicArrowMercenary", "GalvanicArrow")
 
 skills["GeofriSlam"] = {
 	name = "GeofriSlam",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "AzmeriGeofriSlam",
 	color = 4,
 	skillTypes = { [SkillType.Attack] = true, [SkillType.Area] = true, },
 	statDescriptionScope = "skill_stat_descriptions",
@@ -8688,11 +8791,12 @@ skills["GeofriSlam"] = {
 		[2] = { 80, baseMultiplier = 0.95, cooldown = 5, damageEffectiveness = 0.95, levelRequirement = 76, storedUses = 1, statInterpolation = { 1, }, },
 	},
 }
-inheritSkillData("GeofriSlam", "AzmeriGeofriSlam")
 
 skills["GigaFlameDashMercenary"] = {
 	name = "Greater Flame Dash",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "FlameDash",
 	color = 3,
 	baseEffectiveness = 0.80000001192093,
 	incrementalEffectiveness = 0.052499998360872,
@@ -8767,11 +8871,12 @@ skills["GigaFlameDashMercenary"] = {
 		[40] = { 0.80000001192093, 1.2000000476837, 33.333334078391, 15, cooldown = 1.5, critChance = 6, damageEffectiveness = 1.4, levelRequirement = 100, storedUses = 3, statInterpolation = { 3, 3, 3, 1, }, },
 	},
 }
-inheritSkillData("GigaFlameDashMercenary", "FemaleCannibalBossFlameDash")
 
 skills["GigaKineticBlastMercenary"] = {
 	name = "Greater Kinetic Blast",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "KineticBlast",
 	color = 3,
 	description = "Fires a projectile from a Wand that causes a series of area explosions in a secondary radius around its point of impact, each damaging enemies.",
 	skillTypes = { [SkillType.Attack] = true, [SkillType.RangedAttack] = true, [SkillType.Projectile] = true, [SkillType.ProjectilesFromUser] = true, [SkillType.Area] = true, [SkillType.Trappable] = true, [SkillType.Mineable] = true, [SkillType.Totemable] = true, [SkillType.WandAttack] = true, },
@@ -8842,11 +8947,12 @@ skills["GigaKineticBlastMercenary"] = {
 		[40] = { 8, 3, baseMultiplier = 1.668, cooldown = 8, damageEffectiveness = 1.67, levelRequirement = 100, storedUses = 1, statInterpolation = { 1, 1, }, },
 	},
 }
-inheritSkillData("GigaKineticBlastMercenary", "KineticBlast")
 
 skills["GigaLightningArrowMercenary"] = {
 	name = "Greater Lightning Arrow",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "LightningArrow",
 	color = 2,
 	description = "Fires a charged arrow which damages enemies by causing them to be struck by a bolt of lightning, which also damages a number of surrounding enemies.",
 	skillTypes = { [SkillType.Attack] = true, [SkillType.RangedAttack] = true, [SkillType.MirageArcherCanUse] = true, [SkillType.Area] = true, [SkillType.Projectile] = true, [SkillType.ProjectilesFromUser] = true, [SkillType.Totemable] = true, [SkillType.Trappable] = true, [SkillType.Mineable] = true, [SkillType.Lightning] = true, [SkillType.Triggerable] = true, },
@@ -8912,11 +9018,12 @@ skills["GigaLightningArrowMercenary"] = {
 		[40] = { 10, baseMultiplier = 1.988, cooldown = 4.5, damageEffectiveness = 1.988, levelRequirement = 100, storedUses = 1, statInterpolation = { 1, }, },
 	},
 }
-inheritSkillData("GigaLightningArrowMercenary", "LightningArrow")
 
 skills["GigaRaiseZombieMercenary"] = {
 	name = "Raise Zombie of Gigantism",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "RaiseZombieAltX",
 	color = 3,
 	baseEffectiveness = 0,
 	description = "Raises a zombie minion from a corpse, which will follow you and attack enemies with a melee strike and an area of effect slam.",
@@ -8986,11 +9093,12 @@ skills["GigaRaiseZombieMercenary"] = {
 		[40] = { 204, 136, 136, 136, cooldown = 4, levelRequirement = 100, storedUses = 1, statInterpolation = { 1, 1, 1, 1, }, },
 	},
 }
-inheritSkillData("GigaRaiseZombieMercenary", "RaiseZombieAltX")
 
 skills["GigaRaiseZombieMercenaryEncounter"] = {
 	name = "Raise Zombie of Gigantism",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "RaiseZombieAltX",
 	color = 3,
 	baseEffectiveness = 0,
 	description = "Raises a zombie minion from a corpse, which will follow you and attack enemies with a melee strike and an area of effect slam.",
@@ -9060,11 +9168,12 @@ skills["GigaRaiseZombieMercenaryEncounter"] = {
 		[40] = { -90, 136, 136, 136, cooldown = 4, levelRequirement = 100, storedUses = 1, statInterpolation = { 1, 1, 1, 1, }, },
 	},
 }
-inheritSkillData("GigaRaiseZombieMercenaryEncounter", "RaiseZombieAltX")
 
 skills["GigaShockNovaMercenary"] = {
 	name = "Greater Shock Nova",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "ShockNova",
 	color = 3,
 	baseEffectiveness = 1.3489999771118,
 	incrementalEffectiveness = 0.049300000071526,
@@ -9134,11 +9243,12 @@ skills["GigaShockNovaMercenary"] = {
 		[40] = { 0.5, 1.5, cooldown = 5, critChance = 6, damageEffectiveness = 1.9, levelRequirement = 100, storedUses = 1, statInterpolation = { 3, 3, }, cost = { Mana = 31, }, },
 	},
 }
-inheritSkillData("GigaShockNovaMercenary", "AzmeriKudukuShockNova")
 
 skills["GigaShockNovaMercenaryEncounter"] = {
 	name = "Greater Shock Nova",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "ShockNova",
 	color = 3,
 	baseEffectiveness = 0.30000001192093,
 	incrementalEffectiveness = 0.049300000071526,
@@ -9208,11 +9318,12 @@ skills["GigaShockNovaMercenaryEncounter"] = {
 		[40] = { 0.5, 1.5, cooldown = 5, critChance = 6, damageEffectiveness = 1.9, levelRequirement = 100, storedUses = 1, statInterpolation = { 3, 3, }, cost = { Mana = 31, }, },
 	},
 }
-inheritSkillData("GigaShockNovaMercenaryEncounter", "AzmeriKudukuShockNova")
 
 skills["GigaSoulrendMercenary"] = {
 	name = "Greater Soulrend",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "Soulrend",
 	color = 3,
 	baseEffectiveness = 4.2814998626709,
 	incrementalEffectiveness = 0.056699998676777,
@@ -9288,11 +9399,12 @@ skills["GigaSoulrendMercenary"] = {
 		[40] = { 21.833332867672, 0.23999999463558, 0.37000000476837, 9, cooldown = 8, critChance = 5, damageEffectiveness = 1.7, levelRequirement = 100, storedUses = 1, statInterpolation = { 3, 3, 3, 1, }, },
 	},
 }
-inheritSkillData("GigaSoulrendMercenary", "Soulrend")
 
 skills["GigaSoulrendMercenaryEncounter"] = {
 	name = "Greater Soulrend",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "Soulrend",
 	color = 3,
 	baseEffectiveness = 2.4000000953674,
 	incrementalEffectiveness = 0.03999999910593,
@@ -9368,11 +9480,12 @@ skills["GigaSoulrendMercenaryEncounter"] = {
 		[40] = { 22.500000900279, 0.20000000298023, 0.34999999403954, 9, cooldown = 8, critChance = 5, damageEffectiveness = 1.7, levelRequirement = 100, storedUses = 1, statInterpolation = { 3, 3, 3, 1, }, },
 	},
 }
-inheritSkillData("GigaSoulrendMercenaryEncounter", "Soulrend")
 
 skills["GigaStormCallMercenary"] = {
 	name = "Greater Stormcall",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "StormCall",
 	color = 3,
 	baseEffectiveness = 3,
 	incrementalEffectiveness = 0.050000000745058,
@@ -9443,11 +9556,12 @@ skills["GigaStormCallMercenary"] = {
 		[40] = { 0.5, 1.5, 11, cooldown = 8, critChance = 6, damageEffectiveness = 2.5, levelRequirement = 100, storedUses = 1, statInterpolation = { 3, 3, 1, }, cost = { Mana = 22, }, },
 	},
 }
-inheritSkillData("GigaStormCallMercenary", "LegionTemplarJudgeStormCall")
 
 skills["GigaStormCallMercenaryEncounter"] = {
 	name = "Greater Stormcall",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "StormCall",
 	color = 3,
 	baseEffectiveness = 1.7999999523163,
 	incrementalEffectiveness = 0.050000000745058,
@@ -9479,11 +9593,12 @@ skills["GigaStormCallMercenaryEncounter"] = {
 		[1] = { 0.5, 1.5, 8, cooldown = 8, critChance = 5, levelRequirement = 0, storedUses = 1, statInterpolation = { 3, 3, 1, }, cost = { Mana = 12, }, },
 	},
 }
-inheritSkillData("GigaStormCallMercenaryEncounter", "LegionTemplarJudgeStormCall")
 
 skills["GigaVortexTrapMercenary"] = {
 	name = "Greater Vortex Trap",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "Vortex",
 	color = 3,
 	baseEffectiveness = 1.2086000442505,
 	incrementalEffectiveness = 0.049499999731779,
@@ -9561,11 +9676,12 @@ skills["GigaVortexTrapMercenary"] = {
 		[40] = { 0.80000001192093, 1.2000000476837, 166.16667483126, cooldown = 5, critChance = 6, damageEffectiveness = 1.7, levelRequirement = 100, storedUses = 1, statInterpolation = { 3, 3, 3, }, },
 	},
 }
-inheritSkillData("GigaVortexTrapMercenary", "Vortex")
 
 skills["GigaVortexTrapMercenaryEncounter"] = {
 	name = "Greater Vortex Trap",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "Vortex",
 	color = 3,
 	baseEffectiveness = 1.2000000476837,
 	incrementalEffectiveness = 0.045000001788139,
@@ -9604,11 +9720,12 @@ skills["GigaVortexTrapMercenaryEncounter"] = {
 		[1] = { 0.80000001192093, 1.2000000476837, 50.000001117587, cooldown = 5, critChance = 6, damageEffectiveness = 1.7, levelRequirement = 0, storedUses = 1, statInterpolation = { 3, 3, 3, }, },
 	},
 }
-inheritSkillData("GigaVortexTrapMercenaryEncounter", "Vortex")
 
 skills["GlacialHammerMercenary"] = {
 	name = "Glacial Hammer",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "GlacialHammer",
 	color = 1,
 	description = "Hits enemies, converting some of your physical damage to cold damage. If a non-unique enemy is frozen and is on less than one third life, they will shatter when hit by Glacial Hammer. If striking three times in a row, the third strike will freeze enemies more easily. Requires a Mace, Sceptre or Staff.",
 	skillTypes = { [SkillType.Attack] = true, [SkillType.MeleeSingleTarget] = true, [SkillType.Multistrikeable] = true, [SkillType.Melee] = true, [SkillType.Cold] = true, [SkillType.ThresholdJewelArea] = true, },
@@ -9677,11 +9794,12 @@ skills["GlacialHammerMercenary"] = {
 		[40] = { 44, 540, baseMultiplier = 14.302, damageEffectiveness = 14.302, levelRequirement = 100, statInterpolation = { 1, 1, }, },
 	},
 }
-inheritSkillData("GlacialHammerMercenary", "AzmeriHailrakeGlacialHammer")
 
 skills["GraceMercenary"] = {
 	name = "Grace",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "Grace",
 	color = 2,
 	description = "Casts an aura that grants evasion to you and your allies.",
 	skillTypes = { [SkillType.Spell] = true, [SkillType.Area] = true, [SkillType.Buff] = true, [SkillType.HasReservation] = true, [SkillType.TotemCastsAlone] = true, [SkillType.Totemable] = true, [SkillType.Aura] = true, [SkillType.Instant] = true, [SkillType.AreaSpell] = true, [SkillType.CanHaveBlessing] = true, [SkillType.InstantNoRepeatWhenHeld] = true, [SkillType.InstantShiftAttackForLeftMouse] = true, [SkillType.Cooldown] = true, },
@@ -9744,11 +9862,12 @@ skills["GraceMercenary"] = {
 		[40] = { 37, 3188, 34, cooldown = 1.2, levelRequirement = 100, storedUses = 1, statInterpolation = { 1, 1, 1, }, },
 	},
 }
-inheritSkillData("GraceMercenary", "AzmeriBirdGrace")
 
 skills["GroundSlamMercenary"] = {
 	name = "Ground Slam",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "GroundSlam",
 	color = 1,
 	baseEffectiveness = 0.6700000166893,
 	incrementalEffectiveness = 0.023299999535084,
@@ -9824,11 +9943,12 @@ skills["GroundSlamMercenary"] = {
 		[40] = { 18, 56, baseMultiplier = 7.829, damageEffectiveness = 7.829, levelRequirement = 100, statInterpolation = { 1, 1, }, },
 	},
 }
-inheritSkillData("GroundSlamMercenary", "GroundSlam")
 
 skills["HasteMercenary"] = {
 	name = "Haste",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "Haste",
 	color = 2,
 	description = "Casts an aura that increases the movement speed, attack speed and cast speed of you and your allies.",
 	skillTypes = { [SkillType.Spell] = true, [SkillType.Area] = true, [SkillType.Buff] = true, [SkillType.HasReservation] = true, [SkillType.TotemCastsAlone] = true, [SkillType.Totemable] = true, [SkillType.Aura] = true, [SkillType.Instant] = true, [SkillType.AreaSpell] = true, [SkillType.CanHaveBlessing] = true, [SkillType.InstantNoRepeatWhenHeld] = true, [SkillType.InstantShiftAttackForLeftMouse] = true, [SkillType.Cooldown] = true, },
@@ -9892,11 +10012,12 @@ skills["HasteMercenary"] = {
 		[40] = { 32, 32, 21, 34, cooldown = 1.2, levelRequirement = 100, storedUses = 1, statInterpolation = { 1, 1, 1, 1, }, },
 	},
 }
-inheritSkillData("HasteMercenary", "AzmeriTigerHaste")
 
 skills["HatredMercenary"] = {
 	name = "Hatred",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "Hatred",
 	color = 2,
 	baseEffectiveness = 1.5,
 	incrementalEffectiveness = 0.025000000372529,
@@ -9960,11 +10081,12 @@ skills["HatredMercenary"] = {
 		[40] = { 47, 34, cooldown = 1.2, levelRequirement = 100, storedUses = 1, statInterpolation = { 1, 1, }, },
 	},
 }
-inheritSkillData("HatredMercenary", "AzmeriHydraHatred")
 
 skills["HeavyStrikeAltMercenary"] = {
 	name = "Heavy Strike of Trarthus",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "HeavyStrikeAltY",
 	color = 1,
 	baseEffectiveness = 0,
 	description = "Attacks enemies with a forceful blow. Requires a Staff.",
@@ -10027,11 +10149,12 @@ skills["HeavyStrikeAltMercenary"] = {
 		[40] = { attackSpeedMultiplier = -15, baseMultiplier = 11.222, damageEffectiveness = 11.222, levelRequirement = 100, },
 	},
 }
-inheritSkillData("HeavyStrikeAltMercenary", "HeavyStrikeAltY")
 
 skills["HeavyStrikeMercenary"] = {
 	name = "Heavy Strike of Vulnerability",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "HeavyStrike",
 	color = 1,
 	baseEffectiveness = 0,
 	description = "Attacks enemies with a forceful blow. Requires a Mace, Sceptre, Axe, Sword or Staff.",
@@ -10103,11 +10226,12 @@ skills["HeavyStrikeMercenary"] = {
 		[40] = { 54, attackSpeedMultiplier = -15, baseMultiplier = 11.222, damageEffectiveness = 11.222, levelRequirement = 100, statInterpolation = { 1, }, },
 	},
 }
-inheritSkillData("HeavyStrikeMercenary", "HeavyStrike")
 
 skills["HeraldOfAshMercenary"] = {
 	name = "Herald of Ash",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "HeraldOfAsh",
 	color = 1,
 	baseEffectiveness = 0.5,
 	incrementalEffectiveness = 0.032699998468161,
@@ -10172,11 +10296,12 @@ skills["HeraldOfAshMercenary"] = {
 		[40] = { 68, 25, cooldown = 1.2, levelRequirement = 100, storedUses = 1, statInterpolation = { 1, 1, }, },
 	},
 }
-inheritSkillData("HeraldOfAshMercenary", "HeraldOfAsh")
 
 skills["HeraldOfIceMercenary"] = {
 	name = "Herald of Ice",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "HeraldOfIce",
 	color = 2,
 	baseEffectiveness = 1.3636000156403,
 	incrementalEffectiveness = 0.023000000044703,
@@ -10252,11 +10377,12 @@ skills["HeraldOfIceMercenary"] = {
 		[40] = { 0.20000000298023, 0.30000001192093, 0.20000000298023, 0.30000001192093, 1085, 1670, cooldown = 1.2, damageEffectiveness = 0.8, levelRequirement = 100, storedUses = 1, statInterpolation = { 3, 3, 3, 3, 1, 1, }, },
 	},
 }
-inheritSkillData("HeraldOfIceMercenary", "HeraldOfIce")
 
 skills["HeraldOfPurityMercenary"] = {
 	name = "Herald of Purity",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "HeraldOfPurity",
 	color = 1,
 	baseEffectiveness = 0.31700000166893,
 	incrementalEffectiveness = 0.01799999922514,
@@ -10331,11 +10457,11 @@ skills["HeraldOfPurityMercenary"] = {
 		[40] = { 15, 170, 78, 100, cooldown = 1.2, levelRequirement = 100, storedUses = 1, statInterpolation = { 1, 1, 1, 1, }, },
 	},
 }
-inheritSkillData("HeraldOfPurityMercenary", "HeraldOfPurity")
 
 skills["HolyFireMortarMercenary"] = {
 	name = "Holy Mortar",
 	hidden = true,
+	mercenary = true,
 	color = 3,
 	baseEffectiveness = 2.5,
 	incrementalEffectiveness = 0.037999998778105,
@@ -10410,6 +10536,8 @@ skills["HolyFireMortarMercenary"] = {
 skills["HolyFlameTotemMercenary"] = {
 	name = "Holy Flame Totem",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "HolyFlameTotem",
 	color = 1,
 	baseEffectiveness = 0.74919998645782,
 	incrementalEffectiveness = 0.032200001180172,
@@ -10489,11 +10617,12 @@ skills["HolyFlameTotemMercenary"] = {
 		[40] = { 0.80000001192093, 1.2000000476837, critChance = 6, damageEffectiveness = 0.35, levelRequirement = 100, statInterpolation = { 3, 3, }, },
 	},
 }
-inheritSkillData("HolyFlameTotemMercenary", "HolyFlameTotem")
 
 skills["HolyHammersMercenary"] = {
 	name = "Holy Hammers",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "HolyHammers",
 	color = 1,
 	description = "Slam the ground, calling down a Holy Hammer from above. On hitting an enemy, another Hammer will cascade forward, repeating if further enemies are hit, up to a cap. A Power Charge can be expended to call down additional Hammers to either side of the initial slam. Requires a Mace, Sceptre or Staff.",
 	skillTypes = { [SkillType.Attack] = true, [SkillType.Slam] = true, [SkillType.Melee] = true, [SkillType.Area] = true, [SkillType.Lightning] = true, [SkillType.Totemable] = true, [SkillType.Multistrikeable] = true, },
@@ -10566,11 +10695,12 @@ skills["HolyHammersMercenary"] = {
 		[40] = { attackSpeedMultiplier = -15, baseMultiplier = 2.989, damageEffectiveness = 2.989, levelRequirement = 100, },
 	},
 }
-inheritSkillData("HolyHammersMercenary", "HolyHammers")
 
 skills["HolyStrikeMercenary"] = {
 	name = "Holy Strike",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "HolyStrike",
 	color = 1,
 	description = "Infuse your weapon with holy energy and swing. Successfully hitting an enemy will summon forth a copy of your Main Hand weapon as a Holy Armament. These Holy Armaments are undamageable minions, and will attack the enemies you target with Holy Strike. Requires a Mace, Sceptre or Staff.",
 	skillTypes = { [SkillType.CreatesMinion] = true, [SkillType.Minion] = true, [SkillType.Attack] = true, [SkillType.MeleeSingleTarget] = true, [SkillType.Melee] = true, [SkillType.Multistrikeable] = true, [SkillType.Lightning] = true, [SkillType.Duration] = true, [SkillType.MinionsAreUndamagable] = true, },
@@ -10648,11 +10778,12 @@ skills["HolyStrikeMercenary"] = {
 		[40] = { 30, 2, 348, attackSpeedMultiplier = 15, baseMultiplier = 8.589, damageEffectiveness = 8.589, levelRequirement = 100, statInterpolation = { 1, 1, 1, }, },
 	},
 }
-inheritSkillData("HolyStrikeMercenary", "HolyStrike")
 
 skills["HydraForkArrowMercenary"] = {
 	name = "Frigid Forkshot",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "AzmeriHydraForkArrow",
 	color = 2,
 	skillTypes = { [SkillType.Attack] = true, [SkillType.Projectile] = true, [SkillType.ProjectilesFromUser] = true, [SkillType.Totemable] = true, [SkillType.Trappable] = true, [SkillType.Mineable] = true, [SkillType.RangedAttack] = true, [SkillType.MirageArcherCanUse] = true, },
 	weaponTypes = {
@@ -10675,11 +10806,12 @@ skills["HydraForkArrowMercenary"] = {
 		[1] = { attackSpeedMultiplier = -30, cooldown = 8, levelRequirement = 1, storedUses = 1, },
 	},
 }
-inheritSkillData("HydraForkArrowMercenary", "AzmeriHydraForkArrow")
 
 skills["IceCrashMercenary"] = {
 	name = "Ice Crash",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "IceCrash",
 	color = 1,
 	baseEffectiveness = 1.5,
 	incrementalEffectiveness = 0.023299999535084,
@@ -10758,11 +10890,12 @@ skills["IceCrashMercenary"] = {
 		[40] = { baseMultiplier = 10.095, damageEffectiveness = 10.095, levelRequirement = 100, },
 	},
 }
-inheritSkillData("IceCrashMercenary", "IceCrash")
 
 skills["IceNovaMercenary"] = {
 	name = "Ice Nova",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "IceNova",
 	color = 3,
 	baseEffectiveness = 2.2599999904633,
 	incrementalEffectiveness = 0.043600000441074,
@@ -10830,11 +10963,12 @@ skills["IceNovaMercenary"] = {
 		[40] = { 0.80000001192093, 1.2000000476837, 8, critChance = 7.5, damageEffectiveness = 2.3, levelRequirement = 100, statInterpolation = { 3, 3, 1, }, },
 	},
 }
-inheritSkillData("IceNovaMercenary", "IceNova")
 
 skills["IceNovaProjectedMercenary"] = {
 	name = "Ice Nova of Projection",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "IceNova",
 	color = 3,
 	baseEffectiveness = 2.2599999904633,
 	incrementalEffectiveness = 0.043600000441074,
@@ -10903,11 +11037,12 @@ skills["IceNovaProjectedMercenary"] = {
 		[40] = { 0.80000001192093, 1.2000000476837, 8, critChance = 6, damageEffectiveness = 2.3, levelRequirement = 100, statInterpolation = { 3, 3, 1, }, },
 	},
 }
-inheritSkillData("IceNovaProjectedMercenary", "IceNova")
 
 skills["IceShotMercenary"] = {
 	name = "Ice Shot",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "IceShot",
 	color = 2,
 	description = "Fires an arrow that converts some physical damage to cold on its target and converts all physical damage to cold in a cone behind that target.",
 	skillTypes = { [SkillType.Attack] = true, [SkillType.RangedAttack] = true, [SkillType.Projectile] = true, [SkillType.ProjectilesFromUser] = true, [SkillType.Area] = true, [SkillType.Cold] = true, [SkillType.Triggerable] = true, [SkillType.MirageArcherCanUse] = true, [SkillType.Totemable] = true, [SkillType.Trappable] = true, [SkillType.Mineable] = true, },
@@ -10972,11 +11107,12 @@ skills["IceShotMercenary"] = {
 		[40] = { 270, baseMultiplier = 2.4, damageEffectiveness = 2.4, levelRequirement = 100, statInterpolation = { 1, }, },
 	},
 }
-inheritSkillData("IceShotMercenary", "IceShot")
 
 skills["IceTrapMercenary"] = {
 	name = "Ice Trap",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "IceTrap",
 	color = 2,
 	baseEffectiveness = 2.5,
 	incrementalEffectiveness = 0.050000000745058,
@@ -11051,11 +11187,12 @@ skills["IceTrapMercenary"] = {
 		[40] = { 0.80000001192093, 1.2000000476837, critChance = 5, damageEffectiveness = 2.9, levelRequirement = 100, statInterpolation = { 3, 3, }, },
 	},
 }
-inheritSkillData("IceTrapMercenary", "IceTrap")
 
 skills["IcestormMercenary"] = {
 	name = "Icestorm",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "Icestorm",
 	color = 3,
 	baseEffectiveness = 0.80000001192093,
 	incrementalEffectiveness = 0.050000000745058,
@@ -11130,11 +11267,12 @@ skills["IcestormMercenary"] = {
 		[40] = { 0.40000000596046, 0.60000002384186, 3, cooldown = 6.5, critChance = 6, levelRequirement = 100, storedUses = 1, statInterpolation = { 3, 3, 1, }, },
 	},
 }
-inheritSkillData("IcestormMercenary", "Icestorm")
 
 skills["InfernalBlowAltMercenary"] = {
 	name = "Infernal Blow of Immolation",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "InfernalBlowAltX",
 	color = 1,
 	description = "Attacks with your weapon, applying a charged debuff to you the first time you hit an enemy with this skill. Upon reaching 6 charges, or charges expiring, the charged debuff is removed to damage nearby enemies. Requires a Sword, Axe, Mace, Sceptre, Staff or Unarmed.",
 	skillTypes = { [SkillType.Attack] = true, [SkillType.Area] = true, [SkillType.MeleeSingleTarget] = true, [SkillType.Multistrikeable] = true, [SkillType.Melee] = true, [SkillType.Fire] = true, [SkillType.Duration] = true, },
@@ -11209,11 +11347,12 @@ skills["InfernalBlowAltMercenary"] = {
 		[40] = { baseMultiplier = 7.347, damageEffectiveness = 7.347, levelRequirement = 100, },
 	},
 }
-inheritSkillData("InfernalBlowAltMercenary", "InfernalBlowAltX")
 
 skills["InfernalCryMercenary"] = {
 	name = "Infernal Cry",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "InfernalCry",
 	color = 1,
 	description = "Performs a warcry, taunting nearby enemies to attack the user and exerting subsequent attacks. The user and nearby allies gain a buff that grants a portion of their physical damage as extra fire damage. In addition to being taunted, enemies are inflicted with a secondary debuff causing them to explode when they die, dealing fire damage in an area.",
 	skillTypes = { [SkillType.Area] = true, [SkillType.Duration] = true, [SkillType.Fire] = true, [SkillType.Damage] = true, [SkillType.Warcry] = true, [SkillType.Cooldown] = true, },
@@ -11288,11 +11427,12 @@ skills["InfernalCryMercenary"] = {
 		[40] = { 54, 4200, 4200, cooldown = 8, levelRequirement = 100, storedUses = 1, statInterpolation = { 1, 1, 1, }, },
 	},
 }
-inheritSkillData("InfernalCryMercenary", "InfernalCry")
 
 skills["InspiringCryMercenary"] = {
 	name = "Inspiring Cry",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "DropBearSummonedRallyingCry",
 	color = 1,
 	description = "DNT Unused (replaced)",
 	skillTypes = { [SkillType.Buff] = true, [SkillType.Area] = true, [SkillType.Duration] = true, [SkillType.Warcry] = true, [SkillType.Cooldown] = true, },
@@ -11318,11 +11458,12 @@ skills["InspiringCryMercenary"] = {
 		[1] = { cooldown = 7, levelRequirement = 1, storedUses = 1, },
 	},
 }
-inheritSkillData("InspiringCryMercenary", "DropBearSummonedRallyingCry")
 
 skills["IntimidatingCryMercenary"] = {
 	name = "Intimidating Cry",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "IntimidatingCry",
 	color = 1,
 	description = "Performs a warcry, taunting nearby enemies to attack the user and exerting subsequent attacks. The user and nearby allies gain a buff that grants movement speed.",
 	skillTypes = { [SkillType.Area] = true, [SkillType.Buff] = true, [SkillType.Duration] = true, [SkillType.Warcry] = true, [SkillType.Cooldown] = true, [SkillType.Physical] = true, },
@@ -11394,11 +11535,12 @@ skills["IntimidatingCryMercenary"] = {
 		[40] = { 54, 4200, cooldown = 8, levelRequirement = 100, storedUses = 1, statInterpolation = { 1, 1, }, },
 	},
 }
-inheritSkillData("IntimidatingCryMercenary", "IntimidatingCry")
 
 skills["IntimidatingCryMercenaryEncounter"] = {
 	name = "Intimidating Cry",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "IntimidatingCry",
 	color = 1,
 	description = "Performs a warcry, taunting nearby enemies to attack the user and exerting subsequent attacks. The user and nearby allies gain a buff that grants movement speed.",
 	skillTypes = { [SkillType.Area] = true, [SkillType.Buff] = true, [SkillType.Duration] = true, [SkillType.Warcry] = true, [SkillType.Cooldown] = true, [SkillType.Physical] = true, },
@@ -11432,11 +11574,12 @@ skills["IntimidatingCryMercenaryEncounter"] = {
 		[2] = { 54, 4200, cooldown = 8, levelRequirement = 100, storedUses = 1, statInterpolation = { 2, 2, }, },
 	},
 }
-inheritSkillData("IntimidatingCryMercenaryEncounter", "IntimidatingCry")
 
 skills["KineticBlastAltMercenary"] = {
 	name = "Kinetic Blast of Clustering",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "KineticBlastAltX",
 	color = 3,
 	description = "Fires a projectile from a Wand that causes a series of area explosions in a secondary radius around its point of impact, each damaging enemies.",
 	skillTypes = { [SkillType.Attack] = true, [SkillType.RangedAttack] = true, [SkillType.Projectile] = true, [SkillType.ProjectilesFromUser] = true, [SkillType.Area] = true, [SkillType.Trappable] = true, [SkillType.Mineable] = true, [SkillType.Totemable] = true, [SkillType.Physical] = true, },
@@ -11506,11 +11649,12 @@ skills["KineticBlastAltMercenary"] = {
 		[40] = { 21, attackSpeedMultiplier = 15, baseMultiplier = 1.668, damageEffectiveness = 1.67, levelRequirement = 100, statInterpolation = { 1, }, },
 	},
 }
-inheritSkillData("KineticBlastAltMercenary", "KineticBlastAltX")
 
 skills["KineticBoltMercenary"] = {
 	name = "Kinetic Bolt",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "KineticBolt",
 	color = 3,
 	description = "Fire a projectile from your wand that changes direction in a zig-zag pattern at regular intervals or when hitting enemies. Each time it changes direction, a secondary projectile breaks off, flying in the direction it changed away from.",
 	skillTypes = { [SkillType.Attack] = true, [SkillType.Projectile] = true, [SkillType.ProjectilesFromUser] = true, [SkillType.Trappable] = true, [SkillType.Mineable] = true, [SkillType.Totemable] = true, [SkillType.RangedAttack] = true, [SkillType.Triggerable] = true, [SkillType.WandAttack] = true, },
@@ -11575,11 +11719,12 @@ skills["KineticBoltMercenary"] = {
 		[40] = { 11, baseMultiplier = 2.674, damageEffectiveness = 2.674, levelRequirement = 100, statInterpolation = { 1, }, },
 	},
 }
-inheritSkillData("KineticBoltMercenary", "KineticBolt")
 
 skills["KineticRainAltXMercenary"] = {
 	name = "Kinetic Rain of Impact",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "KineticRainAltX",
 	color = 3,
 	description = "Swing your wand to cause a number of projectiles to rain down within a large area in front of you, directly targeting the locations of enemies in the area. The locations where each projectile will land are shown with markers before they fall. Each projectile explodes when hitting the ground, dealing area damage.",
 	skillTypes = { [SkillType.Attack] = true, [SkillType.Area] = true, [SkillType.Projectile] = true, [SkillType.Trappable] = true, [SkillType.Mineable] = true, [SkillType.Triggerable] = true, [SkillType.Totemable] = true, [SkillType.WandAttack] = true, [SkillType.RangedAttack] = true, [SkillType.Rain] = true, },
@@ -11654,11 +11799,12 @@ skills["KineticRainAltXMercenary"] = {
 		[40] = { 10, attackSpeedMultiplier = 20, baseMultiplier = 1.468, damageEffectiveness = 1.468, levelRequirement = 100, statInterpolation = { 1, }, },
 	},
 }
-inheritSkillData("KineticRainAltXMercenary", "KineticRainAltX")
 
 skills["LacerateMercenary"] = {
 	name = "Lacerate",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "Lacerate",
 	color = 2,
 	description = "Slashes twice, releasing waves of force that damage enemies they hit. Enemies in the middle of the slashes can be hit by both. The slashes will have a chance to inflict bleeding in Blood Stance, or have a wider angle in Sand Stance. Can be used with Axes and Swords. You are in Blood Stance by default.",
 	skillTypes = { [SkillType.Attack] = true, [SkillType.Area] = true, [SkillType.Multistrikeable] = true, [SkillType.Melee] = true, [SkillType.Physical] = true, },
@@ -11731,11 +11877,12 @@ skills["LacerateMercenary"] = {
 		[40] = { 17, 118, baseMultiplier = 7.654, damageEffectiveness = 7.654, levelRequirement = 100, statInterpolation = { 1, 1, }, },
 	},
 }
-inheritSkillData("LacerateMercenary", "AzmeriDoubleSlashAnimatedWeapon")
 
 skills["LancingSteelMercenary"] = {
 	name = "Lancing Steel",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "LancingSteel",
 	color = 2,
 	description = "Thrust an Axe or Sword forward, consuming your Steel Shards to form a cluster of shards in front of you. The cluster will fire a number of projectiles in sequence, aiming at enemies in front of or close to it. Steel Shards are gained with the Call of Steel Skill.",
 	skillTypes = { [SkillType.Attack] = true, [SkillType.Projectile] = true, [SkillType.Damage] = true, [SkillType.ProjectileSpeed] = true, [SkillType.RangedAttack] = true, [SkillType.Physical] = true, [SkillType.ProjectilesNotFromUser] = true, [SkillType.Steel] = true, },
@@ -11805,11 +11952,12 @@ skills["LancingSteelMercenary"] = {
 		[40] = { attackSpeedMultiplier = -20, baseMultiplier = 2.263, damageEffectiveness = 2.263, levelRequirement = 100, },
 	},
 }
-inheritSkillData("LancingSteelMercenary", "LancingSteel")
 
 skills["LeapSlamMercenary"] = {
 	name = "Leap Slam",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "LeapSlam",
 	color = 1,
 	description = "Jump through the air, damaging and knocking back enemies with your weapon where you land. Enemies you would land on are pushed out of the way. Requires an Axe, Mace, Sceptre, Sword or Staff.",
 	skillTypes = { [SkillType.Attack] = true, [SkillType.Area] = true, [SkillType.Melee] = true, [SkillType.Movement] = true, [SkillType.Travel] = true, [SkillType.Slam] = true, [SkillType.Totemable] = true, },
@@ -11885,11 +12033,12 @@ skills["LeapSlamMercenary"] = {
 		[40] = { 54, baseMultiplier = 6.123, damageEffectiveness = 6.123, levelRequirement = 100, statInterpolation = { 1, }, },
 	},
 }
-inheritSkillData("LeapSlamMercenary", "AzmeriGolemLeapSlam")
 
 skills["LeapSlamMercenaryAlt"] = {
 	name = "Leap Slam of Groundbreaking",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "LeapSlamAltX",
 	color = 1,
 	description = "Jump a short distance through the air, damaging and knocking back enemies with your weapon where you land. Enemies you would land on are pushed out of the way. Requires an Axe, Mace, Sceptre, Sword or Staff.",
 	skillTypes = { [SkillType.Attack] = true, [SkillType.Area] = true, [SkillType.Melee] = true, [SkillType.Movement] = true, [SkillType.Travel] = true, [SkillType.Slam] = true, [SkillType.Totemable] = true, },
@@ -11964,11 +12113,12 @@ skills["LeapSlamMercenaryAlt"] = {
 		[40] = { 54, attackSpeedMultiplier = -30, baseMultiplier = 12.858, damageEffectiveness = 12.858, levelRequirement = 100, statInterpolation = { 1, }, },
 	},
 }
-inheritSkillData("LeapSlamMercenaryAlt", "LeapSlamAltX")
 
 skills["LightningArrowMercenary"] = {
 	name = "Lightning Arrow",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "LightningArrow",
 	color = 2,
 	description = "Fires a charged arrow which damages enemies by causing them to be struck by a bolt of lightning, which also damages a number of surrounding enemies.",
 	skillTypes = { [SkillType.Attack] = true, [SkillType.RangedAttack] = true, [SkillType.MirageArcherCanUse] = true, [SkillType.Area] = true, [SkillType.Projectile] = true, [SkillType.ProjectilesFromUser] = true, [SkillType.Totemable] = true, [SkillType.Trappable] = true, [SkillType.Mineable] = true, [SkillType.Lightning] = true, [SkillType.Triggerable] = true, },
@@ -12033,11 +12183,12 @@ skills["LightningArrowMercenary"] = {
 		[40] = { 490, baseMultiplier = 1.988, damageEffectiveness = 1.988, levelRequirement = 100, statInterpolation = { 1, }, },
 	},
 }
-inheritSkillData("LightningArrowMercenary", "LightningArrow")
 
 skills["LightningSpireTrapMercenary"] = {
 	name = "Lightning Spire Trap",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "LightningSpireTrap",
 	color = 3,
 	baseEffectiveness = 0.61379998922348,
 	incrementalEffectiveness = 0.048900000751019,
@@ -12113,11 +12264,12 @@ skills["LightningSpireTrapMercenary"] = {
 		[40] = { 0.5, 1.5, 168, 280, cooldown = 8, critChance = 6, damageEffectiveness = 0.85, levelRequirement = 100, storedUses = 1, statInterpolation = { 3, 3, 1, 1, }, },
 	},
 }
-inheritSkillData("LightningSpireTrapMercenary", "LightningSpireTrap")
 
 skills["LightningStrikeFireMercenary"] = {
 	name = "Flamebolt Strike",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "LightningStrike",
 	color = 2,
 	description = "Infuses your melee weapon with electrical energies as you swing. In addition to converting some of your physical damage to lightning damage, the stored energy is released from the weapon as projectiles as you strike, flying out to hit farther-away enemies. The projectiles cannot miss if the melee attack hit a target.",
 	skillTypes = { [SkillType.Attack] = true, [SkillType.RangedAttack] = true, [SkillType.Projectile] = true, [SkillType.MeleeSingleTarget] = true, [SkillType.Multistrikeable] = true, [SkillType.Melee] = true, [SkillType.Lightning] = true, [SkillType.ProjectilesNotFromUser] = true, },
@@ -12194,11 +12346,12 @@ skills["LightningStrikeFireMercenary"] = {
 		[40] = { 3, baseMultiplier = 8.878, damageEffectiveness = 8.878, levelRequirement = 100, statInterpolation = { 1, }, },
 	},
 }
-inheritSkillData("LightningStrikeFireMercenary", "LightningStrike")
 
 skills["LightningTrapMercenary"] = {
 	name = "Lightning Trap",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "LightningTrap",
 	color = 3,
 	baseEffectiveness = 2.4788999557495,
 	incrementalEffectiveness = 0.043200001120567,
@@ -12274,11 +12427,12 @@ skills["LightningTrapMercenary"] = {
 		[40] = { 0.5, 1.5, 34, 148, critChance = 6, damageEffectiveness = 2.4, levelRequirement = 100, statInterpolation = { 3, 3, 1, 1, }, },
 	},
 }
-inheritSkillData("LightningTrapMercenary", "LightningTrap")
 
 skills["LightningWarpMercenary"] = {
 	name = "Lightning Warp",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "LightningWarp",
 	color = 3,
 	baseEffectiveness = 1.2000000476837,
 	incrementalEffectiveness = 0.045000001788139,
@@ -12350,11 +12504,12 @@ skills["LightningWarpMercenary"] = {
 		[40] = { 0.5, 1.5, -64, 0, cooldown = 5, critChance = 6, damageEffectiveness = 0.9, levelRequirement = 100, storedUses = 2, statInterpolation = { 3, 3, 1, 1, }, },
 	},
 }
-inheritSkillData("LightningWarpMercenary", "AzmeriKudukuWarp")
 
 skills["LightningWarpPhysMercenary"] = {
 	name = "Bloody Warp",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "LightningWarp",
 	color = 3,
 	baseEffectiveness = 1.9125000238419,
 	incrementalEffectiveness = 0.04280000180006,
@@ -12428,11 +12583,12 @@ skills["LightningWarpPhysMercenary"] = {
 		[40] = { 0.10000000149012, 1.8999999761581, -64, 8, cooldown = 4, critChance = 6, damageEffectiveness = 0.9, levelRequirement = 100, storedUses = 1, statInterpolation = { 3, 3, 1, 1, }, },
 	},
 }
-inheritSkillData("LightningWarpPhysMercenary", "AzmeriKudukuWarp")
 
 skills["LightningWarpTrapsMercenary"] = {
 	name = "Lightning Warp Trap",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "LightningWarp",
 	color = 3,
 	baseEffectiveness = 1.9125000238419,
 	incrementalEffectiveness = 0.04280000180006,
@@ -12508,11 +12664,11 @@ skills["LightningWarpTrapsMercenary"] = {
 		[40] = { 0.10000000149012, 1.8999999761581, -64, 8, critChance = 6, damageEffectiveness = 0.9, levelRequirement = 100, statInterpolation = { 3, 3, 1, 1, }, },
 	},
 }
-inheritSkillData("LightningWarpTrapsMercenary", "AzmeriKudukuWarp")
 
 skills["LunarisSpellBarrageTrapMercenary"] = {
 	name = "[DNT] UNUSED",
 	hidden = true,
+	mercenary = true,
 	color = 4,
 	baseEffectiveness = 1.8181999921799,
 	incrementalEffectiveness = 0.050000000745058,
@@ -12553,6 +12709,8 @@ skills["LunarisSpellBarrageTrapMercenary"] = {
 skills["MalevolenceMercenary"] = {
 	name = "Malevolence",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "Malevolence",
 	color = 3,
 	baseEffectiveness = 1.5,
 	incrementalEffectiveness = 0.025000000372529,
@@ -12617,11 +12775,11 @@ skills["MalevolenceMercenary"] = {
 		[40] = { 25, 34, 27, cooldown = 1.2, levelRequirement = 100, storedUses = 1, statInterpolation = { 1, 1, 1, }, },
 	},
 }
-inheritSkillData("MalevolenceMercenary", "FaridunCasterUndeadDamageOverTimeAura")
 
 skills["MassEnduranceMercenary"] = {
 	name = "Endure",
 	hidden = true,
+	mercenary = true,
 	color = 4,
 	baseEffectiveness = 1.8700000047684,
 	skillTypes = { [SkillType.Spell] = true, [SkillType.Area] = true, [SkillType.AreaSpell] = true, },
@@ -12644,6 +12802,8 @@ skills["MassEnduranceMercenary"] = {
 skills["MassFrenzyMercenary"] = {
 	name = "Incite",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "MassFrenzy",
 	color = 4,
 	baseEffectiveness = 1.8700000047684,
 	skillTypes = { [SkillType.Spell] = true, [SkillType.Area] = true, [SkillType.AreaSpell] = true, },
@@ -12662,11 +12822,12 @@ skills["MassFrenzyMercenary"] = {
 		[1] = { cooldown = 8, levelRequirement = 0, storedUses = 1, },
 	},
 }
-inheritSkillData("MassFrenzyMercenary", "MassFrenzy")
 
 skills["MercenaryLightningDelayedBlast"] = {
 	name = "Unnerving Blast",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "DelayedBlastSpectre",
 	color = 3,
 	baseEffectiveness = 4.6251997947693,
 	incrementalEffectiveness = 0.034400001168251,
@@ -12733,11 +12894,12 @@ skills["MercenaryLightningDelayedBlast"] = {
 		[40] = { 0.80000001192093, 1.2000000476837, critChance = 5, levelRequirement = 100, statInterpolation = { 3, 3, }, },
 	},
 }
-inheritSkillData("MercenaryLightningDelayedBlast", "DelayedBlastSpectre")
 
 skills["MeteorUpheavalMercenary"] = {
 	name = "Meteor",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "IncursionMeteorUpheaval",
 	color = 4,
 	baseEffectiveness = 4.166699886322,
 	incrementalEffectiveness = 0.03999999910593,
@@ -12765,11 +12927,12 @@ skills["MeteorUpheavalMercenary"] = {
 		[1] = { 0.80000001192093, 1.2000000476837, cooldown = 6, critChance = 5, levelRequirement = 1, storedUses = 1, statInterpolation = { 3, 3, }, },
 	},
 }
-inheritSkillData("MeteorUpheavalMercenary", "IncursionMeteorUpheaval")
 
 skills["MeteorUpheavalMercenaryEncounter"] = {
 	name = "Meteor",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "IncursionMeteorUpheaval",
 	color = 4,
 	baseEffectiveness = 3.2999999523163,
 	incrementalEffectiveness = 0.035999998450279,
@@ -12797,11 +12960,12 @@ skills["MeteorUpheavalMercenaryEncounter"] = {
 		[1] = { 0.80000001192093, 1.2000000476837, cooldown = 6, critChance = 5, levelRequirement = 1, storedUses = 1, statInterpolation = { 3, 3, }, },
 	},
 }
-inheritSkillData("MeteorUpheavalMercenaryEncounter", "IncursionMeteorUpheaval")
 
 skills["MirrorArrowMercenary"] = {
 	name = "Mirror Arrow",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "MirrorArrow",
 	color = 2,
 	description = "Fires an arrow at the target destination. When the arrow lands, a clone is summoned. The clone is a minion that uses your bow and quiver.",
 	skillTypes = { [SkillType.ProjectileSpeed] = true, [SkillType.Attack] = true, [SkillType.Minion] = true, [SkillType.RangedAttack] = true, [SkillType.MinionsCanExplode] = true, [SkillType.Duration] = true, [SkillType.Totemable] = true, [SkillType.Trappable] = true, [SkillType.Mineable] = true, [SkillType.Movement] = true, [SkillType.Triggerable] = true, [SkillType.CreatesMinion] = true, [SkillType.Travel] = true, [SkillType.Cooldown] = true, [SkillType.Rain] = true, },
@@ -12875,11 +13039,12 @@ skills["MirrorArrowMercenary"] = {
 		[40] = { 100, 85, 102, cooldown = 6, levelRequirement = 100, storedUses = 2, statInterpolation = { 1, 1, 1, }, },
 	},
 }
-inheritSkillData("MirrorArrowMercenary", "MirrorArrow")
 
 skills["MoltenShellMercenary"] = {
 	name = "Molten Shell",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "MoltenShell",
 	color = 1,
 	baseEffectiveness = 9.6499996185303,
 	incrementalEffectiveness = 0.016499999910593,
@@ -12947,11 +13112,12 @@ skills["MoltenShellMercenary"] = {
 		[40] = { 1, cooldown = 8, levelRequirement = 100, storedUses = 1, statInterpolation = { 3, }, },
 	},
 }
-inheritSkillData("MoltenShellMercenary", "MoltenShell")
 
 skills["MoltenStrikeHolyMercenary"] = {
 	name = "Sanctified Strike",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "MoltenStrike",
 	color = 1,
 	description = "Infuses your melee weapon with molten energies to attack with physical and fire damage. This attack causes balls of molten magma to launch forth from the enemies you hit, divided amongst all enemies hit by the strike. These will deal area attack damage to enemies where they land.",
 	skillTypes = { [SkillType.Attack] = true, [SkillType.Projectile] = true, [SkillType.Area] = true, [SkillType.Melee] = true, [SkillType.MeleeSingleTarget] = true, [SkillType.Fire] = true, [SkillType.RangedAttack] = true, [SkillType.ProjectilesNotFromUser] = true, [SkillType.ThresholdJewelChaining] = true, [SkillType.Multistrikeable] = true, },
@@ -13027,11 +13193,12 @@ skills["MoltenStrikeHolyMercenary"] = {
 		[40] = { baseMultiplier = 7.003, damageEffectiveness = 7.003, levelRequirement = 100, },
 	},
 }
-inheritSkillData("MoltenStrikeHolyMercenary", "AzmeriFireFuryMoltenStrike")
 
 skills["MoltenStrikeMercenary"] = {
 	name = "Molten Strike",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "MoltenStrike",
 	color = 1,
 	description = "Infuses your melee weapon with molten energies to attack with physical and fire damage. This attack causes balls of molten magma to launch forth from the enemies you hit, divided amongst all enemies hit by the strike. These will deal area attack damage to enemies where they land.",
 	skillTypes = { [SkillType.Attack] = true, [SkillType.Projectile] = true, [SkillType.Area] = true, [SkillType.Melee] = true, [SkillType.MeleeSingleTarget] = true, [SkillType.Fire] = true, [SkillType.RangedAttack] = true, [SkillType.ProjectilesNotFromUser] = true, [SkillType.ThresholdJewelChaining] = true, [SkillType.Multistrikeable] = true, },
@@ -13107,11 +13274,12 @@ skills["MoltenStrikeMercenary"] = {
 		[40] = { baseMultiplier = 7.003, damageEffectiveness = 7.003, levelRequirement = 100, },
 	},
 }
-inheritSkillData("MoltenStrikeMercenary", "AzmeriFireFuryMoltenStrike")
 
 skills["MoltenStrikePoisonMercenary"] = {
 	name = "Profane Strike",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "MoltenStrike",
 	color = 2,
 	description = "Infuses your melee weapon with molten energies to attack with physical and fire damage. This attack causes balls of molten magma to launch forth from the enemies you hit, divided amongst all enemies hit by the strike. These will deal area attack damage to enemies where they land.",
 	skillTypes = { [SkillType.Attack] = true, [SkillType.Projectile] = true, [SkillType.Area] = true, [SkillType.Melee] = true, [SkillType.MeleeSingleTarget] = true, [SkillType.Fire] = true, [SkillType.RangedAttack] = true, [SkillType.ProjectilesNotFromUser] = true, [SkillType.ThresholdJewelChaining] = true, [SkillType.Multistrikeable] = true, },
@@ -13188,11 +13356,12 @@ skills["MoltenStrikePoisonMercenary"] = {
 		[40] = { baseMultiplier = 7.003, damageEffectiveness = 7.003, levelRequirement = 100, },
 	},
 }
-inheritSkillData("MoltenStrikePoisonMercenary", "AzmeriFireFuryMoltenStrike")
 
 skills["OfferingOfJudgementChaosMercenary"] = {
 	name = "Altar of Chaos",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "AzmeriGoddessOfferingOfJudgement",
 	color = 4,
 	baseEffectiveness = 2.666699886322,
 	incrementalEffectiveness = 0.050000000745058,
@@ -13216,11 +13385,12 @@ skills["OfferingOfJudgementChaosMercenary"] = {
 		[1] = { 16.666667039196, cooldown = 10, levelRequirement = 1, storedUses = 1, statInterpolation = { 3, }, },
 	},
 }
-inheritSkillData("OfferingOfJudgementChaosMercenary", "AzmeriGoddessOfferingOfJudgement")
 
 skills["OrbOfStormsMercenary"] = {
 	name = "Orb of Storms",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "OrbOfStorms",
 	color = 3,
 	baseEffectiveness = 0.80000001192093,
 	incrementalEffectiveness = 0.04619999974966,
@@ -13292,11 +13462,12 @@ skills["OrbOfStormsMercenary"] = {
 		[40] = { 0.5, 1.5, 44, 1550, cooldown = 0.5, damageEffectiveness = 1.1, levelRequirement = 100, storedUses = 1, statInterpolation = { 3, 3, 1, 1, }, cost = { Mana = 22, }, },
 	},
 }
-inheritSkillData("OrbOfStormsMercenary", "OrbOfStorms")
 
 skills["PerforateMercenary"] = {
 	name = "Perforate",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "Perforate",
 	color = 1,
 	description = "Smash the ground to bring forth multiple spears to damage enemies. When in Blood Stance, multiple spikes burst from the ground in sequence, able to hit enemies multiple times. In Sand Stance, the spikes are thrust outwards. Requires a Sword or Axe. You are in Blood Stance by default.",
 	skillTypes = { [SkillType.Attack] = true, [SkillType.Area] = true, [SkillType.Damage] = true, [SkillType.Melee] = true, [SkillType.Multistrikeable] = true, [SkillType.Slam] = true, [SkillType.Totemable] = true, },
@@ -13366,11 +13537,12 @@ skills["PerforateMercenary"] = {
 		[40] = { 136, baseMultiplier = 14.302, damageEffectiveness = 14.302, levelRequirement = 100, statInterpolation = { 1, }, },
 	},
 }
-inheritSkillData("PerforateMercenary", "Perforate")
 
 skills["PestilentStrikeMercenary"] = {
 	name = "Pestilent Strike",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "PestilentStrike",
 	color = 2,
 	description = "Attacks with your weapon, inflicting a debuff on enemies hit by the strike. If a debuffed enemy dies while poisoned, Pestilent Strike inflicts a secondary chaos damage over time debuff on enemies around them, based on the poisons on the slain enemy. This damage is not affected by your damage modifiers. Requires a Claw or Dagger.",
 	skillTypes = { [SkillType.Attack] = true, [SkillType.Melee] = true, [SkillType.MeleeSingleTarget] = true, [SkillType.Multistrikeable] = true, [SkillType.Area] = true, [SkillType.Duration] = true, [SkillType.Chaos] = true, },
@@ -13440,11 +13612,12 @@ skills["PestilentStrikeMercenary"] = {
 		[40] = { baseMultiplier = 7.801, damageEffectiveness = 7.801, levelRequirement = 100, },
 	},
 }
-inheritSkillData("PestilentStrikeMercenary", "PestilentStrike")
 
 skills["PhysStormCallMercenary"] = {
 	name = "[DNT] Unused",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "StormCall",
 	color = 3,
 	baseEffectiveness = 4.5,
 	incrementalEffectiveness = 0.026000000536442,
@@ -13474,11 +13647,12 @@ skills["PhysStormCallMercenary"] = {
 		[1] = { 0.80000001192093, 1.2000000476837, cooldown = 4, critChance = 5, levelRequirement = 1, storedUses = 1, statInterpolation = { 3, 3, }, },
 	},
 }
-inheritSkillData("PhysStormCallMercenary", "LegionTemplarJudgeStormCall")
 
 skills["PhysicalAegisMercenary"] = {
 	name = "Physical Aegis",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "PhysicalAegis",
 	color = 4,
 	description = "Calls forth a protective aegis which takes physical damage from hits for you until depleted. The aegis will be restored to its full value after a short delay if you stop taking physical damage from hits, or if depleted.",
 	skillTypes = { [SkillType.Spell] = true, [SkillType.Triggerable] = true, [SkillType.Triggered] = true, [SkillType.InbuiltTrigger] = true, [SkillType.Aegis] = true, },
@@ -13540,11 +13714,12 @@ skills["PhysicalAegisMercenary"] = {
 		[40] = { 20927, levelRequirement = 100, statInterpolation = { 1, }, },
 	},
 }
-inheritSkillData("PhysicalAegisMercenary", "PhysicalAegis")
 
 skills["PhysicalAegisMercenaryEncounter"] = {
 	name = "Physical Aegis",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "PhysicalAegis",
 	color = 4,
 	description = "Calls forth a protective aegis which takes physical damage from hits for you until depleted. The aegis will be restored to its full value after a short delay if you stop taking physical damage from hits, or if depleted.",
 	skillTypes = { [SkillType.Spell] = true, [SkillType.Triggerable] = true, [SkillType.Triggered] = true, [SkillType.InbuiltTrigger] = true, [SkillType.Aegis] = true, },
@@ -13606,11 +13781,11 @@ skills["PhysicalAegisMercenaryEncounter"] = {
 		[40] = { 303561, levelRequirement = 100, statInterpolation = { 1, }, },
 	},
 }
-inheritSkillData("PhysicalAegisMercenaryEncounter", "PhysicalAegis")
 
 skills["PhysicalBeaconMercenary"] = {
 	name = "Beacons of Faith",
 	hidden = true,
+	mercenary = true,
 	color = 1,
 	baseEffectiveness = 3.5,
 	incrementalEffectiveness = 0.031500000506639,
@@ -13684,6 +13859,8 @@ skills["PhysicalBeaconMercenary"] = {
 skills["PoachersMarkMercenary"] = {
 	name = "Poacher's Mark",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "PoachersMark",
 	color = 2,
 	baseEffectiveness = 0.25170001387596,
 	incrementalEffectiveness = 0.024100000038743,
@@ -13748,11 +13925,12 @@ skills["PoachersMarkMercenary"] = {
 		[40] = { 0.80000001192093, 1.2000000476837, 72, 36, cooldown = 6, levelRequirement = 100, storedUses = 1, statInterpolation = { 3, 3, 1, 1, }, },
 	},
 }
-inheritSkillData("PoachersMarkMercenary", "PoachersMark")
 
 skills["PowerSiphonMercenary"] = {
 	name = "Power Siphon",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "PowerSiphon",
 	color = 3,
 	description = "Fires your wand to fire a single projectile each at a number of nearby enemies, granting you a power charge if an enemy is killed by, or soon after, the hit.",
 	skillTypes = { [SkillType.Attack] = true, [SkillType.RangedAttack] = true, [SkillType.Projectile] = true, [SkillType.ProjectilesFromUser] = true, [SkillType.Totemable] = true, [SkillType.Trappable] = true, [SkillType.Mineable] = true, [SkillType.WandAttack] = true, },
@@ -13822,11 +14000,12 @@ skills["PowerSiphonMercenary"] = {
 		[40] = { 11, baseMultiplier = 1.168, damageEffectiveness = 1.168, levelRequirement = 100, statInterpolation = { 1, }, },
 	},
 }
-inheritSkillData("PowerSiphonMercenary", "PowerSiphon")
 
 skills["PrecisionMercenary"] = {
 	name = "Precision",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "Precision",
 	color = 2,
 	description = "Casts an aura that grants accuracy and critical strike chance to you and your allies.",
 	skillTypes = { [SkillType.Spell] = true, [SkillType.Area] = true, [SkillType.Buff] = true, [SkillType.HasReservation] = true, [SkillType.TotemCastsAlone] = true, [SkillType.Totemable] = true, [SkillType.Aura] = true, [SkillType.Instant] = true, [SkillType.AreaSpell] = true, [SkillType.CanHaveBlessing] = true, [SkillType.InstantNoRepeatWhenHeld] = true, [SkillType.InstantShiftAttackForLeftMouse] = true, [SkillType.Cooldown] = true, },
@@ -13889,11 +14068,12 @@ skills["PrecisionMercenary"] = {
 		[40] = { 1390, 88, 34, cooldown = 1.2, levelRequirement = 100, storedUses = 1, statInterpolation = { 1, 1, 1, }, },
 	},
 }
-inheritSkillData("PrecisionMercenary", "AzmeriAdmiralPrecision")
 
 skills["PrideMercenary"] = {
 	name = "Pride",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "Pride",
 	color = 1,
 	description = "Casts an aura that causes nearby enemies to take more physical damage.",
 	skillTypes = { [SkillType.Spell] = true, [SkillType.Area] = true, [SkillType.Buff] = true, [SkillType.HasReservation] = true, [SkillType.TotemCastsAlone] = true, [SkillType.Totemable] = true, [SkillType.Aura] = true, [SkillType.Instant] = true, [SkillType.AreaSpell] = true, [SkillType.Physical] = true, [SkillType.AuraAffectsEnemies] = true, [SkillType.CanHaveBlessing] = true, [SkillType.InstantNoRepeatWhenHeld] = true, [SkillType.InstantShiftAttackForLeftMouse] = true, [SkillType.Cooldown] = true, },
@@ -13956,11 +14136,11 @@ skills["PrideMercenary"] = {
 		[40] = { 23, 49, 17, levelRequirement = 100, statInterpolation = { 1, 1, 1, }, },
 	},
 }
-inheritSkillData("PrideMercenary", "AzmeriDemonPhysicalDamageAura")
 
 skills["ProximityShieldMercenary"] = {
 	name = "Proximity Shield",
 	hidden = true,
+	mercenary = true,
 	color = 4,
 	skillTypes = { [SkillType.Spell] = true, [SkillType.Area] = true, [SkillType.Duration] = true, [SkillType.Triggerable] = true, [SkillType.AreaSpell] = true, },
 	statDescriptionScope = "skill_stat_descriptions",
@@ -13984,6 +14164,8 @@ skills["ProximityShieldMercenary"] = {
 skills["PunctureMercenary"] = {
 	name = "Puncture",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "Puncture",
 	color = 2,
 	description = "Punctures enemies with your Bow, causing a bleeding debuff, which will be affected by modifiers to skill duration.",
 	skillTypes = { [SkillType.Attack] = true, [SkillType.RangedAttack] = true, [SkillType.MirageArcherCanUse] = true, [SkillType.Projectile] = true, [SkillType.ProjectilesFromUser] = true, [SkillType.Duration] = true, [SkillType.Trappable] = true, [SkillType.Mineable] = true, [SkillType.Totemable] = true, [SkillType.Triggerable] = true, [SkillType.Physical] = true, },
@@ -14052,11 +14234,12 @@ skills["PunctureMercenary"] = {
 		[40] = { 69, baseMultiplier = 2.352, damageEffectiveness = 2.352, levelRequirement = 100, statInterpolation = { 1, }, },
 	},
 }
-inheritSkillData("PunctureMercenary", "Puncture")
 
 skills["PunctureMercenaryEncounter"] = {
 	name = "Puncture",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "Puncture",
 	color = 2,
 	description = "Punctures enemies with your Bow, causing a bleeding debuff, which will be affected by modifiers to skill duration.",
 	skillTypes = { [SkillType.Attack] = true, [SkillType.RangedAttack] = true, [SkillType.MirageArcherCanUse] = true, [SkillType.Projectile] = true, [SkillType.ProjectilesFromUser] = true, [SkillType.Duration] = true, [SkillType.Trappable] = true, [SkillType.Mineable] = true, [SkillType.Totemable] = true, [SkillType.Triggerable] = true, [SkillType.Physical] = true, },
@@ -14125,11 +14308,12 @@ skills["PunctureMercenaryEncounter"] = {
 		[40] = { 69, attackSpeedMultiplier = -40, baseMultiplier = 2.0816, damageEffectiveness = 2.0816, levelRequirement = 100, statInterpolation = { 1, }, },
 	},
 }
-inheritSkillData("PunctureMercenaryEncounter", "Puncture")
 
 skills["PunishmentMercenary"] = {
 	name = "Punishment",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "Punishment",
 	color = 1,
 	description = "Curses all targets in an area, causing them to be debilitated when they hit enemies and increasing damage they take while on low life.",
 	skillTypes = { [SkillType.Spell] = true, [SkillType.Area] = true, [SkillType.Duration] = true, [SkillType.Trappable] = true, [SkillType.Totemable] = true, [SkillType.Mineable] = true, [SkillType.Multicastable] = true, [SkillType.Triggerable] = true, [SkillType.Cascadable] = true, [SkillType.AppliesCurse] = true, [SkillType.CanRapidFire] = true, [SkillType.AreaSpell] = true, [SkillType.InstantNoRepeatWhenHeld] = true, [SkillType.InstantShiftAttackForLeftMouse] = true, [SkillType.Hex] = true, },
@@ -14197,11 +14381,12 @@ skills["PunishmentMercenary"] = {
 		[40] = { 14800, 17, 81, levelRequirement = 100, statInterpolation = { 1, 1, 1, }, },
 	},
 }
-inheritSkillData("PunishmentMercenary", "Punishment")
 
 skills["PurifyingFlameMercenary"] = {
 	name = "Purifying Flame",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "PurifyingFlame",
 	color = 3,
 	baseEffectiveness = 2.4525001049042,
 	incrementalEffectiveness = 0.046799998730421,
@@ -14276,11 +14461,12 @@ skills["PurifyingFlameMercenary"] = {
 		[40] = { 0.80000001192093, 1.2000000476837, 5, 11, critChance = 6, damageEffectiveness = 3, levelRequirement = 100, statInterpolation = { 3, 3, 1, 1, }, },
 	},
 }
-inheritSkillData("PurifyingFlameMercenary", "PurifyingFlame")
 
 skills["PurifyingFlameMercenaryEncounter"] = {
 	name = "Purifying Flame",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "PurifyingFlame",
 	color = 3,
 	baseEffectiveness = 2,
 	incrementalEffectiveness = 0.042500000447035,
@@ -14316,11 +14502,12 @@ skills["PurifyingFlameMercenaryEncounter"] = {
 		[1] = { 0.80000001192093, 1.2000000476837, 4, 10, critChance = 6, damageEffectiveness = 2.5, levelRequirement = 0, statInterpolation = { 3, 3, 1, 1, }, },
 	},
 }
-inheritSkillData("PurifyingFlameMercenaryEncounter", "PurifyingFlame")
 
 skills["PurityOfFireMercenary"] = {
 	name = "Purity of Fire",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "PurityOfFire",
 	color = 1,
 	description = "Casts an aura that grants fire resistance to you and your allies.",
 	skillTypes = { [SkillType.Spell] = true, [SkillType.Area] = true, [SkillType.Buff] = true, [SkillType.HasReservation] = true, [SkillType.TotemCastsAlone] = true, [SkillType.Totemable] = true, [SkillType.Aura] = true, [SkillType.Fire] = true, [SkillType.Instant] = true, [SkillType.AreaSpell] = true, [SkillType.CanHaveBlessing] = true, [SkillType.InstantNoRepeatWhenHeld] = true, [SkillType.InstantShiftAttackForLeftMouse] = true, [SkillType.Cooldown] = true, },
@@ -14383,11 +14570,12 @@ skills["PurityOfFireMercenary"] = {
 		[40] = { 56, 5, 34, cooldown = 1.2, levelRequirement = 100, storedUses = 1, statInterpolation = { 1, 1, 1, }, },
 	},
 }
-inheritSkillData("PurityOfFireMercenary", "PurityOfFire")
 
 skills["PurityOfIceMercenary"] = {
 	name = "Purity of Ice",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "PurityOfIce",
 	color = 2,
 	description = "Casts an aura that grants cold resistance to you and your allies.",
 	skillTypes = { [SkillType.Spell] = true, [SkillType.Area] = true, [SkillType.Buff] = true, [SkillType.HasReservation] = true, [SkillType.TotemCastsAlone] = true, [SkillType.Totemable] = true, [SkillType.Aura] = true, [SkillType.Cold] = true, [SkillType.Instant] = true, [SkillType.AreaSpell] = true, [SkillType.CanHaveBlessing] = true, [SkillType.InstantNoRepeatWhenHeld] = true, [SkillType.InstantShiftAttackForLeftMouse] = true, [SkillType.Cooldown] = true, },
@@ -14450,11 +14638,12 @@ skills["PurityOfIceMercenary"] = {
 		[40] = { 56, 5, 34, cooldown = 1.2, levelRequirement = 100, storedUses = 1, statInterpolation = { 1, 1, 1, }, },
 	},
 }
-inheritSkillData("PurityOfIceMercenary", "PurityOfIce")
 
 skills["PurityOfLightningMercenary"] = {
 	name = "Purity of Lightning",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "PurityOfLightning",
 	color = 3,
 	description = "Casts an aura that grants lightning resistance to you and your allies.",
 	skillTypes = { [SkillType.Spell] = true, [SkillType.Area] = true, [SkillType.Buff] = true, [SkillType.HasReservation] = true, [SkillType.TotemCastsAlone] = true, [SkillType.Totemable] = true, [SkillType.Aura] = true, [SkillType.Lightning] = true, [SkillType.Instant] = true, [SkillType.AreaSpell] = true, [SkillType.CanHaveBlessing] = true, [SkillType.InstantNoRepeatWhenHeld] = true, [SkillType.InstantShiftAttackForLeftMouse] = true, [SkillType.Cooldown] = true, },
@@ -14517,11 +14706,12 @@ skills["PurityOfLightningMercenary"] = {
 		[40] = { 56, 5, 34, cooldown = 1.2, levelRequirement = 100, storedUses = 1, statInterpolation = { 1, 1, 1, }, },
 	},
 }
-inheritSkillData("PurityOfLightningMercenary", "PurityOfLightning")
 
 skills["QuickGuardAllyMercenary"] = {
 	name = "Steelskin Ally",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "QuickGuard",
 	color = 1,
 	baseEffectiveness = 10,
 	incrementalEffectiveness = 0.029999999329448,
@@ -14584,11 +14774,12 @@ skills["QuickGuardAllyMercenary"] = {
 		[40] = { 1, cooldown = 4, levelRequirement = 100, storedUses = 1, statInterpolation = { 3, }, },
 	},
 }
-inheritSkillData("QuickGuardAllyMercenary", "QuickGuard")
 
 skills["RainOfArrowsAltMercenary"] = {
 	name = "Rain of Arrows of Saturation",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "RainOfArrowsAltY",
 	color = 2,
 	description = "Fires multiple arrows into the air, to slowly land in sequence after a delay, starting at the targeted location and spreading outwards in all directions. Each arrow deals damage in an area around it. Half of the arrows will land directly on targets if there are targets in their range.",
 	skillTypes = { [SkillType.Attack] = true, [SkillType.RangedAttack] = true, [SkillType.MirageArcherCanUse] = true, [SkillType.Area] = true, [SkillType.ProjectileSpeed] = true, [SkillType.ProjectileNumber] = true, [SkillType.Totemable] = true, [SkillType.Trappable] = true, [SkillType.Mineable] = true, [SkillType.Triggerable] = true, [SkillType.Rain] = true, },
@@ -14651,11 +14842,12 @@ skills["RainOfArrowsAltMercenary"] = {
 		[40] = { 39, baseMultiplier = 0.429, cooldown = 2, damageEffectiveness = 0.429, levelRequirement = 100, storedUses = 1, statInterpolation = { 1, }, },
 	},
 }
-inheritSkillData("RainOfArrowsAltMercenary", "RainOfArrowsAltY")
 
 skills["RaiseSpectreAltMercenary"] = {
 	name = "Raise Spectre of Transience",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "RaiseSpectreAltX",
 	color = 3,
 	baseEffectiveness = 0,
 	description = "Raises a spectral version of a defeated foe as a temporary minion to fight for you in battle for a duration.",
@@ -14724,11 +14916,12 @@ skills["RaiseSpectreAltMercenary"] = {
 		[40] = { 7, 91, 0, levelRequirement = 100, statInterpolation = { 1, 1, 1, }, },
 	},
 }
-inheritSkillData("RaiseSpectreAltMercenary", "RaiseSpectreAltX")
 
 skills["RaiseSpectreAltMercenaryEncounter"] = {
 	name = "Raise Spectre of Transience",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "RaiseSpectreAltX",
 	color = 3,
 	baseEffectiveness = 0,
 	description = "Raises a spectral version of a defeated foe as a temporary minion to fight for you in battle for a duration.",
@@ -14798,11 +14991,12 @@ skills["RaiseSpectreAltMercenaryEncounter"] = {
 		[40] = { 7, 91, 0, levelRequirement = 100, statInterpolation = { 1, 1, 1, }, },
 	},
 }
-inheritSkillData("RaiseSpectreAltMercenaryEncounter", "RaiseSpectreAltX")
 
 skills["RaiseZombieAltMercenary"] = {
 	name = "Raise Zombie of Falling",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "RaiseZombieAltY",
 	color = 3,
 	description = "Raises necromantic energies into the sky above a targeted location, where they coalesce into a zombie minion. The minion then attacks by falling to the ground, causing an impact that deals damage in an area. The zombie cannot survive the impact.",
 	skillTypes = { [SkillType.Spell] = true, [SkillType.Minion] = true, [SkillType.MinionsCanExplode] = true, [SkillType.Trappable] = true, [SkillType.Totemable] = true, [SkillType.Mineable] = true, [SkillType.Multicastable] = true, [SkillType.Triggerable] = true, [SkillType.CanRapidFire] = true, [SkillType.CreatesMinion] = true, },
@@ -14863,11 +15057,12 @@ skills["RaiseZombieAltMercenary"] = {
 		[40] = { levelRequirement = 100, },
 	},
 }
-inheritSkillData("RaiseZombieAltMercenary", "RaiseZombieAltY")
 
 skills["RaiseZombieAltMercenaryEncounter"] = {
 	name = "Raise Zombie of Falling",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "RaiseZombieAltY",
 	color = 3,
 	description = "Raises necromantic energies into the sky above a targeted location, where they coalesce into a zombie minion. The minion then attacks by falling to the ground, causing an impact that deals damage in an area. The zombie cannot survive the impact.",
 	skillTypes = { [SkillType.Spell] = true, [SkillType.Minion] = true, [SkillType.MinionsCanExplode] = true, [SkillType.Trappable] = true, [SkillType.Totemable] = true, [SkillType.Mineable] = true, [SkillType.Multicastable] = true, [SkillType.Triggerable] = true, [SkillType.CanRapidFire] = true, [SkillType.CreatesMinion] = true, },
@@ -14928,11 +15123,12 @@ skills["RaiseZombieAltMercenaryEncounter"] = {
 		[40] = { baseMultiplier = 0.4, damageEffectiveness = 0.4, levelRequirement = 100, },
 	},
 }
-inheritSkillData("RaiseZombieAltMercenaryEncounter", "RaiseZombieAltY")
 
 skills["RallyingCryMercenary"] = {
 	name = "Rallying Cry",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "RallyingCry",
 	color = 1,
 	description = "Performs a warcry, taunting nearby enemies to attack the user and exerting subsequent attacks. Nearby allies gain a buff based on the damage of your weapon.",
 	skillTypes = { [SkillType.Buff] = true, [SkillType.Area] = true, [SkillType.Duration] = true, [SkillType.Warcry] = true, [SkillType.Cooldown] = true, },
@@ -15005,11 +15201,12 @@ skills["RallyingCryMercenary"] = {
 		[40] = { 54, 4200, cooldown = 8, levelRequirement = 100, storedUses = 1, statInterpolation = { 1, 1, }, },
 	},
 }
-inheritSkillData("RallyingCryMercenary", "RallyingCry")
 
 skills["ReapMercenary"] = {
 	name = "Reap",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "Reap",
 	color = 1,
 	baseEffectiveness = 1.405699968338,
 	incrementalEffectiveness = 0.05009999871254,
@@ -15082,11 +15279,12 @@ skills["ReapMercenary"] = {
 		[40] = { 0.80000001192093, 1.2000000476837, 83.400004979471, critChance = 6, damageEffectiveness = 2.1, levelRequirement = 100, statInterpolation = { 3, 3, 3, }, },
 	},
 }
-inheritSkillData("ReapMercenary", "Reap")
 
 skills["ReapMercenaryEncounter"] = {
 	name = "Reap",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "Reap",
 	color = 1,
 	baseEffectiveness = 1.25,
 	incrementalEffectiveness = 0.037500001490116,
@@ -15159,11 +15357,11 @@ skills["ReapMercenaryEncounter"] = {
 		[40] = { 0.80000001192093, 1.2000000476837, 14.999999937912, critChance = 6, damageEffectiveness = 2.1, levelRequirement = 100, statInterpolation = { 3, 3, 3, }, },
 	},
 }
-inheritSkillData("ReapMercenaryEncounter", "Reap")
 
 skills["RemoteSlamMercenary"] = {
 	name = "Tunnelslam",
 	hidden = true,
+	mercenary = true,
 	color = 1,
 	skillTypes = { [SkillType.Attack] = true, [SkillType.Area] = true, [SkillType.Damage] = true, },
 	statDescriptionScope = "skill_stat_descriptions",
@@ -15191,6 +15389,8 @@ skills["RemoteSlamMercenary"] = {
 skills["RitualDaemonChaosProjectile1"] = {
 	name = "RitualDaemonChaosProjectile1",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "BetrayalSecretPoliceCurveDagger1",
 	color = 4,
 	baseEffectiveness = 1.0499999523163,
 	incrementalEffectiveness = 0.045000001788139,
@@ -15223,11 +15423,12 @@ skills["RitualDaemonChaosProjectile1"] = {
 		[1] = { 0.80000001192093, 1.2000000476837, levelRequirement = 1, statInterpolation = { 3, 3, }, },
 	},
 }
-inheritSkillData("RitualDaemonChaosProjectile1", "BetrayalSecretPoliceCurveDagger1")
 
 skills["RitualDaemonChaosProjectile2"] = {
 	name = "RitualDaemonChaosProjectile2",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "BetrayalSecretPoliceCurveDagger1",
 	color = 4,
 	baseEffectiveness = 1.0499999523163,
 	incrementalEffectiveness = 0.045000001788139,
@@ -15260,11 +15461,12 @@ skills["RitualDaemonChaosProjectile2"] = {
 		[1] = { 0.80000001192093, 1.2000000476837, levelRequirement = 1, statInterpolation = { 3, 3, }, },
 	},
 }
-inheritSkillData("RitualDaemonChaosProjectile2", "BetrayalSecretPoliceCurveDagger1")
 
 skills["RitualDaemonChaosProjectile3"] = {
 	name = "RitualDaemonChaosProjectile3",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "BetrayalSecretPoliceCurveDagger1",
 	color = 4,
 	baseEffectiveness = 1.0499999523163,
 	incrementalEffectiveness = 0.045000001788139,
@@ -15297,11 +15499,12 @@ skills["RitualDaemonChaosProjectile3"] = {
 		[1] = { 0.80000001192093, 1.2000000476837, levelRequirement = 1, statInterpolation = { 3, 3, }, },
 	},
 }
-inheritSkillData("RitualDaemonChaosProjectile3", "BetrayalSecretPoliceCurveDagger1")
 
 skills["RitualDaemonChaosProjectile4"] = {
 	name = "RitualDaemonChaosProjectile4",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "BetrayalSecretPoliceCurveDagger1",
 	color = 4,
 	baseEffectiveness = 1.0499999523163,
 	incrementalEffectiveness = 0.045000001788139,
@@ -15334,11 +15537,12 @@ skills["RitualDaemonChaosProjectile4"] = {
 		[1] = { 0.80000001192093, 1.2000000476837, levelRequirement = 1, statInterpolation = { 3, 3, }, },
 	},
 }
-inheritSkillData("RitualDaemonChaosProjectile4", "BetrayalSecretPoliceCurveDagger1")
 
 skills["RitualDaemonChaosProjectile5"] = {
 	name = "RitualDaemonChaosProjectile5",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "BetrayalSecretPoliceCurveDagger1",
 	color = 4,
 	baseEffectiveness = 1.0499999523163,
 	incrementalEffectiveness = 0.045000001788139,
@@ -15371,11 +15575,12 @@ skills["RitualDaemonChaosProjectile5"] = {
 		[1] = { 0.80000001192093, 1.2000000476837, levelRequirement = 1, statInterpolation = { 3, 3, }, },
 	},
 }
-inheritSkillData("RitualDaemonChaosProjectile5", "BetrayalSecretPoliceCurveDagger1")
 
 skills["RitualDaemonChaosProjectile6"] = {
 	name = "RitualDaemonChaosProjectile6",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "BetrayalSecretPoliceCurveDagger1",
 	color = 4,
 	baseEffectiveness = 1.0499999523163,
 	incrementalEffectiveness = 0.045000001788139,
@@ -15407,11 +15612,12 @@ skills["RitualDaemonChaosProjectile6"] = {
 		[1] = { 0.80000001192093, 1.2000000476837, levelRequirement = 1, statInterpolation = { 3, 3, }, },
 	},
 }
-inheritSkillData("RitualDaemonChaosProjectile6", "BetrayalSecretPoliceCurveDagger1")
 
 skills["RollingMagmaMercenary"] = {
 	name = "Rolling Magma",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "GoatmanFireMagmaOrb",
 	color = 3,
 	baseEffectiveness = 2.5980000495911,
 	incrementalEffectiveness = 0.045000001788139,
@@ -15485,11 +15691,11 @@ skills["RollingMagmaMercenary"] = {
 		[40] = { 0.80000001192093, 1.2000000476837, 4, 6, 4, critChance = 5, damageEffectiveness = 2.8, levelRequirement = 100, statInterpolation = { 3, 3, 1, 1, 1, }, },
 	},
 }
-inheritSkillData("RollingMagmaMercenary", "GoatmanFireMagmaOrb")
 
 skills["SSMHolySpectresMercenary"] = {
 	name = "Raise Spectre: Holy Flame Elementals",
 	hidden = true,
+	mercenary = true,
 	color = 4,
 	skillTypes = { [SkillType.Spell] = true, [SkillType.Multicastable] = true, [SkillType.Triggerable] = true, },
 	statDescriptionScope = "skill_stat_descriptions",
@@ -15516,6 +15722,7 @@ skills["SSMHolySpectresMercenary"] = {
 skills["SSMMercenaryRelic"] = {
 	name = "Relic of Binding",
 	hidden = true,
+	mercenary = true,
 	color = 4,
 	skillTypes = { [SkillType.Spell] = true, [SkillType.Multicastable] = true, [SkillType.Triggerable] = true, [SkillType.Trappable] = true, [SkillType.Totemable] = true, [SkillType.Mineable] = true, },
 	statDescriptionScope = "skill_stat_descriptions",
@@ -15541,6 +15748,7 @@ skills["SSMMercenaryRelic"] = {
 skills["SSMMercenarySoulrendOrb"] = {
 	name = "Summon Seeking Void",
 	hidden = true,
+	mercenary = true,
 	color = 4,
 	skillTypes = { [SkillType.Spell] = true, [SkillType.Multicastable] = true, [SkillType.Triggerable] = true, [SkillType.Trappable] = true, [SkillType.Totemable] = true, [SkillType.Mineable] = true, },
 	statDescriptionScope = "skill_stat_descriptions",
@@ -15566,6 +15774,7 @@ skills["SSMMercenarySoulrendOrb"] = {
 skills["SSMPaganBishopMercenary"] = {
 	name = "Reinforce: Fallen Bishop",
 	hidden = true,
+	mercenary = true,
 	color = 4,
 	skillTypes = { [SkillType.Spell] = true, [SkillType.Multicastable] = true, [SkillType.Triggerable] = true, },
 	statDescriptionScope = "skill_stat_descriptions",
@@ -15592,6 +15801,7 @@ skills["SSMPaganBishopMercenary"] = {
 skills["SSMPaganBishopMercenaryEncounter"] = {
 	name = "Reinforce: Fallen Bishop",
 	hidden = true,
+	mercenary = true,
 	color = 4,
 	skillTypes = { [SkillType.Spell] = true, [SkillType.Multicastable] = true, [SkillType.Triggerable] = true, },
 	statDescriptionScope = "skill_stat_descriptions",
@@ -15619,6 +15829,7 @@ skills["SSMPaganBishopMercenaryEncounter"] = {
 skills["SSMSkeletalBossMercenary"] = {
 	name = "Reinforce: Fallen Osseotitan",
 	hidden = true,
+	mercenary = true,
 	color = 4,
 	skillTypes = { [SkillType.Spell] = true, [SkillType.Multicastable] = true, [SkillType.Triggerable] = true, },
 	statDescriptionScope = "skill_stat_descriptions",
@@ -15645,6 +15856,7 @@ skills["SSMSkeletalBossMercenary"] = {
 skills["SSMSkeletalBossMercenaryEncounter"] = {
 	name = "Reinforce: Fallen Osseotitan",
 	hidden = true,
+	mercenary = true,
 	color = 4,
 	skillTypes = { [SkillType.Spell] = true, [SkillType.Multicastable] = true, [SkillType.Triggerable] = true, },
 	statDescriptionScope = "skill_stat_descriptions",
@@ -15672,6 +15884,7 @@ skills["SSMSkeletalBossMercenaryEncounter"] = {
 skills["SSMVollMercenary"] = {
 	name = "Reinforce: Fallen Emperor",
 	hidden = true,
+	mercenary = true,
 	color = 4,
 	skillTypes = { [SkillType.Spell] = true, [SkillType.Multicastable] = true, [SkillType.Triggerable] = true, },
 	statDescriptionScope = "skill_stat_descriptions",
@@ -15698,6 +15911,7 @@ skills["SSMVollMercenary"] = {
 skills["SSMVollMercenaryEncounter"] = {
 	name = "Reinforce: Fallen Emperor",
 	hidden = true,
+	mercenary = true,
 	color = 4,
 	skillTypes = { [SkillType.Spell] = true, [SkillType.Multicastable] = true, [SkillType.Triggerable] = true, },
 	statDescriptionScope = "skill_stat_descriptions",
@@ -15725,6 +15939,8 @@ skills["SSMVollMercenaryEncounter"] = {
 skills["SandstormChaosMercenary"] = {
 	name = "Scourstorm",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "SandstormChaosElementalSummoned",
 	color = 4,
 	baseEffectiveness = 16.840000152588,
 	incrementalEffectiveness = 0.016499999910593,
@@ -15777,11 +15993,12 @@ skills["SandstormChaosMercenary"] = {
 		[30] = { 16.666667039196, cooldown = 18, levelRequirement = 90, storedUses = 1, statInterpolation = { 3, }, },
 	},
 }
-inheritSkillData("SandstormChaosMercenary", "SandstormChaosElementalSummoned")
 
 skills["ScorchingRayTotemMercenary"] = {
 	name = "Scorching Ray Totem",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "KaomFireBeamTotemSpectre",
 	color = 3,
 	baseEffectiveness = 3.6275000572205,
 	incrementalEffectiveness = 0.048900000751019,
@@ -15853,11 +16070,12 @@ skills["ScorchingRayTotemMercenary"] = {
 		[40] = { 16.666667039196, cooldown = 6, levelRequirement = 100, storedUses = 1, statInterpolation = { 3, }, },
 	},
 }
-inheritSkillData("ScorchingRayTotemMercenary", "KaomFireBeamTotemSpectre")
 
 skills["ScorchingRayTotemMercenaryEncounter"] = {
 	name = "Scorching Ray Totem",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "KaomFireBeamTotemSpectre",
 	color = 3,
 	baseEffectiveness = 3.6275000572205,
 	incrementalEffectiveness = 0.048900000751019,
@@ -15929,11 +16147,12 @@ skills["ScorchingRayTotemMercenaryEncounter"] = {
 		[40] = { 4.1666667597989, cooldown = 6, levelRequirement = 100, storedUses = 1, statInterpolation = { 3, }, },
 	},
 }
-inheritSkillData("ScorchingRayTotemMercenaryEncounter", "KaomFireBeamTotemSpectre")
 
 skills["ScourgeArrowAltMercenary"] = {
 	name = "Scourge Arrow of Menace",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "ScourgeArrowAltX",
 	color = 2,
 	description = "Fire an arrow that leaves a spore pod in its wake. The spore pod blooms, firing thorn arrows, which travel for a short time before dissipating. Modifiers that cause additional projectiles to be fired will only apply to the initial arrows, each of which leaves its own spore pod.",
 	skillTypes = { [SkillType.Attack] = true, [SkillType.RangedAttack] = true, [SkillType.MirageArcherCanUse] = true, [SkillType.Projectile] = true, [SkillType.ProjectilesFromUser] = true, [SkillType.Totemable] = true, [SkillType.Damage] = true, [SkillType.Chaos] = true, [SkillType.Trappable] = true, [SkillType.Mineable] = true, [SkillType.Triggerable] = true, },
@@ -16001,11 +16220,12 @@ skills["ScourgeArrowAltMercenary"] = {
 		[40] = { baseMultiplier = 0.8115, damageEffectiveness = 0.8115, levelRequirement = 100, },
 	},
 }
-inheritSkillData("ScourgeArrowAltMercenary", "ScourgeArrowAltX")
 
 skills["ShatteringSteelMercenary"] = {
 	name = "Shattering Steel",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "ShatteringSteel",
 	color = 2,
 	description = "Swing an Axe or Sword, firing projectiles which shatter on impact or soon after being launched, dealing area damage in front of where they shatter.",
 	skillTypes = { [SkillType.Attack] = true, [SkillType.Projectile] = true, [SkillType.Damage] = true, [SkillType.ProjectileSpeed] = true, [SkillType.RangedAttack] = true, [SkillType.Area] = true, [SkillType.Physical] = true, [SkillType.ProjectilesFromUser] = true, },
@@ -16075,11 +16295,12 @@ skills["ShatteringSteelMercenary"] = {
 		[40] = { attackSpeedMultiplier = -15, baseMultiplier = 3.4, damageEffectiveness = 3.4, levelRequirement = 100, },
 	},
 }
-inheritSkillData("ShatteringSteelMercenary", "ShatteringSteel")
 
 skills["ShieldChargeMercenary"] = {
 	name = "Shield Charge",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "ShieldCharge",
 	color = 1,
 	baseEffectiveness = 2.0499999523163,
 	incrementalEffectiveness = 0.024599999189377,
@@ -16155,11 +16376,12 @@ skills["ShieldChargeMercenary"] = {
 		[40] = { 0.80000001192093, 1.2000000476837, 124, 14, 18, attackTime = 500, critChance = 5, levelRequirement = 100, statInterpolation = { 3, 3, 1, 1, 1, }, },
 	},
 }
-inheritSkillData("ShieldChargeMercenary", "ShieldCharge")
 
 skills["ShieldChargeMercenaryEncounter"] = {
 	name = "Shield Charge",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "ShieldCharge",
 	color = 1,
 	baseEffectiveness = 1.5,
 	incrementalEffectiveness = 0.017500000074506,
@@ -16197,11 +16419,12 @@ skills["ShieldChargeMercenaryEncounter"] = {
 		[2] = { 0.80000001192093, 1.2000000476837, 124, 4, 7, attackTime = 500, critChance = 5, levelRequirement = 100, statInterpolation = { 3, 3, 2, 2, 2, }, },
 	},
 }
-inheritSkillData("ShieldChargeMercenaryEncounter", "ShieldCharge")
 
 skills["ShieldCrushMercenary"] = {
 	name = "Shield Crush",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "ShieldCrush",
 	color = 1,
 	baseEffectiveness = 1.3899999856949,
 	incrementalEffectiveness = 0.032999999821186,
@@ -16271,11 +16494,12 @@ skills["ShieldCrushMercenary"] = {
 		[40] = { 0.80000001192093, 1.2000000476837, 14, 21, 11, attackTime = 800, critChance = 5, levelRequirement = 100, statInterpolation = { 3, 3, 1, 1, 1, }, },
 	},
 }
-inheritSkillData("ShieldCrushMercenary", "ShieldCrush")
 
 skills["ShieldCrushMercenaryEncounter"] = {
 	name = "Shield Crush",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "ShieldCrush",
 	color = 1,
 	incrementalEffectiveness = 0.029999999329448,
 	description = "Swipe your shield, dealing area damage in three waves in front of you. Enemies can be hit by two of the waves where they overlap.",
@@ -16344,11 +16568,12 @@ skills["ShieldCrushMercenaryEncounter"] = {
 		[1] = { 0.80000001192093, 1.2000000476837, 7, 11, 8, attackTime = 800, baseMultiplier = 0.4, critChance = 5, damageEffectiveness = 0.4, levelRequirement = 1, statInterpolation = { 3, 3, 1, 1, 1, }, },
 	},
 }
-inheritSkillData("ShieldCrushMercenaryEncounter", "ShieldCrush")
 
 skills["ShockwaveTotemMercenary"] = {
 	name = "Shockwave Totem of Shocking",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "ShockwaveTotem",
 	color = 1,
 	baseEffectiveness = 1.0778000354767,
 	incrementalEffectiveness = 0.043600000441074,
@@ -16423,11 +16648,12 @@ skills["ShockwaveTotemMercenary"] = {
 		[40] = { 0.69999998807907, 1.2999999523163, critChance = 5, damageEffectiveness = 1.1, levelRequirement = 100, statInterpolation = { 3, 3, }, },
 	},
 }
-inheritSkillData("ShockwaveTotemMercenary", "ShockwaveTotem")
 
 skills["ShrapnelBallistaMercenary"] = {
 	name = "Shrapnel Ballista",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "ShrapnelBallista",
 	color = 2,
 	description = "Summons a ballista totem that fires multiple arrows with extreme force, breaking them apart into shrapnel. Enemies can be hit by multiple arrows from the same attack. Requires a Bow.",
 	skillTypes = { [SkillType.Attack] = true, [SkillType.Projectile] = true, [SkillType.ProjectilesFromUser] = true, [SkillType.RangedAttack] = true, [SkillType.Trappable] = true, [SkillType.Mineable] = true, [SkillType.SummonsTotem] = true, [SkillType.AttackInPlaceIsDefault] = true, [SkillType.TotemsAreBallistae] = true, },
@@ -16504,11 +16730,12 @@ skills["ShrapnelBallistaMercenary"] = {
 		[40] = { 4, 0, baseMultiplier = 0.584, damageEffectiveness = 0.584, levelRequirement = 100, statInterpolation = { 1, 2, }, },
 	},
 }
-inheritSkillData("ShrapnelBallistaMercenary", "ShrapnelBallista")
 
 skills["SiegeBallistaAltMercenary"] = {
 	name = "Siege Ballista of Trarthus",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "SiegeBallistaAltY",
 	color = 2,
 	description = "Summons a ring of ballista totems around a targeted location. These ballistae fire once at the targeted location and then expire. Requires a Bow.",
 	skillTypes = { [SkillType.Attack] = true, [SkillType.Projectile] = true, [SkillType.ProjectilesFromUser] = true, [SkillType.RangedAttack] = true, [SkillType.Trappable] = true, [SkillType.Mineable] = true, [SkillType.SummonsTotem] = true, [SkillType.AttackInPlaceIsDefault] = true, [SkillType.TotemsAreBallistae] = true, },
@@ -16584,11 +16811,12 @@ skills["SiegeBallistaAltMercenary"] = {
 		[40] = { 0, 11, baseMultiplier = 1.158, cooldown = 8, damageEffectiveness = 1.158, levelRequirement = 100, storedUses = 1, statInterpolation = { 1, 1, }, },
 	},
 }
-inheritSkillData("SiegeBallistaAltMercenary", "SiegeBallistaAltY")
 
 skills["SigilOfPowerMercenary"] = {
 	name = "Sigil of Power",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "SigilOfPower",
 	color = 3,
 	baseEffectiveness = 0.38400000333786,
 	incrementalEffectiveness = 0.028000000864267,
@@ -16654,11 +16882,12 @@ skills["SigilOfPowerMercenary"] = {
 		[40] = { 0.10000000149012, 1.8999999761581, 72, -10, cooldown = 16, levelRequirement = 100, storedUses = 1, statInterpolation = { 3, 3, 1, 1, }, },
 	},
 }
-inheritSkillData("SigilOfPowerMercenary", "SigilOfPower")
 
 skills["SigilOfPowerMercenaryEncounter"] = {
 	name = "Sigil of Power",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "SigilOfPower",
 	color = 3,
 	baseEffectiveness = 0.38400000333786,
 	incrementalEffectiveness = 0.028000000864267,
@@ -16686,11 +16915,12 @@ skills["SigilOfPowerMercenaryEncounter"] = {
 		[2] = { 0.019999999552965, 0.37999999523163, 500, -24, cooldown = 16, levelRequirement = 100, storedUses = 1, statInterpolation = { 3, 3, 2, 2, }, },
 	},
 }
-inheritSkillData("SigilOfPowerMercenaryEncounter", "SigilOfPower")
 
 skills["SkeletonLargeMapBoneProjectile"] = {
 	name = "SkeletonLargeMapBoneProjectile",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "Snipe",
 	color = 4,
 	baseEffectiveness = 1.8700000047684,
 	skillTypes = { [SkillType.Attack] = true, [SkillType.RangedAttack] = true, [SkillType.MirageArcherCanUse] = true, [SkillType.Projectile] = true, [SkillType.ProjectilesFromUser] = true, [SkillType.Damage] = true, [SkillType.Triggerable] = true, },
@@ -16714,11 +16944,12 @@ skills["SkeletonLargeMapBoneProjectile"] = {
 		[1] = { baseMultiplier = 1.2, damageEffectiveness = 1.2, levelRequirement = 1, },
 	},
 }
-inheritSkillData("SkeletonLargeMapBoneProjectile", "AtlasEyrieArcherSnipe")
 
 skills["SmiteMercenary"] = {
 	name = "Smite",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "Smite",
 	color = 1,
 	baseEffectiveness = 0.60000002384186,
 	incrementalEffectiveness = 0.028000000864267,
@@ -16809,11 +17040,12 @@ skills["SmiteMercenary"] = {
 		[40] = { 0.10000000149012, 1.8999999761581, 27, 11, 11, -13, baseMultiplier = 8.903, damageEffectiveness = 8.903, levelRequirement = 100, statInterpolation = { 3, 3, 1, 1, 1, 1, }, },
 	},
 }
-inheritSkillData("SmiteMercenary", "AnimateGuardianSmite")
 
 skills["SmokeMineMercenary"] = {
 	name = "Smoke Mine",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "SmokeMine",
 	color = 2,
 	description = "Throws a mine that will teleport you to it when detonated. It covers both your escape and arrival with a cloud of smoke that blinds enemies, and gives you a temporary buff to movement speed. Shares a cooldown with other Blink skills.",
 	skillTypes = { [SkillType.Spell] = true, [SkillType.Area] = true, [SkillType.Duration] = true, [SkillType.Movement] = true, [SkillType.RemoteMined] = true, [SkillType.AreaSpell] = true, [SkillType.Travel] = true, [SkillType.HasReservation] = true, [SkillType.Blink] = true, [SkillType.Cooldown] = true, },
@@ -16888,11 +17120,12 @@ skills["SmokeMineMercenary"] = {
 		[40] = { 6000, 37, cooldown = 5, levelRequirement = 100, storedUses = 3, statInterpolation = { 1, 1, }, },
 	},
 }
-inheritSkillData("SmokeMineMercenary", "SmokeMine")
 
 skills["SoulrendAltMercenary"] = {
 	name = "Soulrend of Reaping",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "SoulrendAltX",
 	color = 3,
 	baseEffectiveness = 8.6300001144409,
 	incrementalEffectiveness = 0.056699998676777,
@@ -16960,11 +17193,12 @@ skills["SoulrendAltMercenary"] = {
 		[40] = { 0.80000001192093, 1.2000000476837, critChance = 7, damageEffectiveness = 4, levelRequirement = 100, statInterpolation = { 3, 3, }, },
 	},
 }
-inheritSkillData("SoulrendAltMercenary", "SoulrendAltX")
 
 skills["SparkMercenary"] = {
 	name = "Spark",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "Spark",
 	color = 3,
 	baseEffectiveness = 3.8399000167847,
 	incrementalEffectiveness = 0.033100001513958,
@@ -17033,11 +17267,12 @@ skills["SparkMercenary"] = {
 		[40] = { 0.10000000149012, 1.8999999761581, 11, critChance = 6, damageEffectiveness = 1.9, levelRequirement = 100, statInterpolation = { 3, 3, 1, }, cost = { Mana = 28, }, },
 	},
 }
-inheritSkillData("SparkMercenary", "AzmeriKudukuSparkExtraProj")
 
 skills["SparkMercenaryEncounter"] = {
 	name = "Spark",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "Spark",
 	color = 3,
 	baseEffectiveness = 2.4500000476837,
 	incrementalEffectiveness = 0.033100001513958,
@@ -17106,11 +17341,12 @@ skills["SparkMercenaryEncounter"] = {
 		[40] = { 0.5, 1.5, 11, critChance = 6, damageEffectiveness = 1.9, levelRequirement = 100, statInterpolation = { 3, 3, 1, }, cost = { Mana = 28, }, },
 	},
 }
-inheritSkillData("SparkMercenaryEncounter", "AzmeriKudukuSparkExtraProj")
 
 skills["SpectralHelixAltMercenary"] = {
 	name = "Spectral Helix of Trarthus",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "SpectralHelixAltY",
 	color = 2,
 	description = "Throws a trap which, once triggered, fires a spectral copy of your melee weapon. It spins around while flying in a large spiral, damaging enemies in its path, and bouncing if it collides with walls. If dual wielding, each Trap thrown will randomly use either the main hand or off hand weapon.",
 	skillTypes = { [SkillType.Attack] = true, [SkillType.RangedAttack] = true, [SkillType.Projectile] = true, [SkillType.ProjectilesFromUser] = true, [SkillType.Trapped] = true, },
@@ -17191,11 +17427,12 @@ skills["SpectralHelixAltMercenary"] = {
 		[40] = { baseMultiplier = 2.703, damageEffectiveness = 2.703, levelRequirement = 100, },
 	},
 }
-inheritSkillData("SpectralHelixAltMercenary", "SpectralHelixAltY")
 
 skills["SpectralHelixMercenary"] = {
 	name = "Spectral Helix",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "SpectralHelix",
 	color = 2,
 	description = "Throws a spectral copy of your melee weapon. It spins around while flying in a large spiral, damaging enemies in its path, and bouncing if it collides with walls.",
 	skillTypes = { [SkillType.Attack] = true, [SkillType.RangedAttack] = true, [SkillType.Projectile] = true, [SkillType.ProjectilesFromUser] = true, },
@@ -17269,11 +17506,12 @@ skills["SpectralHelixMercenary"] = {
 		[40] = { attackSpeedMultiplier = 20, baseMultiplier = 1.5886, damageEffectiveness = 1.5886, levelRequirement = 100, },
 	},
 }
-inheritSkillData("SpectralHelixMercenary", "SpectralHelix")
 
 skills["SpectralShieldThrowAltMercenary"] = {
 	name = "Spectral Shield Throw of Trarthus",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "SpectralShieldThrowAltY",
 	color = 2,
 	baseEffectiveness = 1.6200000047684,
 	incrementalEffectiveness = 0.017300000414252,
@@ -17347,11 +17585,12 @@ skills["SpectralShieldThrowAltMercenary"] = {
 		[40] = { 0.80000001192093, 1.2000000476837, 10, 4, 6, attackTime = 650, critChance = 5, levelRequirement = 100, statInterpolation = { 3, 3, 1, 1, 1, }, },
 	},
 }
-inheritSkillData("SpectralShieldThrowAltMercenary", "SpectralShieldThrowAltY")
 
 skills["SpectralThrowAltMercenary"] = {
 	name = "Spectral Throw of Trarthus",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "SpectralThrowAltY",
 	color = 2,
 	description = "Throws a trap which, once triggered, fires many spectral copies of your melee weapon. They fly out in all directions and then return to where the trap triggered, in a spinning attack that damages enemies in their path. If dual wielding, each Trap thrown will randomly use either the main hand or off hand weapon.",
 	skillTypes = { [SkillType.Attack] = true, [SkillType.RangedAttack] = true, [SkillType.Projectile] = true, [SkillType.ProjectilesFromUser] = true, [SkillType.Trapped] = true, },
@@ -17432,11 +17671,12 @@ skills["SpectralThrowAltMercenary"] = {
 		[40] = { 7, baseMultiplier = 1.958, damageEffectiveness = 1.958, levelRequirement = 100, statInterpolation = { 1, }, },
 	},
 }
-inheritSkillData("SpectralThrowAltMercenary", "SpectralThrowAltY")
 
 skills["SplitArrowMercenary"] = {
 	name = "Split Arrow",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "SplitArrow",
 	color = 2,
 	description = "Fires multiple arrows at different targets.",
 	skillTypes = { [SkillType.Attack] = true, [SkillType.RangedAttack] = true, [SkillType.MirageArcherCanUse] = true, [SkillType.Projectile] = true, [SkillType.ProjectilesFromUser] = true, [SkillType.Totemable] = true, [SkillType.Trappable] = true, [SkillType.Mineable] = true, [SkillType.Triggerable] = true, },
@@ -17500,11 +17740,12 @@ skills["SplitArrowMercenary"] = {
 		[40] = { 13, baseMultiplier = 1.608, damageEffectiveness = 1.608, levelRequirement = 100, statInterpolation = { 1, }, },
 	},
 }
-inheritSkillData("SplitArrowMercenary", "SplitArrow")
 
 skills["SplittingSteelMercenary"] = {
 	name = "Splitting Steel",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "SplittingSteel",
 	color = 2,
 	description = "Fire a single projectile that splits on impact or at the targeted location, dealing area damage when it splits and again when the split projectiles explode at the end of their flight. Projectiles from this skill cannot return. Requires a Sword or Axe.",
 	skillTypes = { [SkillType.Attack] = true, [SkillType.RangedAttack] = true, [SkillType.Projectile] = true, [SkillType.ProjectilesFromUser] = true, [SkillType.Area] = true, [SkillType.Physical] = true, [SkillType.SingleMainProjectile] = true, [SkillType.ProjectileCannotReturn] = true, },
@@ -17579,11 +17820,12 @@ skills["SplittingSteelMercenary"] = {
 		[40] = { 8, 8, attackSpeedMultiplier = -10, baseMultiplier = 5.978, damageEffectiveness = 5.978, levelRequirement = 100, statInterpolation = { 1, 1, }, },
 	},
 }
-inheritSkillData("SplittingSteelMercenary", "SplittingSteel")
 
 skills["StaticStrikeMercenary"] = {
 	name = "Static Strike",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "StaticStrike",
 	color = 1,
 	description = "Attack with a melee weapon, gaining static energy for a duration if you hit an enemy. While you have static energy, you'll frequently hit a number of nearby enemies with beams, dealing attack damage.",
 	skillTypes = { [SkillType.Attack] = true, [SkillType.MeleeSingleTarget] = true, [SkillType.Multistrikeable] = true, [SkillType.Melee] = true, [SkillType.Area] = true, [SkillType.Duration] = true, [SkillType.Lightning] = true, [SkillType.Chains] = true, },
@@ -17661,11 +17903,12 @@ skills["StaticStrikeMercenary"] = {
 		[40] = { 260, 7, baseMultiplier = 6.736, damageEffectiveness = 6.736, levelRequirement = 100, statInterpolation = { 1, 1, }, },
 	},
 }
-inheritSkillData("StaticStrikeMercenary", "StaticStrike")
 
 skills["StaticStrikeMercenaryEncounteer"] = {
 	name = "Static Strike",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "StaticStrike",
 	color = 1,
 	description = "Attack with a melee weapon, gaining static energy for a duration if you hit an enemy. While you have static energy, you'll frequently hit a number of nearby enemies with beams, dealing attack damage.",
 	skillTypes = { [SkillType.Attack] = true, [SkillType.MeleeSingleTarget] = true, [SkillType.Multistrikeable] = true, [SkillType.Melee] = true, [SkillType.Area] = true, [SkillType.Duration] = true, [SkillType.Lightning] = true, [SkillType.Chains] = true, },
@@ -17704,11 +17947,12 @@ skills["StaticStrikeMercenaryEncounteer"] = {
 		[1] = { 300, 5, baseMultiplier = 2.2, damageEffectiveness = 2.2, levelRequirement = 0, statInterpolation = { 1, 1, }, },
 	},
 }
-inheritSkillData("StaticStrikeMercenaryEncounteer", "StaticStrike")
 
 skills["StormCallAltMercenary"] = {
 	name = "Storm Call of Trarthus",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "StormCallAltX",
 	color = 3,
 	baseEffectiveness = 1.827399969101,
 	incrementalEffectiveness = 0.044100001454353,
@@ -17779,11 +18023,12 @@ skills["StormCallAltMercenary"] = {
 		[40] = { 0.80000001192093, 1.2000000476837, 59.999999751647, damageEffectiveness = 2.35, levelRequirement = 100, statInterpolation = { 3, 3, 3, }, },
 	},
 }
-inheritSkillData("StormCallAltMercenary", "StormCallAltX")
 
 skills["StormCallAltMercenaryEncounter"] = {
 	name = "Storm Call of Trarthus",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "StormCallAltX",
 	color = 3,
 	baseEffectiveness = 2,
 	incrementalEffectiveness = 0.035000000149012,
@@ -17854,11 +18099,12 @@ skills["StormCallAltMercenaryEncounter"] = {
 		[40] = { 0.80000001192093, 1.2000000476837, 33.333334078391, critChance = 5, damageEffectiveness = 1.1, levelRequirement = 100, statInterpolation = { 3, 3, 3, }, },
 	},
 }
-inheritSkillData("StormCallAltMercenaryEncounter", "StormCallAltX")
 
 skills["StormCallMercenary"] = {
 	name = "Stormcall",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "StormCall",
 	color = 3,
 	baseEffectiveness = 3,
 	incrementalEffectiveness = 0.050000000745058,
@@ -17928,11 +18174,12 @@ skills["StormCallMercenary"] = {
 		[40] = { 0.5, 1.5, 11, critChance = 6, damageEffectiveness = 2.5, levelRequirement = 100, statInterpolation = { 3, 3, 1, }, cost = { Mana = 22, }, },
 	},
 }
-inheritSkillData("StormCallMercenary", "LegionTemplarJudgeStormCall")
 
 skills["StormRainMercenary"] = {
 	name = "Storm Rain",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "StormRain",
 	color = 2,
 	description = "Fires an arrow into the air to land at a targeted location, dealing area damage. The arrow sticks in the ground where it lands, and periodically fires a beam of lightning to another arrow near it, dealing area damage between them.",
 	skillTypes = { [SkillType.Attack] = true, [SkillType.RangedAttack] = true, [SkillType.MirageArcherCanUse] = true, [SkillType.Area] = true, [SkillType.ProjectileSpeed] = true, [SkillType.Totemable] = true, [SkillType.Trappable] = true, [SkillType.Mineable] = true, [SkillType.Triggerable] = true, [SkillType.Rain] = true, [SkillType.Lightning] = true, [SkillType.ProjectileNumber] = true, [SkillType.Damage] = true, },
@@ -18002,11 +18249,12 @@ skills["StormRainMercenary"] = {
 		[40] = { 330, baseMultiplier = 0.675, damageEffectiveness = 0.67, levelRequirement = 100, statInterpolation = { 1, }, },
 	},
 }
-inheritSkillData("StormRainMercenary", "StormRain")
 
 skills["SummonHolyRelicMercenary"] = {
 	name = "Holy Relic",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "SummonHolyRelic",
 	color = 3,
 	description = "Summon a Holy Relic that stays near you. When you hit an enemy with an attack, the Holy Relic triggers a nova spell with a short cooldown, that deals physical damage to enemies and grants life regeneration to allies in an area around it. This life regeneration is higher when applied to minions.",
 	skillTypes = { [SkillType.Triggerable] = true, [SkillType.Mineable] = true, [SkillType.Minion] = true, [SkillType.MinionsCanExplode] = true, [SkillType.Multicastable] = true, [SkillType.Spell] = true, [SkillType.Totemable] = true, [SkillType.Trappable] = true, [SkillType.CreatesMinion] = true, [SkillType.Cooldown] = true, },
@@ -18075,11 +18323,12 @@ skills["SummonHolyRelicMercenary"] = {
 		[40] = { 136, 16293, 815, 100, cooldown = 2, levelRequirement = 100, storedUses = 1, statInterpolation = { 1, 1, 1, 1, }, },
 	},
 }
-inheritSkillData("SummonHolyRelicMercenary", "SummonHolyRelic")
 
 skills["SummonRagingSpiritMercenary"] = {
 	name = "Summon Raging Spirit",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "SummonRagingSpirit",
 	color = 3,
 	description = "Summons a short-lived flaming skull that rushes at nearby enemies and attacks them rapidly, converting all its physical damage to fire. Enemies will not directly engage these spirits, and can pass through them.",
 	skillTypes = { [SkillType.Spell] = true, [SkillType.Minion] = true, [SkillType.Duration] = true, [SkillType.MinionsCanExplode] = true, [SkillType.Trappable] = true, [SkillType.Totemable] = true, [SkillType.Mineable] = true, [SkillType.Multicastable] = true, [SkillType.Triggerable] = true, [SkillType.Fire] = true, [SkillType.CanRapidFire] = true, [SkillType.CreatesMinion] = true, },
@@ -18142,11 +18391,12 @@ skills["SummonRagingSpiritMercenary"] = {
 		[40] = { levelRequirement = 100, },
 	},
 }
-inheritSkillData("SummonRagingSpiritMercenary", "SummonRagingSpirit")
 
 skills["SummonSkeletonsMercenary"] = {
 	name = "Summon Skeletons",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "SummonSkeletons",
 	color = 3,
 	baseEffectiveness = 0,
 	description = "Summon Skeleton Warrior minions at the targeted location. They use a melee attack and die after a duration. If made aggressive, Skeleton Warriors will also dash towards nearby enemies.",
@@ -18211,11 +18461,12 @@ skills["SummonSkeletonsMercenary"] = {
 		[40] = { 5, 9, 100, levelRequirement = 100, statInterpolation = { 1, 1, 1, }, },
 	},
 }
-inheritSkillData("SummonSkeletonsMercenary", "SummonSkeletons")
 
 skills["SummonSkitterbotsMercenary"] = {
 	name = "Summon Skitterbots",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "SummonSkitterbots",
 	color = 3,
 	description = "Summon a Chilling Skitterbot and a Shocking Skitterbot, which will trigger your traps and detonate your mines. Mines detonated by Skitterbots will re-arm and can then be detonated again. The Skitterbots grant you more trap and mine damage, and cannot be targeted or damaged.",
 	skillTypes = { [SkillType.Spell] = true, [SkillType.Buff] = true, [SkillType.Instant] = true, [SkillType.Minion] = true, [SkillType.CreatesMinion] = true, [SkillType.MinionsAreUndamagable] = true, [SkillType.HasReservation] = true, [SkillType.Cold] = true, [SkillType.Lightning] = true, [SkillType.NonHitChill] = true, [SkillType.ElementalStatus] = true, [SkillType.Area] = true, [SkillType.Aura] = true, [SkillType.AuraAffectsEnemies] = true, [SkillType.AuraNotOnCaster] = true, [SkillType.InstantNoRepeatWhenHeld] = true, [SkillType.InstantShiftAttackForLeftMouse] = true, [SkillType.Cooldown] = true, },
@@ -18279,11 +18530,12 @@ skills["SummonSkitterbotsMercenary"] = {
 		[40] = { 39, 39, 156, cooldown = 1.2, levelRequirement = 100, storedUses = 1, statInterpolation = { 1, 1, 1, }, },
 	},
 }
-inheritSkillData("SummonSkitterbotsMercenary", "SummonSkitterbots")
 
 skills["SunderAltMercenary"] = {
 	name = "Sunder of Trarthus",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "SunderAltY",
 	color = 1,
 	description = "Slams the ground, creating a slow wave of churning terrain that damages enemies in a sequence of areas in front of you. A number of enemies hit by the wave will release a shockwave, damaging other enemies around them. Using the skill again will stop the previous wave. When the wave reaches a target or terrain, it can restart aiming towards an enemy, if one is in range. Requires a Mace, Sceptre, Axe, Staff or Unarmed.",
 	skillTypes = { [SkillType.Attack] = true, [SkillType.Area] = true, [SkillType.Multistrikeable] = true, [SkillType.Melee] = true, [SkillType.Slam] = true, [SkillType.Totemable] = true, },
@@ -18358,11 +18610,12 @@ skills["SunderAltMercenary"] = {
 		[40] = { baseMultiplier = 6.81, damageEffectiveness = 6.81, levelRequirement = 100, },
 	},
 }
-inheritSkillData("SunderAltMercenary", "SunderAltY")
 
 skills["SunderAltMercenaryEncounter"] = {
 	name = "Sunder of Trarthus",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "SunderAltY",
 	color = 1,
 	description = "Slams the ground, creating a slow wave of churning terrain that damages enemies in a sequence of areas in front of you. A number of enemies hit by the wave will release a shockwave, damaging other enemies around them. Using the skill again will stop the previous wave. When the wave reaches a target or terrain, it can restart aiming towards an enemy, if one is in range. Requires a Mace, Sceptre, Axe, Staff or Unarmed.",
 	skillTypes = { [SkillType.Attack] = true, [SkillType.Area] = true, [SkillType.Multistrikeable] = true, [SkillType.Melee] = true, [SkillType.Slam] = true, [SkillType.Totemable] = true, },
@@ -18438,11 +18691,12 @@ skills["SunderAltMercenaryEncounter"] = {
 		[40] = { baseMultiplier = 5.067, damageEffectiveness = 5.067, levelRequirement = 100, },
 	},
 }
-inheritSkillData("SunderAltMercenaryEncounter", "SunderAltY")
 
 skills["SweepMercenary"] = {
 	name = "Holy Sweep",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "Sweep",
 	color = 1,
 	description = "Swings a two handed mace or a staff in a circle, calling down holy hammers to land randomly on a number of enemies struck. Hits from these holy hammers cannot be evaded.",
 	skillTypes = { [SkillType.Attack] = true, [SkillType.Area] = true, [SkillType.Multistrikeable] = true, [SkillType.Melee] = true, [SkillType.Lightning] = true, },
@@ -18514,11 +18768,11 @@ skills["SweepMercenary"] = {
 		[40] = { 31, 8, attackSpeedMultiplier = -30, baseMultiplier = 6.192, damageEffectiveness = 6.192, levelRequirement = 100, statInterpolation = { 1, 1, }, },
 	},
 }
-inheritSkillData("SweepMercenary", "AzmeriOakSweep")
 
 skills["TalismanDegenMapBoss"] = {
 	name = "Talisman Degen",
 	hidden = true,
+	mercenary = true,
 	color = 4,
 	baseEffectiveness = 0.60000002384186,
 	incrementalEffectiveness = 0.029999999329448,
@@ -18587,6 +18841,8 @@ skills["TalismanDegenMapBoss"] = {
 skills["TectonicSlamFireMercenary"] = {
 	name = "Tectonic Slam",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "TectonicSlam",
 	color = 1,
 	description = "Slam the ground, unleashing a fiery fissure in front of you, dealing area damage and randomly releasing a number of smaller fissures branching off from it. Consume an Endurance Charge every third time you slam the ground with this skill. Requires a Mace, Sceptre, Sword, Axe, Staff, or Unarmed.",
 	skillTypes = { [SkillType.Attack] = true, [SkillType.Area] = true, [SkillType.Multistrikeable] = true, [SkillType.Melee] = true, [SkillType.Fire] = true, [SkillType.Slam] = true, [SkillType.Totemable] = true, },
@@ -18661,11 +18917,12 @@ skills["TectonicSlamFireMercenary"] = {
 		[40] = { baseMultiplier = 8.948, damageEffectiveness = 8.948, levelRequirement = 100, },
 	},
 }
-inheritSkillData("TectonicSlamFireMercenary", "TectonicSlam")
 
 skills["TectonicSlamPhysMercenary"] = {
 	name = "Tectonic Cascade",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "TectonicSlam",
 	color = 1,
 	description = "Slam the ground, unleashing a fiery fissure in front of you, dealing area damage and randomly releasing a number of smaller fissures branching off from it. Consume an Endurance Charge every third time you slam the ground with this skill. Requires a Mace, Sceptre, Sword, Axe, Staff, or Unarmed.",
 	skillTypes = { [SkillType.Attack] = true, [SkillType.Area] = true, [SkillType.Multistrikeable] = true, [SkillType.Melee] = true, [SkillType.Fire] = true, [SkillType.Slam] = true, [SkillType.Totemable] = true, },
@@ -18737,11 +18994,12 @@ skills["TectonicSlamPhysMercenary"] = {
 		[40] = { baseMultiplier = 8.948, cooldown = 4, damageEffectiveness = 8.948, levelRequirement = 100, storedUses = 1, },
 	},
 }
-inheritSkillData("TectonicSlamPhysMercenary", "TectonicSlam")
 
 skills["TempestShieldMercenary"] = {
 	name = "Tempest Shield",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "TempestShield",
 	color = 3,
 	baseEffectiveness = 4.6932997703552,
 	incrementalEffectiveness = 0.038199998438358,
@@ -18811,11 +19069,12 @@ skills["TempestShieldMercenary"] = {
 		[40] = { 0.5, 1.5, 31, cooldown = 1.2, critChance = 6, damageEffectiveness = 2.2, levelRequirement = 100, storedUses = 1, statInterpolation = { 3, 3, 1, }, },
 	},
 }
-inheritSkillData("TempestShieldMercenary", "TempestShield")
 
 skills["TempestShieldMercenaryEncounter"] = {
 	name = "Tempest Shield",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "TempestShield",
 	color = 3,
 	baseEffectiveness = 4,
 	incrementalEffectiveness = 0.035000000149012,
@@ -18846,11 +19105,11 @@ skills["TempestShieldMercenaryEncounter"] = {
 		[1] = { 0.5, 1.5, 25, cooldown = 1.2, critChance = 6, damageEffectiveness = 1.6, levelRequirement = 0, storedUses = 1, statInterpolation = { 3, 3, 1, }, },
 	},
 }
-inheritSkillData("TempestShieldMercenaryEncounter", "TempestShield")
 
 skills["TemporalAnomalyMercenary"] = {
 	name = "Clutches of the Damned",
 	hidden = true,
+	mercenary = true,
 	color = 4,
 	description = "Creates an Eternity Sphere at your location, which reduces the Action Speed of enemies within it. The amount of Action Speed reduction applied by the sphere decreases to zero over its duration.",
 	skillTypes = { [SkillType.Spell] = true, [SkillType.Area] = true, [SkillType.Triggerable] = true, [SkillType.Triggered] = true, [SkillType.InbuiltTrigger] = true, [SkillType.Duration] = true, [SkillType.AreaSpell] = true, [SkillType.Nova] = true, [SkillType.Cooldown] = true, },
@@ -18876,6 +19135,8 @@ skills["TemporalAnomalyMercenary"] = {
 skills["TemporalChainsBossCurseAura"] = {
 	name = "Temporal Chains",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "TemporalChains",
 	color = 4,
 	baseEffectiveness = 0,
 	description = "Curses all enemies in an area, lowering their action speed and making other effects on them expire more slowly.",
@@ -18901,11 +19162,12 @@ skills["TemporalChainsBossCurseAura"] = {
 		[1] = { cooldown = 5, levelRequirement = 0, storedUses = 1, cost = { Mana = 50, }, },
 	},
 }
-inheritSkillData("TemporalChainsBossCurseAura", "AxisTemporalChains")
 
 skills["TemporalChainsMercenary"] = {
 	name = "Temporal Chains",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "TemporalChains",
 	color = 2,
 	baseEffectiveness = 0,
 	description = "Curses all enemies in an area, lowering their action speed and making other effects on them expire more slowly.",
@@ -18976,11 +19238,12 @@ skills["TemporalChainsMercenary"] = {
 		[40] = { 11800, 17, -34, -26, levelRequirement = 100, statInterpolation = { 1, 1, 1, 1, }, },
 	},
 }
-inheritSkillData("TemporalChainsMercenary", "AxisTemporalChains")
 
 skills["TornadoAltMercenary"] = {
 	name = "Tornado of Elemental Turbulence",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "TornadoAltY",
 	color = 2,
 	baseEffectiveness = 0.80000001192093,
 	incrementalEffectiveness = 0.050000000745058,
@@ -19055,11 +19318,12 @@ skills["TornadoAltMercenary"] = {
 		[40] = { 0.80000001192093, 1.2000000476837, 102, cooldown = 6, critChance = 5, damageEffectiveness = 0.65, levelRequirement = 100, storedUses = 1, statInterpolation = { 3, 3, 1, }, },
 	},
 }
-inheritSkillData("TornadoAltMercenary", "TornadoAltY")
 
 skills["TornadoShotMercenary"] = {
 	name = "Tornado Shot",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "TornadoShot",
 	color = 2,
 	description = "Fires a piercing shot that travels until it reaches the targeted location. It will then fire projectiles out in all directions from that point, which will travel for a short time before disappearing.",
 	skillTypes = { [SkillType.Attack] = true, [SkillType.Projectile] = true, [SkillType.ProjectilesFromUser] = true, [SkillType.Trappable] = true, [SkillType.Mineable] = true, [SkillType.Totemable] = true, [SkillType.RangedAttack] = true, [SkillType.MirageArcherCanUse] = true, [SkillType.Triggerable] = true, },
@@ -19122,11 +19386,12 @@ skills["TornadoShotMercenary"] = {
 		[40] = { baseMultiplier = 1.358, damageEffectiveness = 1.36, levelRequirement = 100, },
 	},
 }
-inheritSkillData("TornadoShotMercenary", "SkeletonSoldierTornadoShot")
 
 skills["ToxicRainMercenary"] = {
 	name = "Toxic Rain",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "ToxicRain",
 	color = 2,
 	baseEffectiveness = 2,
 	incrementalEffectiveness = 0.035999998450279,
@@ -19201,11 +19466,12 @@ skills["ToxicRainMercenary"] = {
 		[40] = { 20.000001241763, baseMultiplier = 0.908, damageEffectiveness = 0.91, levelRequirement = 100, statInterpolation = { 3, }, },
 	},
 }
-inheritSkillData("ToxicRainMercenary", "ToxicRain")
 
 skills["TriggeredFireSlamMercenary"] = {
 	name = "Triggerslam",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "AfflictionMinionPhysSlamCircleBig",
 	color = 4,
 	skillTypes = { [SkillType.Triggerable] = true, [SkillType.Attack] = true, },
 	statDescriptionScope = "skill_stat_descriptions",
@@ -19224,11 +19490,11 @@ skills["TriggeredFireSlamMercenary"] = {
 		[1] = { levelRequirement = 1, },
 	},
 }
-inheritSkillData("TriggeredFireSlamMercenary", "AfflictionMinionPhysSlamCircleBig")
 
 skills["VaalAncestralWarchiefMercenary"] = {
 	name = "Vaal Ancestral Warchief",
 	hidden = true,
+	mercenary = true,
 	color = 1,
 	description = "Summons an Ancestor Totem which attacks enemies with a powerful cascading slam while you're near it. If the enemies are far away, it will leap toward them as it slams. Being near it grants you more melee damage. Requires a Melee Weapon or Unarmed.",
 	skillTypes = { [SkillType.Attack] = true, [SkillType.SummonsTotem] = true, [SkillType.Melee] = true, [SkillType.Area] = true, [SkillType.Vaal] = true, [SkillType.NeverExertable] = true, },
@@ -19319,6 +19585,8 @@ skills["VaalAncestralWarchiefMercenary"] = {
 skills["VaalArcticArmourMercenary"] = {
 	name = "Vaal Arctic Armour",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "VaalArcticArmour",
 	color = 2,
 	description = "Immediately encases you in ice, protecting you for a duration or until you take damage from a number of hits, and also grants a buff once the cast time has finished. You cannot move or perform non-instant actions while in the ice. When the ice breaks, the buff is also removed.",
 	skillTypes = { [SkillType.Spell] = true, [SkillType.Buff] = true, [SkillType.Duration] = true, [SkillType.Cold] = true, [SkillType.Vaal] = true, },
@@ -19383,11 +19651,12 @@ skills["VaalArcticArmourMercenary"] = {
 		[40] = { 5000, 257554, 7752, cooldown = 20, levelRequirement = 100, storedUses = 1, statInterpolation = { 1, 1, 1, }, },
 	},
 }
-inheritSkillData("VaalArcticArmourMercenary", "VaalArcticArmour")
 
 skills["VaalBurningArrowMercenary"] = {
 	name = "Vaal Burning Arrow",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "VaalBurningArrow",
 	color = 2,
 	description = "Fires an arrow that explodes, dealing fire damage to its target and other nearby enemies, with an increased chance of igniting them.",
 	skillTypes = { [SkillType.Attack] = true, [SkillType.RangedAttack] = true, [SkillType.Projectile] = true, [SkillType.ProjectilesFromUser] = true, [SkillType.Totemable] = true, [SkillType.Trappable] = true, [SkillType.Mineable] = true, [SkillType.Area] = true, [SkillType.Vaal] = true, [SkillType.Fire] = true, [SkillType.ThresholdJewelDuration] = true, },
@@ -19456,11 +19725,12 @@ skills["VaalBurningArrowMercenary"] = {
 		[40] = { baseMultiplier = 6.942, cooldown = 10, damageEffectiveness = 6.942, levelRequirement = 100, storedUses = 1, },
 	},
 }
-inheritSkillData("VaalBurningArrowMercenary", "VaalBurningArrow")
 
 skills["VaalBurningArrowMercenaryEncounter"] = {
 	name = "Vaal Burning Arrow",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "VaalBurningArrow",
 	color = 2,
 	description = "Fires an arrow that explodes, dealing fire damage to its target and other nearby enemies, with an increased chance of igniting them.",
 	skillTypes = { [SkillType.Attack] = true, [SkillType.RangedAttack] = true, [SkillType.Projectile] = true, [SkillType.ProjectilesFromUser] = true, [SkillType.Totemable] = true, [SkillType.Trappable] = true, [SkillType.Mineable] = true, [SkillType.Area] = true, [SkillType.Vaal] = true, [SkillType.Fire] = true, [SkillType.ThresholdJewelDuration] = true, },
@@ -19489,11 +19759,12 @@ skills["VaalBurningArrowMercenaryEncounter"] = {
 		[1] = { baseMultiplier = 3.5, cooldown = 10, damageEffectiveness = 3.5, levelRequirement = 0, storedUses = 1, },
 	},
 }
-inheritSkillData("VaalBurningArrowMercenaryEncounter", "VaalBurningArrow")
 
 skills["VaalCausticArrowMercenary"] = {
 	name = "Vaal Caustic Arrow",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "VaalCausticArrow",
 	color = 2,
 	baseEffectiveness = 19.590000152588,
 	incrementalEffectiveness = 0.050299998372793,
@@ -19570,11 +19841,12 @@ skills["VaalCausticArrowMercenary"] = {
 		[40] = { 16.666667039196, baseMultiplier = 2.975, cooldown = 10, damageEffectiveness = 2.975, levelRequirement = 100, storedUses = 1, statInterpolation = { 3, }, },
 	},
 }
-inheritSkillData("VaalCausticArrowMercenary", "VaalCausticArrow")
 
 skills["VaalCausticArrowMercenaryEncounter"] = {
 	name = "Vaal Caustic Arrow",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "VaalCausticArrow",
 	color = 2,
 	baseEffectiveness = 5,
 	incrementalEffectiveness = 0.046000000089407,
@@ -19651,11 +19923,12 @@ skills["VaalCausticArrowMercenaryEncounter"] = {
 		[40] = { 10.000000620882, baseMultiplier = 1.5925, cooldown = 10, damageEffectiveness = 1.5925, levelRequirement = 100, storedUses = 1, statInterpolation = { 3, }, },
 	},
 }
-inheritSkillData("VaalCausticArrowMercenaryEncounter", "VaalCausticArrow")
 
 skills["VaalCleaveMercenary"] = {
 	name = "Vaal Cleave",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "VaalCleave",
 	color = 1,
 	description = "The character swings their weapon (or both weapons if dual wielding) in an arc, damaging monsters in an area in front of them. Killing Blows on Rare or Unique enemies grant a buff that improves Cleave for a duration. Killing Blows on Rare Enemies also steal their modifiers for a secondary duration. Only works with Axes and Swords.",
 	skillTypes = { [SkillType.Attack] = true, [SkillType.Area] = true, [SkillType.Melee] = true, [SkillType.ThresholdJewelArea] = true, [SkillType.Vaal] = true, [SkillType.Duration] = true, [SkillType.Buff] = true, [SkillType.NeverExertable] = true, },
@@ -19739,11 +20012,12 @@ skills["VaalCleaveMercenary"] = {
 		[40] = { 32, baseMultiplier = 19.6325, cooldown = 6, damageEffectiveness = 19.6325, levelRequirement = 100, storedUses = 1, statInterpolation = { 1, }, },
 	},
 }
-inheritSkillData("VaalCleaveMercenary", "VaalCleave")
 
 skills["VaalCleaveMercenaryEncounter"] = {
 	name = "Vaal Cleave",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "VaalCleave",
 	color = 1,
 	description = "The character swings their weapon (or both weapons if dual wielding) in an arc, damaging monsters in an area in front of them. Killing Blows on Rare or Unique enemies grant a buff that improves Cleave for a duration. Killing Blows on Rare Enemies also steal their modifiers for a secondary duration. Only works with Axes and Swords.",
 	skillTypes = { [SkillType.Attack] = true, [SkillType.Area] = true, [SkillType.Melee] = true, [SkillType.ThresholdJewelArea] = true, [SkillType.Vaal] = true, [SkillType.Duration] = true, [SkillType.Buff] = true, [SkillType.NeverExertable] = true, },
@@ -19827,11 +20101,12 @@ skills["VaalCleaveMercenaryEncounter"] = {
 		[40] = { 32, baseMultiplier = 15.906, cooldown = 6, damageEffectiveness = 15.906, levelRequirement = 100, storedUses = 1, statInterpolation = { 1, }, },
 	},
 }
-inheritSkillData("VaalCleaveMercenaryEncounter", "VaalCleave")
 
 skills["VaalDoubleStrikeMercenary"] = {
 	name = "Vaal Double Strike",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "VaalDoubleStrike",
 	color = 2,
 	description = "Performs two fast strikes with a melee weapon, each of which summons a double of you for a duration to continuously attack monsters in this fashion.",
 	skillTypes = { [SkillType.Attack] = true, [SkillType.MeleeSingleTarget] = true, [SkillType.Melee] = true, [SkillType.Duration] = true, [SkillType.Vaal] = true, [SkillType.Physical] = true, [SkillType.NeverExertable] = true, },
@@ -19910,11 +20185,12 @@ skills["VaalDoubleStrikeMercenary"] = {
 		[40] = { 102, baseMultiplier = 2.227, cooldown = 10, damageEffectiveness = 2.227, levelRequirement = 100, storedUses = 1, statInterpolation = { 1, }, },
 	},
 }
-inheritSkillData("VaalDoubleStrikeMercenary", "VaalDoubleStrike")
 
 skills["VaalFlameblastMercenary"] = {
 	name = "Vaal Flameblast",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "VaalFlameblast",
 	color = 3,
 	baseEffectiveness = 1.2000000476837,
 	incrementalEffectiveness = 0.035199999809265,
@@ -19986,11 +20262,12 @@ skills["VaalFlameblastMercenary"] = {
 		[40] = { 0.80000001192093, 1.2000000476837, cooldown = 10, critChance = 5, damageEffectiveness = 0.6, levelRequirement = 100, storedUses = 1, statInterpolation = { 3, 3, }, },
 	},
 }
-inheritSkillData("VaalFlameblastMercenary", "VaalFlameblast")
 
 skills["VaalGlacialHammerMercenary"] = {
 	name = "Vaal Glacial Hammer",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "VaalGlacialHammer",
 	color = 1,
 	description = "Hits enemies, converting some of your physical damage to cold damage. It traps enemies with you in a circle of ice so that they can't escape. Requires a Mace, Sceptre or Staff.",
 	skillTypes = { [SkillType.Attack] = true, [SkillType.MeleeSingleTarget] = true, [SkillType.Melee] = true, [SkillType.Duration] = true, [SkillType.Area] = true, [SkillType.Vaal] = true, [SkillType.Cold] = true, [SkillType.NeverExertable] = true, },
@@ -20068,11 +20345,12 @@ skills["VaalGlacialHammerMercenary"] = {
 		[40] = { 5100, 44, 540, baseMultiplier = 3.39, cooldown = 7, damageEffectiveness = 3.39, levelRequirement = 100, storedUses = 1, statInterpolation = { 1, 1, 1, }, },
 	},
 }
-inheritSkillData("VaalGlacialHammerMercenary", "VaalGlacialHammer")
 
 skills["VaalGraceMercenary"] = {
 	name = "Vaal Grace",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "VaalGrace",
 	color = 2,
 	description = "Casts a temporary aura that grants you and your allies additional chance to evade attacks, and makes suppressed spell damage unlucky against you.",
 	skillTypes = { [SkillType.Spell] = true, [SkillType.Buff] = true, [SkillType.Area] = true, [SkillType.Totemable] = true, [SkillType.TotemCastsAlone] = true, [SkillType.Duration] = true, [SkillType.Vaal] = true, [SkillType.Aura] = true, [SkillType.AreaSpell] = true, [SkillType.Instant] = true, [SkillType.InstantNoRepeatWhenHeld] = true, [SkillType.InstantShiftAttackForLeftMouse] = true, [SkillType.Cooldown] = true, },
@@ -20140,11 +20418,12 @@ skills["VaalGraceMercenary"] = {
 		[40] = { 34, cooldown = 12, levelRequirement = 100, storedUses = 1, statInterpolation = { 1, }, },
 	},
 }
-inheritSkillData("VaalGraceMercenary", "VaalGrace")
 
 skills["VaalGroundSlamMercenary"] = {
 	name = "Vaal Ground Slam",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "VaalGroundSlam",
 	color = 1,
 	baseEffectiveness = 0.6700000166893,
 	incrementalEffectiveness = 0.023299999535084,
@@ -20226,11 +20505,12 @@ skills["VaalGroundSlamMercenary"] = {
 		[40] = { 17, 57, baseMultiplier = 10.933, cooldown = 7, damageEffectiveness = 10.933, levelRequirement = 100, storedUses = 1, statInterpolation = { 1, 1, }, },
 	},
 }
-inheritSkillData("VaalGroundSlamMercenary", "VaalGroundSlam")
 
 skills["VaalIceShotMercenary"] = {
 	name = "Vaal Ice Shot",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "VaalIceShot",
 	color = 2,
 	description = "Fires an arrow that converts some physical damage to cold on its target and converts all physical damage to cold in a cone behind that target. When you use this skill, it summons a squad of Mirage Sharpshooters for a duration. Cannot be used by Totems, Traps, or Mines.",
 	skillTypes = { [SkillType.Attack] = true, [SkillType.RangedAttack] = true, [SkillType.Projectile] = true, [SkillType.ProjectilesFromUser] = true, [SkillType.Area] = true, [SkillType.Cold] = true, [SkillType.Vaal] = true, [SkillType.Duration] = true, [SkillType.ProjectilesNumberModifiersNotApplied] = true, },
@@ -20300,11 +20580,12 @@ skills["VaalIceShotMercenary"] = {
 		[40] = { baseMultiplier = 1.201, cooldown = 5, damageEffectiveness = 1.201, levelRequirement = 100, storedUses = 1, },
 	},
 }
-inheritSkillData("VaalIceShotMercenary", "VaalIceShot")
 
 skills["VaalLightningArrowMercenary"] = {
 	name = "Vaal Lightning Arrow",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "VaalLightningArrow",
 	color = 2,
 	description = "Fires charged arrows, which repeatedly travel for a short time before changing direction. When they hit enemies, they are struck by a bolt of lightning which damages a number of surrounding enemies.",
 	skillTypes = { [SkillType.Attack] = true, [SkillType.RangedAttack] = true, [SkillType.Area] = true, [SkillType.Projectile] = true, [SkillType.ProjectilesFromUser] = true, [SkillType.Totemable] = true, [SkillType.Trappable] = true, [SkillType.Mineable] = true, [SkillType.Lightning] = true, [SkillType.Vaal] = true, },
@@ -20379,11 +20660,12 @@ skills["VaalLightningArrowMercenary"] = {
 		[40] = { baseMultiplier = 0.983, cooldown = 8.5, damageEffectiveness = 0.983, levelRequirement = 100, storedUses = 1, },
 	},
 }
-inheritSkillData("VaalLightningArrowMercenary", "VaalLightningArrow")
 
 skills["VaalLightningTrapMercenary"] = {
 	name = "Vaal Lightning Trap",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "VaalLightningTrap",
 	color = 3,
 	baseEffectiveness = 4.6251997947693,
 	incrementalEffectiveness = 0.034400001168251,
@@ -20467,11 +20749,12 @@ skills["VaalLightningTrapMercenary"] = {
 		[40] = { 0.5, 1.5, cooldown = 8.5, critChance = 6, damageEffectiveness = 2.5, levelRequirement = 100, storedUses = 1, statInterpolation = { 3, 3, }, },
 	},
 }
-inheritSkillData("VaalLightningTrapMercenary", "VaalLightningTrap")
 
 skills["VaalMoltenStrikeMercenary"] = {
 	name = "Vaal Molten Strike",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "VaalMoltenStrike",
 	color = 1,
 	description = "Infuses your melee weapon with molten energies to attack with physical and fire damage. This attack causes balls of molten magma to launch forth causing area attack damage to enemies where they land.",
 	skillTypes = { [SkillType.Attack] = true, [SkillType.Projectile] = true, [SkillType.Area] = true, [SkillType.Melee] = true, [SkillType.MeleeSingleTarget] = true, [SkillType.Fire] = true, [SkillType.RangedAttack] = true, [SkillType.ProjectilesNotFromUser] = true, [SkillType.Chains] = true, [SkillType.Vaal] = true, [SkillType.NeverExertable] = true, },
@@ -20555,11 +20838,12 @@ skills["VaalMoltenStrikeMercenary"] = {
 		[40] = { attackSpeedMultiplier = -30, baseMultiplier = 1.282, cooldown = 8.5, damageEffectiveness = 1.282, levelRequirement = 100, storedUses = 1, },
 	},
 }
-inheritSkillData("VaalMoltenStrikeMercenary", "VaalMoltenStrike")
 
 skills["VaalMoltenStrikeMercenaryEncounter"] = {
 	name = "Vaal Molten Strike",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "VaalMoltenStrike",
 	color = 1,
 	description = "Infuses your melee weapon with molten energies to attack with physical and fire damage. This attack causes balls of molten magma to launch forth causing area attack damage to enemies where they land.",
 	skillTypes = { [SkillType.Attack] = true, [SkillType.Projectile] = true, [SkillType.Area] = true, [SkillType.Melee] = true, [SkillType.MeleeSingleTarget] = true, [SkillType.Fire] = true, [SkillType.RangedAttack] = true, [SkillType.ProjectilesNotFromUser] = true, [SkillType.Chains] = true, [SkillType.Vaal] = true, [SkillType.NeverExertable] = true, },
@@ -20642,11 +20926,12 @@ skills["VaalMoltenStrikeMercenaryEncounter"] = {
 		[40] = { baseMultiplier = 4.035, cooldown = 8.5, damageEffectiveness = 4.035, levelRequirement = 100, storedUses = 1, },
 	},
 }
-inheritSkillData("VaalMoltenStrikeMercenaryEncounter", "VaalMoltenStrike")
 
 skills["VaalReapMercenary"] = {
 	name = "Vaal Reap",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "VaalReap",
 	color = 1,
 	baseEffectiveness = 1.5360000133514,
 	incrementalEffectiveness = 0.053599998354912,
@@ -20718,11 +21003,12 @@ skills["VaalReapMercenary"] = {
 		[40] = { 0.80000001192093, 1.2000000476837, 75.000001676381, cooldown = 15, critChance = 6, damageEffectiveness = 4.8, levelRequirement = 100, storedUses = 1, statInterpolation = { 3, 3, 3, }, },
 	},
 }
-inheritSkillData("VaalReapMercenary", "VaalReap")
 
 skills["VaalReapMercenaryEncounter"] = {
 	name = "Vaal Reap",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "VaalReap",
 	color = 1,
 	baseEffectiveness = 1.5499999523163,
 	incrementalEffectiveness = 0.03999999910593,
@@ -20755,11 +21041,11 @@ skills["VaalReapMercenaryEncounter"] = {
 		[1] = { 0.80000001192093, 1.2000000476837, 12.500000279397, cooldown = 15, critChance = 6, damageEffectiveness = 3.9, levelRequirement = 0, storedUses = 1, statInterpolation = { 3, 3, 3, }, },
 	},
 }
-inheritSkillData("VaalReapMercenaryEncounter", "VaalReap")
 
 skills["VaalSplitArrowMercenary"] = {
 	name = "Greater Split Arrow",
 	hidden = true,
+	mercenary = true,
 	color = 2,
 	baseEffectiveness = 0.80000001192093,
 	incrementalEffectiveness = 0.023299999535084,
@@ -20832,6 +21118,7 @@ skills["VaalSplitArrowMercenary"] = {
 skills["VaalVitalityMercenary"] = {
 	name = "Vaal Vitality",
 	hidden = true,
+	mercenary = true,
 	color = 1,
 	description = "Casts a temporary aura that grants life regeneration to you and your allies.",
 	skillTypes = { [SkillType.Spell] = true, [SkillType.Buff] = true, [SkillType.Area] = true, [SkillType.Totemable] = true, [SkillType.TotemCastsAlone] = true, [SkillType.Duration] = true, [SkillType.Vaal] = true, [SkillType.Aura] = true, [SkillType.AreaSpell] = true, [SkillType.Instant] = true, [SkillType.InstantNoRepeatWhenHeld] = true, [SkillType.InstantShiftAttackForLeftMouse] = true, [SkillType.Cooldown] = true, },
@@ -20898,6 +21185,8 @@ skills["VaalVitalityMercenary"] = {
 skills["VenomGyreMercenary"] = {
 	name = "Venom Gyre",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "VenomGyre",
 	color = 2,
 	description = "Fires a returning projectile that can be caught. Caught projectiles spiral outwards when you use Whirling Blades and do not return. Requires a Dagger or Claw.",
 	skillTypes = { [SkillType.Attack] = true, [SkillType.RangedAttack] = true, [SkillType.Projectile] = true, [SkillType.Chaos] = true, [SkillType.Duration] = true, [SkillType.ProjectilesFromUser] = true, },
@@ -20971,11 +21260,12 @@ skills["VenomGyreMercenary"] = {
 		[40] = { attackSpeedMultiplier = 20, baseMultiplier = 2.395, damageEffectiveness = 2.395, levelRequirement = 100, },
 	},
 }
-inheritSkillData("VenomGyreMercenary", "VenomGyre")
 
 skills["VigilantStrikeMercenary"] = {
 	name = "Vigilant Strike",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "VigilantStrike",
 	color = 1,
 	description = "Attacks enemies with a powerful melee strike which grants Fortification, reducing damage you take from hits. The cooldown can be bypassed by expending an Endurance Charge. Requires a Melee Weapon.",
 	skillTypes = { [SkillType.Attack] = true, [SkillType.Buff] = true, [SkillType.Melee] = true, [SkillType.Multistrikeable] = true, [SkillType.MeleeSingleTarget] = true, [SkillType.ThresholdJewelArea] = true, [SkillType.Cooldown] = true, },
@@ -21046,11 +21336,12 @@ skills["VigilantStrikeMercenary"] = {
 		[40] = { baseMultiplier = 15.775, cooldown = 4, damageEffectiveness = 15.775, levelRequirement = 100, storedUses = 1, },
 	},
 }
-inheritSkillData("VigilantStrikeMercenary", "VigilantStrike")
 
 skills["ViperStrikeMercenary"] = {
 	name = "Viper Strike",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "ViperStrike",
 	color = 2,
 	baseEffectiveness = 1.5,
 	incrementalEffectiveness = 0.023299999535084,
@@ -21125,11 +21416,12 @@ skills["ViperStrikeMercenary"] = {
 		[40] = { baseMultiplier = 10.162, damageEffectiveness = 10.162, levelRequirement = 100, },
 	},
 }
-inheritSkillData("ViperStrikeMercenary", "MonsterViperStrike")
 
 skills["ViperStrikeMercenaryEncounter"] = {
 	name = "Viper Strike",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "ViperStrike",
 	color = 2,
 	baseEffectiveness = 1.5,
 	incrementalEffectiveness = 0.023299999535084,
@@ -21166,11 +21458,12 @@ skills["ViperStrikeMercenaryEncounter"] = {
 		[1] = { baseMultiplier = 2.546, damageEffectiveness = 2.546, levelRequirement = 0, },
 	},
 }
-inheritSkillData("ViperStrikeMercenaryEncounter", "MonsterViperStrike")
 
 skills["VitalityMercenary"] = {
 	name = "Vitality",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "Vitality",
 	color = 1,
 	description = "Casts an aura that grants life regeneration to you and your allies.",
 	skillTypes = { [SkillType.Spell] = true, [SkillType.Area] = true, [SkillType.Buff] = true, [SkillType.HasReservation] = true, [SkillType.TotemCastsAlone] = true, [SkillType.Totemable] = true, [SkillType.Aura] = true, [SkillType.Instant] = true, [SkillType.AreaSpell] = true, [SkillType.CanHaveBlessing] = true, [SkillType.InstantNoRepeatWhenHeld] = true, [SkillType.InstantShiftAttackForLeftMouse] = true, [SkillType.Cooldown] = true, },
@@ -21232,11 +21525,12 @@ skills["VitalityMercenary"] = {
 		[40] = { 21168, 34, cooldown = 1.2, levelRequirement = 100, storedUses = 1, statInterpolation = { 1, 1, }, },
 	},
 }
-inheritSkillData("VitalityMercenary", "AzmeriOakVitality")
 
 skills["VoidSphereMercenary"] = {
 	name = "Void Sphere",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "VoidSphere",
 	color = 3,
 	baseEffectiveness = 0.35989999771118,
 	incrementalEffectiveness = 0.055500000715256,
@@ -21308,11 +21602,12 @@ skills["VoidSphereMercenary"] = {
 		[40] = { 0.80000001192093, 1.2000000476837, -47, cooldown = 10, critChance = 7, damageEffectiveness = 0.75, levelRequirement = 100, storedUses = 1, statInterpolation = { 3, 3, 1, }, },
 	},
 }
-inheritSkillData("VoidSphereMercenary", "VoidSphere")
 
 skills["VolcanicFissureAltMercenary"] = {
 	name = "Volcanic Fissure of Snaking",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "VolcanicFissure",
 	color = 1,
 	description = "Slam the ground, creating a winding fissure that deals area damage while travelling outwards. When it reaches the target location it erupts, releasing a burst of molten projectiles. Requires an Axe, Mace, Sceptre, Staff or Unarmed.",
 	skillTypes = { [SkillType.Attack] = true, [SkillType.Projectile] = true, [SkillType.Area] = true, [SkillType.Melee] = true, [SkillType.Slam] = true, [SkillType.Fire] = true, [SkillType.Multistrikeable] = true, [SkillType.RangedAttack] = true, [SkillType.ProjectilesNotFromUser] = true, [SkillType.Totemable] = true, },
@@ -21383,11 +21678,12 @@ skills["VolcanicFissureAltMercenary"] = {
 		[40] = { 2, baseMultiplier = 5.366, damageEffectiveness = 5.366, levelRequirement = 100, statInterpolation = { 1, }, },
 	},
 }
-inheritSkillData("VolcanicFissureAltMercenary", "VolcanicFissure")
 
 skills["VolcanicFissureAltMercenaryEncounter"] = {
 	name = "Volcanic Fissure of Snaking",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "VolcanicFissure",
 	color = 1,
 	description = "Slam the ground, creating a winding fissure that deals area damage while travelling outwards. When it reaches the target location it erupts, releasing a burst of molten projectiles. Requires an Axe, Mace, Sceptre, Staff or Unarmed.",
 	skillTypes = { [SkillType.Attack] = true, [SkillType.Projectile] = true, [SkillType.Area] = true, [SkillType.Melee] = true, [SkillType.Slam] = true, [SkillType.Fire] = true, [SkillType.Multistrikeable] = true, [SkillType.RangedAttack] = true, [SkillType.ProjectilesNotFromUser] = true, [SkillType.Totemable] = true, },
@@ -21458,11 +21754,11 @@ skills["VolcanicFissureAltMercenaryEncounter"] = {
 		[40] = { 2, baseMultiplier = 3.8379, damageEffectiveness = 3.8379, levelRequirement = 100, statInterpolation = { 1, }, },
 	},
 }
-inheritSkillData("VolcanicFissureAltMercenaryEncounter", "VolcanicFissure")
 
 skills["VollCharge"] = {
 	name = "VollCharge",
 	hidden = true,
+	mercenary = true,
 	color = 4,
 	skillTypes = { [SkillType.Attack] = true, },
 	statDescriptionScope = "skill_stat_descriptions",
@@ -21483,6 +21779,7 @@ skills["VollCharge"] = {
 skills["VollReviveUndead"] = {
 	name = "VollReviveUndead",
 	hidden = true,
+	mercenary = true,
 	color = 4,
 	skillTypes = { [SkillType.Spell] = true, },
 	statDescriptionScope = "skill_stat_descriptions",
@@ -21500,6 +21797,7 @@ skills["VollReviveUndead"] = {
 skills["VollReviveUndeadWithMinions"] = {
 	name = "VollReviveUndeadWithMinions",
 	hidden = true,
+	mercenary = true,
 	color = 4,
 	skillTypes = { [SkillType.Spell] = true, },
 	statDescriptionScope = "skill_stat_descriptions",
@@ -21524,6 +21822,8 @@ skills["VollReviveUndeadWithMinions"] = {
 skills["VollSlamMercenary"] = {
 	name = "VollSlamMercenary",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "AzmeriGeofriSlam",
 	color = 4,
 	skillTypes = { [SkillType.Attack] = true, [SkillType.Area] = true, },
 	statDescriptionScope = "skill_stat_descriptions",
@@ -21548,11 +21848,12 @@ skills["VollSlamMercenary"] = {
 		[84] = { 100, baseMultiplier = 0.95, cooldown = 5, damageEffectiveness = 0.95, levelRequirement = 84, storedUses = 1, statInterpolation = { 2, }, },
 	},
 }
-inheritSkillData("VollSlamMercenary", "AzmeriGeofriSlam")
 
 skills["VoltaxicBurstMercenary"] = {
 	name = "Voltaxic Burst",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "VoltaxicBurst",
 	color = 3,
 	baseEffectiveness = 2.3076000213623,
 	incrementalEffectiveness = 0.043999999761581,
@@ -21625,11 +21926,12 @@ skills["VoltaxicBurstMercenary"] = {
 		[40] = { 0.69999998807907, 1.2999999523163, 5, critChance = 6.5, damageEffectiveness = 2.3, levelRequirement = 100, statInterpolation = { 3, 3, 1, }, },
 	},
 }
-inheritSkillData("VoltaxicBurstMercenary", "VoltaxicBurst")
 
 skills["VortexMercenary"] = {
 	name = "Vortex",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "Vortex",
 	color = 3,
 	baseEffectiveness = 1.2086000442505,
 	incrementalEffectiveness = 0.049499999731779,
@@ -21702,11 +22004,12 @@ skills["VortexMercenary"] = {
 		[40] = { 0.80000001192093, 1.2000000476837, 166.16667483126, critChance = 6, damageEffectiveness = 1.7, levelRequirement = 100, statInterpolation = { 3, 3, 3, }, },
 	},
 }
-inheritSkillData("VortexMercenary", "Vortex")
 
 skills["VortexMercenaryEncounter"] = {
 	name = "Vortex",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "Vortex",
 	color = 3,
 	baseEffectiveness = 1.2000000476837,
 	incrementalEffectiveness = 0.041999999433756,
@@ -21779,11 +22082,12 @@ skills["VortexMercenaryEncounter"] = {
 		[40] = { 0.80000001192093, 1.2000000476837, 41.666667597989, critChance = 5, damageEffectiveness = 1.7, levelRequirement = 100, statInterpolation = { 3, 3, 3, }, },
 	},
 }
-inheritSkillData("VortexMercenaryEncounter", "Vortex")
 
 skills["VulnerabilityAuraMapBoss"] = {
 	name = "Vulnerability",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "Vulnerability",
 	color = 4,
 	baseEffectiveness = 0,
 	description = "Curse all targets in an area, causing them to take increased physical damage. Attacks against the cursed enemies have a chance to inflict bleeding.",
@@ -21808,11 +22112,12 @@ skills["VulnerabilityAuraMapBoss"] = {
 		[1] = { cooldown = 5, levelRequirement = 1, storedUses = 1, cost = { Mana = 50, }, },
 	},
 }
-inheritSkillData("VulnerabilityAuraMapBoss", "NecromancerVulnerability")
 
 skills["WaveOfConvictionAltMercenary"] = {
 	name = "Wave of Conviction of Trarthus",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "WaveOfConvictionAltY",
 	color = 3,
 	baseEffectiveness = 1.8079999685287,
 	incrementalEffectiveness = 0.049699999392033,
@@ -21886,11 +22191,12 @@ skills["WaveOfConvictionAltMercenary"] = {
 		[40] = { 0.80000001192093, 1.2000000476837, 570, cooldown = 3, critChance = 6, damageEffectiveness = 3.3, levelRequirement = 100, storedUses = 1, statInterpolation = { 3, 3, 1, }, },
 	},
 }
-inheritSkillData("WaveOfConvictionAltMercenary", "WaveOfConvictionAltY")
 
 skills["WaveOfConvictionLightningMercenary"] = {
 	name = "Wave of Conviction",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "WaveOfConviction",
 	color = 3,
 	baseEffectiveness = 2.2999999523163,
 	incrementalEffectiveness = 0.0489999987185,
@@ -21965,11 +22271,12 @@ skills["WaveOfConvictionLightningMercenary"] = {
 		[40] = { 0.80000001192093, 1.2000000476837, 840, cooldown = 4.5, critChance = 6, damageEffectiveness = 3.3, levelRequirement = 100, storedUses = 1, statInterpolation = { 3, 3, 1, }, },
 	},
 }
-inheritSkillData("WaveOfConvictionLightningMercenary", "WaveOfConviction")
 
 skills["WhirlingBladesMercenary"] = {
 	name = "Whirling Blades",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "FireMonsterWhirlingBlades",
 	color = 2,
 	baseEffectiveness = 0,
 	description = "Dive through enemies, dealing weapon damage. If dual wielding attacks with both weapons, dealing the damage of both in one hit. Only works with Daggers, Claws, and One-Handed Swords.",
@@ -22040,11 +22347,12 @@ skills["WhirlingBladesMercenary"] = {
 		[40] = { baseMultiplier = 6.123, damageEffectiveness = 6.123, levelRequirement = 100, },
 	},
 }
-inheritSkillData("WhirlingBladesMercenary", "FireMonsterWhirlingBlades")
 
 skills["WildStrikeMercenary"] = {
 	name = "Wild Strike",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "WildStrike",
 	color = 2,
 	description = "Your melee weapon strikes enemies, converting physical damage to a random element. Then, depending on the element chosen, it releases a fiery explosion, an arcing bolt of lightning, or an icy wave. It will avoid choosing the same element twice in a row.",
 	skillTypes = { [SkillType.Attack] = true, [SkillType.MeleeSingleTarget] = true, [SkillType.Multistrikeable] = true, [SkillType.Melee] = true, [SkillType.Lightning] = true, [SkillType.Cold] = true, [SkillType.Fire] = true, [SkillType.Projectile] = true, [SkillType.Area] = true, [SkillType.Chains] = true, [SkillType.RangedAttack] = true, [SkillType.ProjectilesNotFromUser] = true, [SkillType.RandomElement] = true, },
@@ -22123,11 +22431,12 @@ skills["WildStrikeMercenary"] = {
 		[40] = { 9, 34, baseMultiplier = 8.9142, damageEffectiveness = 8.9142, levelRequirement = 100, statInterpolation = { 1, 1, }, },
 	},
 }
-inheritSkillData("WildStrikeMercenary", "WildStrike")
 
 skills["WildStrikeMercenaryEncounter"] = {
 	name = "Wild Strike",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "WildStrike",
 	color = 2,
 	description = "Your melee weapon strikes enemies, converting physical damage to a random element. Then, depending on the element chosen, it releases a fiery explosion, an arcing bolt of lightning, or an icy wave. It will avoid choosing the same element twice in a row.",
 	skillTypes = { [SkillType.Attack] = true, [SkillType.MeleeSingleTarget] = true, [SkillType.Multistrikeable] = true, [SkillType.Melee] = true, [SkillType.Lightning] = true, [SkillType.Cold] = true, [SkillType.Fire] = true, [SkillType.Projectile] = true, [SkillType.Area] = true, [SkillType.Chains] = true, [SkillType.RangedAttack] = true, [SkillType.ProjectilesNotFromUser] = true, [SkillType.RandomElement] = true, },
@@ -22206,11 +22515,11 @@ skills["WildStrikeMercenaryEncounter"] = {
 		[40] = { 9, 34, baseMultiplier = 1.946, damageEffectiveness = 1.946, levelRequirement = 100, statInterpolation = { 1, 1, }, },
 	},
 }
-inheritSkillData("WildStrikeMercenaryEncounter", "WildStrike")
 
 skills["WindSlashMercenary"] = {
 	name = "Slicing Wind",
 	hidden = true,
+	mercenary = true,
 	color = 1,
 	skillTypes = { [SkillType.Attack] = true, [SkillType.Area] = true, [SkillType.Multistrikeable] = true, [SkillType.Melee] = true, },
 	statDescriptionScope = "skill_stat_descriptions",
@@ -22243,6 +22552,7 @@ skills["WindSlashMercenary"] = {
 skills["WindSlashMercenaryEncounter"] = {
 	name = "Slicing Wind",
 	hidden = true,
+	mercenary = true,
 	color = 1,
 	skillTypes = { [SkillType.Attack] = true, [SkillType.Area] = true, [SkillType.Multistrikeable] = true, [SkillType.Melee] = true, },
 	statDescriptionScope = "skill_stat_descriptions",
@@ -22275,6 +22585,8 @@ skills["WindSlashMercenaryEncounter"] = {
 skills["WitherTotemMercenary"] = {
 	name = "Wither Totem",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "Wither",
 	color = 3,
 	description = "Casts a debilitating debuff on enemies in an area, hindering their movement and also inflicts the Withered debuff, which increases the Chaos Damage they take and can stack up to 15 times.",
 	skillTypes = { [SkillType.Spell] = true, [SkillType.Area] = true, [SkillType.Duration] = true, [SkillType.Totemable] = true, [SkillType.Chaos] = true, [SkillType.Channel] = true, [SkillType.AreaSpell] = true, },
@@ -22341,11 +22653,12 @@ skills["WitherTotemMercenary"] = {
 		[40] = { -41, 34, levelRequirement = 100, statInterpolation = { 1, 1, }, },
 	},
 }
-inheritSkillData("WitherTotemMercenary", "Wither")
 
 skills["WitheringStepMercenary"] = {
 	name = "Withering Step",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "WitheringStep",
 	color = 2,
 	baseEffectiveness = 0,
 	description = "Grants Elusive and a buff that grants Phasing. While you have this buff, monsters that enter an area around you will be Withered. Using a skill or losing the Elusive buff ends this skill's effects. Shares a cooldown with other Blink skills. Cannot be used while already Elusive.",
@@ -22414,11 +22727,12 @@ skills["WitheringStepMercenary"] = {
 		[40] = { 13, 9, 68, cooldown = 3, levelRequirement = 100, storedUses = 1, statInterpolation = { 1, 1, 1, }, },
 	},
 }
-inheritSkillData("WitheringStepMercenary", "WitheringStep")
 
 skills["WrathMercenary"] = {
 	name = "Wrath",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "Wrath",
 	color = 3,
 	baseEffectiveness = 2.25,
 	incrementalEffectiveness = 0.023000000044703,
@@ -22484,11 +22798,12 @@ skills["WrathMercenary"] = {
 		[40] = { 0.050000000745058, 0.80000001192093, 34, 26, cooldown = 1.2, levelRequirement = 100, storedUses = 1, statInterpolation = { 3, 3, 1, 1, }, },
 	},
 }
-inheritSkillData("WrathMercenary", "AzmeriKudukuWrath")
 
 skills["WrathMercenaryEncounter"] = {
 	name = "Wrath",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "Wrath",
 	color = 3,
 	baseEffectiveness = 2.25,
 	incrementalEffectiveness = 0.023000000044703,
@@ -22516,11 +22831,12 @@ skills["WrathMercenaryEncounter"] = {
 		[2] = { 0.0099999997764826, 0.15999999642372, 34, 30, cooldown = 1.2, levelRequirement = 100, storedUses = 1, statInterpolation = { 3, 3, 2, 2, }, },
 	},
 }
-inheritSkillData("WrathMercenaryEncounter", "AzmeriKudukuWrath")
 
 skills["ZealotryMercenary"] = {
 	name = "Zealotry",
 	hidden = true,
+	mercenary = true,
+	inheritedFrom = "Zealotry",
 	color = 3,
 	baseEffectiveness = 1.5,
 	incrementalEffectiveness = 0.025000000372529,
@@ -22588,15 +22904,3 @@ skills["ZealotryMercenary"] = {
 		[40] = { 20, 54, 34, cooldown = 1.2, levelRequirement = 100, storedUses = 1, statInterpolation = { 1, 1, 1, }, },
 	},
 }
-inheritSkillData("ZealotryMercenary", "AzmeriCasterDemonSpellDamageAura")
-
-for skillId, grantedEffect in pairs(skills) do
-	if not existingSkills[skillId] then
-		grantedEffect.mercenary = true
-		for _, statId in ipairs(grantedEffect.stats or { }) do
-			if statId == "base_is_projectile" then grantedEffect.baseFlags.projectile = true end
-			if statId == "is_area_damage" then grantedEffect.baseFlags.area = true end
-			if statId:match("^spell_minimum_base_.*_damage$") then grantedEffect.baseFlags.hit = true end
-		end
-	end
-end

@@ -9,7 +9,6 @@ local t_insert = table.insert
 local m_min = math.min
 local m_max = math.max
 
-local MAX_SUPPORTS = 5
 local SUPPORTED_SLOTS = { }
 for _, slotName in ipairs(MercenaryTools.equipmentSlots) do SUPPORTED_SLOTS[slotName] = true end
 local ARMOUR_SLOTS = {
@@ -18,26 +17,28 @@ local ARMOUR_SLOTS = {
 	Gloves = true,
 	Boots = true,
 }
-local UNIQUE_PASSIVE_BY_SLOT = {
-	["Weapon 1"] = "Legendary Arms",
-	["Weapon 2"] = "Legendary Arms",
-	Helmet = "Legendary Helmets",
-	Gloves = "Legendary Gloves",
-	Boots = "Legendary Boots",
-	Amulet = "Legendary Amulets",
-	["Ring 1"] = "Legendary Rings",
-	["Ring 2"] = "Legendary Rings",
-	Belt = "Legendary Belts",
+-- Unique equipment is only permitted where something has granted the matching
+-- "Your Mercenary can equip Unique ..." flag. Body Armour has no such flag.
+local UNIQUE_FLAG_BY_SLOT = {
+	["Weapon 1"] = "MercenaryCanEquipUniqueArms",
+	["Weapon 2"] = "MercenaryCanEquipUniqueArms",
+	Helmet = "MercenaryCanEquipUniqueHelmets",
+	Gloves = "MercenaryCanEquipUniqueGloves",
+	Boots = "MercenaryCanEquipUniqueBoots",
+	Amulet = "MercenaryCanEquipUniqueAmulets",
+	["Ring 1"] = "MercenaryCanEquipUniqueRings",
+	["Ring 2"] = "MercenaryCanEquipUniqueRings",
+	Belt = "MercenaryCanEquipUniqueBelts",
 }
-
-local function hasValue(values, wanted)
-	for _, value in ipairs(values or { }) do
-		if value == wanted then
-			return true
-		end
-	end
-	return false
-end
+local UNIQUE_SLOT_DESCRIPTION = {
+	MercenaryCanEquipUniqueArms = "Unique Weapons, Shields and Quivers",
+	MercenaryCanEquipUniqueHelmets = "Unique Helmets",
+	MercenaryCanEquipUniqueGloves = "Unique Gloves",
+	MercenaryCanEquipUniqueBoots = "Unique Boots",
+	MercenaryCanEquipUniqueAmulets = "Unique Amulets",
+	MercenaryCanEquipUniqueRings = "Unique Rings",
+	MercenaryCanEquipUniqueBelts = "Unique Belts",
+}
 
 local MercenarySkillListClass = newClass("MercenarySkillListControl", "ListControl", function(self, anchor, rect, mercenaryTab)
 	self.ListControl(anchor, rect, 20, "VERTICAL", true, mercenaryTab.profile.skills)
@@ -93,7 +94,6 @@ local MercenaryTabClass = newClass("MercenaryTab", "ControlHost", "Control", fun
 	}
 	self.selectedSkillIndex = 1
 	self.errors = { }
-	self.lastSaved = ""
 	self.importError = nil
 
 	self.controls.classLabel = new("LabelControl", { "TOPLEFT", self, "TOPLEFT" }, { 12, 12, 0, 16 }, "^7Mercenary class:")
@@ -116,7 +116,7 @@ local MercenaryTabClass = newClass("MercenaryTab", "ControlHost", "Control", fun
 	end)
 	self.controls.levelLabel = new("LabelControl", { "LEFT", self.controls.build, "RIGHT" }, { 20, 0, 0, 16 }, "^7Found-area level:")
 	self.controls.level = new("EditControl", { "LEFT", self.controls.levelLabel, "RIGHT" }, { 6, 0, 55, 20 }, "68", nil, "%D", 3, function(buf)
-		self.profile.foundAreaLevel = tonumber(buf) or 0
+		self.profile.foundAreaLevel = m_min(m_max(tonumber(buf) or 1, 1), 100)
 		self:Changed()
 	end)
 
@@ -207,7 +207,7 @@ local MercenaryTabClass = newClass("MercenaryTab", "ControlHost", "Control", fun
 		self.controls["support"..index] = control
 		return control
 	end
-	for index = 1, MAX_SUPPORTS do
+	for index = 1, MercenaryTools.maxSupportLimit(self.data) do
 		self.supportControls[index] = createSupportRow(index)
 	end
 
@@ -296,10 +296,14 @@ function MercenaryTabClass:RefreshControls()
 		local support = self.data.supports[supportId]
 		t_insert(supportList, { id = supportId, label = support.name.." (Tier "..support.variant..")" })
 	end
+	local maxSupports = MercenaryTools.supportLimit(self.data, selectedData)
 	for index, control in ipairs(self.supportControls) do
 		control:SetList(supportList)
 		control:SelByValue(selected and selected.supports[index] and selected.supports[index].id, "id")
 		control.enabled = selected ~= nil
+		-- Only offer as many rows as the selected skill accepts supports.
+		control.shown = index <= maxSupports
+		self.controls["support"..index.."Clear"].shown = control.shown
 	end
 	self:RefreshErrors()
 end
@@ -358,11 +362,11 @@ function MercenaryTabClass:ImportWarrant()
 		local mercBuild = self.data.builds[buildId]
 		local matches = true
 		for _, skill in ipairs(imported.skills) do
-			matches = matches and hasValue(mercBuild.skillIds, skill.id)
+			matches = matches and MercenaryTools.contains(mercBuild.skillIds, skill.id)
 		end
 		if matches then t_insert(matchingBuilds, buildId) end
 	end
-	if self.profile.buildId and hasValue(matchingBuilds, self.profile.buildId) then
+	if self.profile.buildId and MercenaryTools.contains(matchingBuilds, self.profile.buildId) then
 		matchingBuilds = { self.profile.buildId }
 	end
 	if #matchingBuilds ~= 1 then
@@ -403,12 +407,12 @@ function MercenaryTabClass:IsSlotSupported(slotName)
 	return SUPPORTED_SLOTS[parentSlot or slotName] == true
 end
 
-function MercenaryTabClass:HasAllocatedPassive(name)
-	for nodeId in pairs(self.build.spec.allocNodes) do
-		local node = self.build.spec.nodes[nodeId]
-		if node and node.name == name then return true end
-	end
-	return false
+-- Mercenary permissions are granted by parsed modifiers, so they are read from the
+-- modifier database built by the last calculation rather than from tree node names.
+function MercenaryTabClass:PlayerFlag(flagName)
+	-- The tab can be asked to validate items before the first calculation has run.
+	local mainEnv = self.build.calcsTab and self.build.calcsTab.mainEnv
+	return mainEnv and mainEnv.modDB and mainEnv.modDB:Flag(nil, flagName) or false
 end
 
 function MercenaryTabClass:ValidateEquippedItem(item, slotName, itemSet)
@@ -455,17 +459,16 @@ function MercenaryTabClass:ValidateEquippedItem(item, slotName, itemSet)
 		return false, "requires found-area level "..requiredFoundLevel
 	end
 	if item.rarity == "UNIQUE" or item.rarity == "RELIC" then
-		if slotName == "Body Armour" then
-			return false, "Unique Body Armour is never permitted"
-		end
-		local requiredPassive = UNIQUE_PASSIVE_BY_SLOT[slotName]
-		if not requiredPassive or not self:HasAllocatedPassive(requiredPassive) then
-			return false, "requires "..(requiredPassive or "an unavailable Legendary passive")
+		local requiredFlag = UNIQUE_FLAG_BY_SLOT[slotName]
+		if not requiredFlag then
+			return false, "Unique items are never permitted in this slot"
+		elseif not self:PlayerFlag(requiredFlag) then
+			return false, "requires a modifier allowing your Mercenary to equip "..UNIQUE_SLOT_DESCRIPTION[requiredFlag]
 		end
 	end
 	if slotName == "Weapon 1" or slotName == "Weapon 2" then
 		local allowedTypes = slotName == "Weapon 1" and mercBuild.weaponConfiguration.mainHandTypes or mercBuild.weaponConfiguration.offHandTypes
-		if not hasValue(allowedTypes, item.type) then
+		if not MercenaryTools.contains(allowedTypes, item.type) then
 			return false, item.type.." is not valid in this weapon slot for the selected build"
 		end
 	end
@@ -484,12 +487,8 @@ end
 
 function MercenaryTabClass:GetErrors()
 	local errors = MercenaryTools.validateProfile(self.profile, self.data)
-	local spec = self.build.spec
-	if spec.curClassName ~= "Scion" or spec.curAscendClassName ~= "Luminary" then
-		t_insert(errors, "Permanent Mercenaries require a Scion Luminary")
-	end
-	if not self:HasAllocatedPassive("Noble Blood") then
-		t_insert(errors, "Noble Blood is not allocated")
+	if not self:PlayerFlag("CanHirePermanentMercenary") then
+		t_insert(errors, "Permanently hiring a Mercenary requires Noble Blood, from the Scion's Luminary ascendancy")
 	end
 	if (self.profile.foundAreaLevel or 0) >= self.build.characterLevel + 20 then
 		t_insert(errors, "Character level is at least 20 below the found-area level")
@@ -511,7 +510,7 @@ function MercenaryTabClass:GetErrors()
 			local setSlot = itemSet[slot.slotName]
 			local item = itemsTab.items[setSlot and setSlot.selItemId]
 			if item then
-				local baseValid = itemsTab:IsItemValidForBaseSlot(item, slot.slotName, itemSet)
+				local baseValid = itemsTab:IsItemValidForSlot(item, slot.slotName, itemSet)
 				local valid, reason = self:ValidateEquippedItem(item, slot.mercenarySlotName, itemSet)
 				if not baseValid then
 					t_insert(errors, slot.mercenarySlotName..": invalid base slot or weapon configuration")
@@ -522,7 +521,8 @@ function MercenaryTabClass:GetErrors()
 		end
 	end
 	if self.importError then t_insert(errors, self.importError) end
-	for _, calculationError in ipairs(self.calculationErrors or { }) do
+	local mainEnv = self.build.calcsTab and self.build.calcsTab.mainEnv
+	for _, calculationError in ipairs(mainEnv and mainEnv.mercenaryCalculationErrors or { }) do
 		t_insert(errors, calculationError)
 	end
 	return errors
@@ -569,7 +569,7 @@ function MercenaryTabClass:Load(xml)
 			t_insert(self.profile.skills, skill)
 		end
 	end
-	self.lastSaved = self:SerializeState()
+	self.modFlag = false
 	self:RefreshControls()
 end
 
@@ -596,27 +596,13 @@ function MercenaryTabClass:Save(xml)
 		end
 		t_insert(xml, child)
 	end
-	self.lastSaved = self:SerializeState()
 	self.modFlag = false
-end
-
-function MercenaryTabClass:SerializeState()
-	local parts = {
-		tostring(self.profile.buildId), tostring(self.profile.foundAreaLevel), tostring(self.profile.mainSkillId), tostring(self.profile.lifeComparison),
-	}
-	for _, skill in ipairs(self.profile.skills) do
-		t_insert(parts, table.concat({ skill.id, tostring(skill.enabled), tostring(skill.includeInFullDPS), tostring(skill.count), tostring(skill.skillPart), tostring(skill.skillStageCount), tostring(skill.skillMineCount), tostring(skill.skillMinionSkill) }, ":"))
-		for _, support in ipairs(skill.supports or { }) do
-			t_insert(parts, support.id..":"..tostring(support.tier))
-		end
-	end
-	return table.concat(parts, "|")
 end
 
 function MercenaryTabClass:Draw(viewPort, inputEvents)
 	self.x, self.y, self.width, self.height = viewPort.x, viewPort.y, viewPort.width, viewPort.height
+	self:RefreshErrors()
 	self:ProcessControlsInput(inputEvents, viewPort)
 	main:DrawBackground(viewPort)
 	self:DrawControls(viewPort)
-	self.modFlag = self.lastSaved ~= self:SerializeState()
 end

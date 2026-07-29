@@ -455,7 +455,10 @@ function ModStoreClass:EvalMod(mod, cfg, globalLimits)
 			if tag.divVar then
 				tag.div = GetMultiplier(self, tag.divVar, cfg)
 			end
-			local mult = m_max(m_floor(base / (tag.div or 1) + 0.0001) - (tag.subtract or 0), 0)
+			local mult = m_floor(base / (tag.div or 1) + 0.0001)
+			if tag.subtract then
+				mult = m_max(mult - tag.subtract, 0)
+			end
 			local limitTotal
 			if tag.limit or tag.limitVar then
 				local limit = tag.limit or GetMultiplier(self, tag.limitVar, cfg)

@@ -237,10 +237,10 @@ local minionDisplayStats = {
 	{ stat = "EnergyShieldLeechGainRate", label = "ES Leech/On Hit Rate", fmt = ".1f", color = colorCodes.ES, compPercent = true },
 }
 local mercenaryDisplayStats = {
-	{ stat = "CombinedDPS", label = "Selected Skill DPS", fmt = ".1f", compactValue = true },
-	{ stat = "FullDPS", label = "Mercenary Full DPS", fmt = ".1f", compactValue = true, color = colorCodes.CURRENCY },
-	{ stat = "FullDotDPS", label = "Mercenary Full DoT DPS", fmt = ".1f", compactValue = true, color = colorCodes.CURRENCY, warnFunc = function(v) return v >= data.misc.DotDpsCap and "Full DoT DPS exceeds in-game limit" end },
-	{ stat = "SkillDPS", label = "Mercenary Skill DPS", compactValue = true, condFunc = function() return true end },
+	{ stat = "CombinedDPS", label = "Selected Skill DPS", fmt = ".1f", compactValue = true, compPercent = true },
+	{ stat = "FullDPS", label = "Full DPS", fmt = ".1f", compactValue = true, color = colorCodes.CURRENCY, compPercent = true },
+	{ stat = "FullDotDPS", label = "Full DoT DPS", fmt = ".1f", compactValue = true, color = colorCodes.CURRENCY, compPercent = true, warnFunc = function(v) return v >= data.misc.DotDpsCap and "Full DoT DPS exceeds in-game limit" end },
+	{ stat = "SkillDPS", label = "Skill DPS", compactValue = true, condFunc = function() return true end },
 	{ stat = "Life", label = "Life", fmt = "d", compactValue = true, color = colorCodes.LIFE },
 	{ stat = "EnergyShield", label = "Energy Shield", fmt = "d", compactValue = true, color = colorCodes.ES },
 	{ stat = "Armour", label = "Armour", fmt = "d", compactValue = true },

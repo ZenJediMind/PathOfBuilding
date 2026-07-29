@@ -9532,7 +9532,7 @@ c["If you've Consumed a corpse Recently, you and your Minions have 30% increased
 c["If you've Impaled an Enemy Recently, you"]={nil,"If you've Impaled an Enemy Recently, you "}
 c["If you've Impaled an Enemy Recently, you and nearby Allies have +1000 to Armour"]={{[1]={[1]={type="Condition",var="ImpaledRecently"},flags=0,keywordFlags=0,name="ExtraAura",type="LIST",value={mod={flags=0,keywordFlags=0,name="Armour",type="BASE",value=1000}}}},nil}
 c["If you've Warcried Recently, you and nearby allies have 20% increased Attack, Cast and Movement Speed"]={{[1]={[1]={type="Condition",var="UsedWarcryRecently"},flags=0,keywordFlags=0,name="ExtraAura",type="LIST",value={mod={flags=0,keywordFlags=0,name="Speed",type="INC",value=20}}},[2]={[1]={type="Condition",var="UsedWarcryRecently"},flags=0,keywordFlags=0,name="ExtraAura",type="LIST",value={mod={flags=0,keywordFlags=0,name="MovementSpeed",type="INC",value=20}}}},nil}
-c["If your Linked Mercenary dies, the Link owner does not also die"]={{[1]={flags=0,keywordFlags=0,name="MercenaryLinkOwnerSurvives",type="FLAG",value=true}},nil}
+c["If your Linked Mercenary dies, the Link owner does not also die"]={{},"If your Linked Mercenary dies, the Link owner does not also die"}
 c["If your Mercenary's Life is higher than your own, 20% of Damage from Hits is"]={nil,"If your Mercenary's Life is higher than your own, 20% of Damage from Hits is "}
 c["If your Mercenary's Life is higher than your own, 20% of Damage from Hits is taken from your Mercenary's Life before you"]={{[1]={flags=0,keywordFlags=0,name="LoyalBodyguardRedirect",type="BASE",value=20}},nil}
 c["If your Mercenary's Life is lower than your own, 40% of Damage they take is Recouped as Life"]={{[1]={flags=0,keywordFlags=0,name="MercenaryLifeRecoup",type="BASE",value=40}},nil}
@@ -9819,7 +9819,7 @@ c["Link Skills have 20% increased Buff Effect if you have Linked to a target Rec
 c["Link Skills have 5% increased Buff Effect"]={{[1]={[1]={skillType=107,type="SkillType"},flags=0,keywordFlags=0,name="BuffEffect",type="INC",value=5}},nil}
 c["Link Skills have 50% increased range"]={{}," range "}
 c["Link Skills have 50% increased range Limited to 1 Runegraft of Connection"]={{}," range Limited to 1 Runegraft of Connection "}
-c["Link Skills have infinite Attachment Duration"]={{[1]={flags=0,keywordFlags=0,name="MercenaryLinkInfiniteDuration",type="FLAG",value=true}},nil}
+c["Link Skills have infinite Attachment Duration"]={{},"Link Skills have infinite Attachment Duration"}
 c["Linked Targets Cannot Die for 2 seconds after you Die"]={nil,"Linked Targets Cannot Die for 2 seconds after you Die "}
 c["Linked Targets Cannot Die for 2 seconds after you Die Lose no Experience when you die because a Linked target died"]={nil,"Linked Targets Cannot Die for 2 seconds after you Die Lose no Experience when you die because a Linked target died "}
 c["Linked Targets always count as in range of Non-Curse Auras from your Skills"]={{},nil}
@@ -12817,7 +12817,7 @@ c["You can have an additional Brand Attached to an Enemy"]={{[1]={flags=0,keywor
 c["You can have an additional Tincture active"]={{[1]={flags=0,keywordFlags=0,name="TinctureLimit",type="BASE",value=1}},nil}
 c["You can have two Offerings of different types"]={nil,"You can have two Offerings of different types "}
 c["You can have two Offerings of different types 35% chance to Avoid Elemental Ailments"]={nil,"You can have two Offerings of different types 35% chance to Avoid Elemental Ailments "}
-c["You can hire a Mercenary permanently"]={{[1]={flags=0,keywordFlags=0,name="CanHirePermanentMercenary",type="FLAG",value=true},[2]={flags=0,keywordFlags=0,name="MercenaryModifier",type="LIST",value={mod={flags=0,keywordFlags=0,name="Damage",source="Noble Blood",type="MORE",value=-30}}},[3]={flags=0,keywordFlags=0,name="MercenaryMinionModifier",type="LIST",value={mod={flags=0,keywordFlags=0,name="Damage",source="Noble Blood",type="MORE",value=-30}}}},nil}
+c["You can hire a Mercenary permanently"]={{[1]={flags=0,keywordFlags=0,name="CanHirePermanentMercenary",type="FLAG",value=true}},nil}
 c["You can inflict +1 Hallowing Flame on Enemies"]={{[1]={flags=0,keywordFlags=0,name="Multiplier:HallowingFlameMax",type="BASE",value=1}},nil}
 c["You can inflict Bleeding on an Enemy up to 8 times"]={{[1]={flags=0,keywordFlags=0,name="BleedStacksMax",type="OVERRIDE",value=8},[2]={flags=0,keywordFlags=0,name="Condition:HaveCrimsonDance",type="FLAG",value=true}},nil}
 c["You can inflict an additional Ignite on each Enemy"]={{[1]={flags=0,keywordFlags=0,name="IgniteCanStack",type="FLAG",value=true},[2]={flags=0,keywordFlags=0,name="IgniteStacks",type="BASE",value=1}},nil}

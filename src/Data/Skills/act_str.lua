@@ -7534,7 +7534,7 @@ skills["MoltenShell"] = {
 	statDescriptionScope = "buff_skill_stat_descriptions",
 	castTime = 0,
 	preDamageFunc = function(activeSkill, output)
-		local add = (activeSkill.skillData.MoltenShellDamageMitigated or 0) * (activeSkill.skillData.moltenShellReflect or 0) / 100
+		local add = (activeSkill.skillData.MoltenShellDamageMitigated or 0) * activeSkill.skillData.moltenShellReflect / 100
 		activeSkill.skillData.FireMin = add
 		activeSkill.skillData.FireMax = add
 	end,
@@ -7636,7 +7636,7 @@ skills["VaalMoltenShell"] = {
 	statDescriptionScope = "buff_skill_stat_descriptions",
 	castTime = 0,
 	preDamageFunc = function(activeSkill, output)
-		local add = (activeSkill.skillData.VaalMoltenShellDamageMitigated or 0) * (activeSkill.skillData.moltenShellReflect or 0) / 100
+		local add = (activeSkill.skillData.VaalMoltenShellDamageMitigated or 0) * activeSkill.skillData.moltenShellReflect / 100
 		activeSkill.skillData.FireMin = add
 		activeSkill.skillData.FireMax = add
 	end,

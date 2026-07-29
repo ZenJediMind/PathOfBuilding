@@ -38,6 +38,11 @@ describe("Mercenary equipment validation", function()
 		node = build.spec.nodes[node.id] or node
 		node.alloc = true
 		build.spec.allocNodes[node.id] = node
+		-- A Mercenary's equipment permissions are modifiers, so they only reach the tab
+		-- once a calculation has rebuilt the modifier database.
+		build.spec.modFlag = true
+		build.buildFlag = true
+		runCallback("OnFrame")
 	end
 
 	before_each(function()

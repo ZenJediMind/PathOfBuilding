@@ -206,13 +206,13 @@ local ItemsTabClass = newClass("ItemsTab", "UndoHandler", "ControlHost", "Contro
 	end
 	for _, baseSlotName in ipairs(MercenaryTools.equipmentSlots) do
 		local slotName = MercenaryTools.itemSlotName(baseSlotName)
-		local slot = new("ItemSlotControl", {"TOPLEFT",prevSlot,"BOTTOMLEFT"}, 0, 2, self, slotName, slotName)
+		local slot = new("ItemSlotControl", {"TOPLEFT",prevSlot,"BOTTOMLEFT"}, 0, 2, self, slotName, baseSlotName)
 		addMercenarySlot(slot, baseSlotName)
 		slot.shown = showMercenaryEquipment
 		if baseSlotName == "Weapon 1" or baseSlotName == "Weapon 2" or baseSlotName == "Helmet" or baseSlotName == "Gloves" or baseSlotName == "Body Armour" or baseSlotName == "Boots" or baseSlotName == "Belt" then
 			for index = 1, 6 do
 				local baseAbyssalSlotName = baseSlotName.." Abyssal Socket "..index
-				local abyssal = new("ItemSlotControl", {"TOPLEFT",prevSlot,"BOTTOMLEFT"}, 0, 2, self, MercenaryTools.itemSlotName(baseAbyssalSlotName), "Mercenary Abyssal #"..index)
+				local abyssal = new("ItemSlotControl", {"TOPLEFT",prevSlot,"BOTTOMLEFT"}, 0, 2, self, MercenaryTools.itemSlotName(baseAbyssalSlotName), "Abyssal #"..index)
 				addMercenarySlot(abyssal, baseAbyssalSlotName)
 				abyssal.parentSlot = slot
 				abyssal.shown = function()
@@ -2227,7 +2227,7 @@ function ItemsTabClass:GetComparisonSlotNameForItem(item)
 end
 -- Check if the given item could be equipped in the given slot, taking into account possible conflicts with currently equipped items
 -- For example, a shield is not valid for Weapon 2 if Weapon 1 is a staff, and a wand is not valid for Weapon 2 if Weapon 1 is a dagger
-function ItemsTabClass:IsItemValidForBaseSlot(item, slotName, itemSet)
+function ItemsTabClass:IsItemValidForSlot(item, slotName, itemSet)
 	itemSet = itemSet or self.activeItemSet
 	local mercenarySlotName = MercenaryTools.baseItemSlotName(slotName)
 	slotName = mercenarySlotName or slotName
@@ -2277,10 +2277,6 @@ function ItemsTabClass:IsItemValidForBaseSlot(item, slotName, itemSet)
 			return item.type == "Shield" or (self.build.data.weaponTypeInfo[item.type] and self.build.data.weaponTypeInfo[item.type].oneHand and ((weapon1Type == "Wand" and item.type == "Wand") or (weapon1Type ~= "Wand" and item.type ~= "Wand")))
 		end
 	end
-end
-
-function ItemsTabClass:IsItemValidForSlot(item, slotName, itemSet)
-	return self:IsItemValidForBaseSlot(item, slotName, itemSet)
 end
 
 -- Opens the item set manager

@@ -16,13 +16,6 @@ local buffModeDropList = {
 	{ label = "Effective DPS", buffMode = "EFFECTIVE" } 
 }
 
-local calculationActorList = {
-	{ label = "Player", actorId = "PLAYER" },
-	{ label = "Player Minion", actorId = "PLAYER_MINION" },
-	{ label = "Mercenary", actorId = "MERCENARY" },
-	{ label = "Mercenary Minion", actorId = "MERCENARY_MINION" },
-}
-
 local CalcsTabClass = newClass("CalcsTab", "UndoHandler", "ControlHost", "Control", function(self, build)
 	self.UndoHandler()
 	self.ControlHost()
@@ -124,7 +117,7 @@ local CalcsTabClass = newClass("CalcsTab", "UndoHandler", "ControlHost", "Contro
 			end)
 		}, },
 		{ label = "Calculation Actor", { controlName = "actor",
-			control = new("DropDownControl", nil, {0, 0, 160, 16}, calculationActorList, function(index, value)
+			control = new("DropDownControl", nil, {0, 0, 160, 16}, calcLib.calculationActorList, function(index, value)
 				self.input.actor = value.actorId
 				self:AddUndoState()
 				self.build.buildFlag = true

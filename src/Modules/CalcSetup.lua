@@ -239,6 +239,7 @@ function calcs.initMercenary(env)
 	mercenary.modDB.actor = mercenary
 	mercenary.modDB.multipliers.Level = mercenary.level
 	calcs.initModDB(env, mercenary.modDB)
+	mercenary.modDB:AddList(env.build.configTab.modList)
 	local baseStats = env.data.mercenaries.baseStats
 	mercenary.modDB:NewMod("Life", "BASE", baseStats.lifePerLevel * mercenary.level, "Base")
 	mercenary.modDB:NewMod("Mana", "BASE", env.data.monsterConstants.base_maximum_mana + baseStats.manaPerLevel * mercenary.level, "Base")

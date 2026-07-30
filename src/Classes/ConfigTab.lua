@@ -320,7 +320,9 @@ local ConfigTabClass = newClass("ConfigTab", "UndoHandler", "ControlHost", "Cont
 			end
 			if varData.ifCondTrue then
 				t_insert(shownFuncs, listOrSingleIfOption(varData.ifCondTrue, function(ifOption)
-					return self.build.calcsTab.mainEnv.player.modDB.conditions[ifOption]
+					return configVisibility.anyPrimaryActor(self.build.calcsTab.mainEnv, function(actor)
+						return actor.modDB.conditions[ifOption]
+					end)
 				end))
 				t_insert(tooltipFuncs, listOrSingleIfTooltip(varData.ifCondTrue, function(ifOption)
 					if not launch.devModeAlt then
@@ -447,10 +449,10 @@ local ConfigTabClass = newClass("ConfigTab", "UndoHandler", "ControlHost", "Cont
 			end
 			if varData.ifFlag then
 				t_insert(shownFuncs, listOrSingleIfOption(varData.ifFlag, function(ifOption)
-					local skillModList = self.build.calcsTab.mainEnv.player.mainSkill.skillModList
-					local skillFlags = self.build.calcsTab.mainEnv.player.mainSkill.skillFlags
-					-- Check both the skill mods for flags and flags that are set via calcPerform
-					return skillFlags[ifOption] or skillModList:Flag(nil, ifOption)
+					return configVisibility.anyMainSkill(self.build.calcsTab.mainEnv, function(mainSkill)
+						-- Check both the skill mods for flags and flags that are set via calcPerform
+						return mainSkill.skillFlags[ifOption] or mainSkill.skillModList:Flag(nil, ifOption)
+					end)
 				end))
 			end
 			if varData.ifMod then
@@ -496,22 +498,16 @@ local ConfigTabClass = newClass("ConfigTab", "UndoHandler", "ControlHost", "Cont
 			end
 			if varData.ifSkillFlag then
 				t_insert(shownFuncs, listOrSingleIfOption(varData.ifSkillFlag, function(ifOption)
-					for _, activeSkill in ipairs(self.build.calcsTab.mainEnv.player.activeSkillList) do
-						if activeSkill.skillFlags[ifOption] then
-							return true
-						end
-					end
-					return false
+					return configVisibility.anyActiveSkill(self.build.calcsTab.mainEnv, function(activeSkill)
+						return activeSkill.skillFlags[ifOption]
+					end)
 				end))
 			end
 			if varData.ifSkillData then
 				t_insert(shownFuncs, listOrSingleIfOption(varData.ifSkillData, function(ifOption)
-					for _, activeSkill in ipairs(self.build.calcsTab.mainEnv.player.activeSkillList) do
-						if activeSkill.skillData[ifOption] then
-							return true
-						end
-					end
-					return false
+					return configVisibility.anyActiveSkill(self.build.calcsTab.mainEnv, function(activeSkill)
+						return activeSkill.skillData[ifOption]
+					end)
 				end))
 			end
 

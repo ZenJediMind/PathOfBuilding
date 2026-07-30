@@ -32,6 +32,31 @@ local function anyIfValue(ifOption, predicate)
 	return predicate(ifOption) and true or false
 end
 
+local PRIMARY_ACTOR_KEYS = { "player", "mercenary" }
+
+local function anyPrimaryActor(mainEnv, predicate)
+	for _, actorKey in ipairs(PRIMARY_ACTOR_KEYS) do
+		local actor = mainEnv and mainEnv[actorKey]
+		if actor and predicate(actor) then return true end
+	end
+	return false
+end
+
+local function anyMainSkill(mainEnv, predicate)
+	return anyPrimaryActor(mainEnv, function(actor)
+		return actor.mainSkill and predicate(actor.mainSkill)
+	end)
+end
+
+local function anyActiveSkill(mainEnv, predicate)
+	return anyPrimaryActor(mainEnv, function(actor)
+		for _, activeSkill in ipairs(actor.activeSkillList or { }) do
+			if predicate(activeSkill) then return true end
+		end
+		return false
+	end)
+end
+
 -- When the option has an input value and one of its implied conditions is currently used, treat gated predicates as passing.
 local function implyCondActive(varData, build)
 	local configTab = build and build.configTab
@@ -56,8 +81,6 @@ local function isRelevantForBuild(varData, build)
 	if not build then return false end
 	local mainEnv = build.calcsTab and build.calcsTab.mainEnv
 	if not mainEnv then return false end
-	local player = mainEnv.player
-	local mainSkill = player and player.mainSkill
 	local spec = build.spec
 	local configTab = build.configTab
 	local activeInput = configTab and configTab.configSets
@@ -97,7 +120,9 @@ local function isRelevantForBuild(varData, build)
 		if not anyIfValue(varData.ifOption, function(opt) return activeInput[opt] end) then return false end
 	end
 	if varData.ifCondTrue then
-		if not anyIfValue(varData.ifCondTrue, function(opt) return player and player.modDB.conditions[opt] end) then return false end
+		if not anyIfValue(varData.ifCondTrue, function(opt)
+			return anyPrimaryActor(mainEnv, function(actor) return actor.modDB.conditions[opt] end)
+		end) then return false end
 	end
 	if varData.ifStat then
 		if not anyIfValue(varData.ifStat, function(opt)
@@ -105,11 +130,10 @@ local function isRelevantForBuild(varData, build)
 		end) then return false end
 	end
 	if varData.ifFlag then
-		if not mainSkill then return false end
-		local skillFlags = mainSkill.skillFlags or {}
-		local skillModList = mainSkill.skillModList
 		if not anyIfValue(varData.ifFlag, function(opt)
-			return skillFlags[opt] or (skillModList and skillModList:Flag(nil, opt))
+			return anyMainSkill(mainEnv, function(mainSkill)
+				return mainSkill.skillFlags[opt] or mainSkill.skillModList:Flag(nil, opt)
+			end)
 		end) then return false end
 	end
 	if varData.ifSkill then
@@ -127,12 +151,8 @@ local function isRelevantForBuild(varData, build)
 		end
 	end
 	if varData.ifSkillFlag or varData.ifSkillData then
-		local skillList = (player and player.activeSkillList) or {}
 		local function anySkillHas(field, opt)
-			for _, s in ipairs(skillList) do
-				if s[field][opt] then return true end
-			end
-			return false
+			return anyActiveSkill(mainEnv, function(activeSkill) return activeSkill[field][opt] end)
 		end
 		if varData.ifSkillFlag and not anyIfValue(varData.ifSkillFlag, function(opt) return anySkillHas("skillFlags", opt) end) then return false end
 		if varData.ifSkillData and not anyIfValue(varData.ifSkillData, function(opt) return anySkillHas("skillData", opt) end) then return false end
@@ -155,6 +175,9 @@ local function isShowAllExcluded(varData)
 end
 
 return {
+	anyPrimaryActor = anyPrimaryActor,
+	anyMainSkill = anyMainSkill,
+	anyActiveSkill = anyActiveSkill,
 	isRelevantForBuild = isRelevantForBuild,
 	isShowAllExcluded = isShowAllExcluded,
 }

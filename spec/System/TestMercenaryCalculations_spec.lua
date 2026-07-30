@@ -120,6 +120,30 @@ describe("Permanent Mercenary calculations", function()
 		assert.matches("unavailable", build.calcsTab.calcsOutput.ActorUnavailableMessage)
 	end)
 
+	it("does not rebuild after the final Mercenary Full DPS skill", function()
+		configure("TrapsMinesShadow", "TrapsMinesShadowLightning", "LightningTrapMercenary", { includeInFullDPS = true })
+		local calcs = build.calcsTab.calcs
+		local originalInitEnv = calcs.initEnv
+		local initEnvCalls = 0
+		calcs.initEnv = function(...)
+			initEnvCalls = initEnvCalls + 1
+			return originalInitEnv(...)
+		end
+		local fullDPS = calcs.calcFullDPS(build, "CALCULATOR", { })
+		local includedSkillInitCalls = initEnvCalls
+
+		build.mercenaryTab.profile.skills[1].includeInFullDPS = false
+		initEnvCalls = 0
+		local emptyFullDPS = calcs.calcFullDPS(build, "CALCULATOR", { })
+		local emptyInitCalls = initEnvCalls
+		calcs.initEnv = originalInitEnv
+
+		assert.is_true(fullDPS.mercenaryDPS > 0)
+		assert.are.equal(1, includedSkillInitCalls)
+		assert.are.equal(0, emptyFullDPS.mercenaryDPS)
+		assert.are.equal(0, emptyInitCalls)
+	end)
+
 	it("does not initialize an incomplete Mercenary actor without an enabled skill", function()
 		configure("TrapsMinesShadow", "TrapsMinesShadowLightning", "LightningTrapMercenary")
 		build.mercenaryTab.profile.skills[1].enabled = false

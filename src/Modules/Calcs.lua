@@ -165,14 +165,13 @@ local function countSkillDamageOnce(activeSkill, modDB)
 end
 
 function calcs.calcFullDPS(build, mode, override, specEnv)
-	local fullEnv, cachedPlayerDB, cachedEnemyDB, cachedMinionDB = calcs.initEnv(build, mode, override, specEnv)
-	local usedEnv = nil
-
 	local fullDPS = {
 		combinedDPS = 0,
 		TotalDotDPS = 0,
 		skills = { },
 		mercenarySkills = { },
+		mercenaryDPS = 0,
+		mercenaryDotDPS = 0,
 		TotalPoisonDPS = 0,
 		causticGroundDPS = 0,
 		impaleDPS = 0,
@@ -184,6 +183,19 @@ function calcs.calcFullDPS(build, mode, override, specEnv)
 		dotDPS = 0,
 		cullingMulti = 0
 	}
+	local hasFullDPSSkill = false
+	for _, socketGroup in ipairs(build.skillsTab.socketGroupList) do
+		if socketGroup.includeInFullDPS then hasFullDPSSkill = true break end
+	end
+	if not hasFullDPSSkill then
+		for _, selected in ipairs(build.mercenaryTab and build.mercenaryTab.profile.skills or { }) do
+			if selected.enabled ~= false and selected.includeInFullDPS then hasFullDPSSkill = true break end
+		end
+	end
+	if not hasFullDPSSkill then return fullDPS end
+
+	local fullEnv, cachedPlayerDB, cachedEnemyDB, cachedMinionDB = calcs.initEnv(build, mode, override, specEnv)
+	local usedEnv = nil
 
 	local bleedSource = ""
 	local corruptingBloodSource = ""
@@ -344,7 +356,7 @@ function calcs.calcFullDPS(build, mode, override, specEnv)
 			t_insert(mercenaryFullDPSSkills, activeSkill.mercenarySkill)
 		end
 	end
-	for _, selected in ipairs(mercenaryFullDPSSkills) do
+	for selectedIndex, selected in ipairs(mercenaryFullDPSSkills) do
 		local activeSkill
 		for _, candidate in ipairs(fullEnv.mercenary and fullEnv.mercenary.activeSkillList or { }) do
 			if candidate.mercenarySkill and candidate.mercenarySkill.id == selected.id then activeSkill = candidate break end
@@ -447,8 +459,10 @@ function calcs.calcFullDPS(build, mode, override, specEnv)
 				mercenaryTotals.culling = m_max(mercenaryTotals.culling, actorOutput.CullMultiplier or 0)
 			end
 
-			local accelerationTbl = { nodeAlloc = true, requirementsItems = true, requirementsGems = true, skills = true, everything = true }
-			fullEnv, _, _, _ = calcs.initEnv(build, mode, override, { cachedPlayerDB = cachedPlayerDB, cachedEnemyDB = cachedEnemyDB, cachedMinionDB = cachedMinionDB, env = fullEnv, accelerate = accelerationTbl })
+			if selectedIndex < #mercenaryFullDPSSkills then
+				local accelerationTbl = { nodeAlloc = true, requirementsItems = true, requirementsGems = true, skills = true, everything = true }
+				fullEnv, _, _, _ = calcs.initEnv(build, mode, override, { cachedPlayerDB = cachedPlayerDB, cachedEnemyDB = cachedEnemyDB, cachedMinionDB = cachedMinionDB, env = fullEnv, accelerate = accelerationTbl })
+			end
 		end
 	end
 

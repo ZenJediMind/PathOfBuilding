@@ -1,4 +1,5 @@
 describe("TestImportReimport", function()
+	local MercenaryTools = require("Modules/MercenaryTools")
 	local DEFAULT_CHARACTER_LEVEL = 12
 	local DEFAULT_ITEM_LEVEL = 10
 	local TEST_IMPORT_ITEM_ID = "test-import-item-1"
@@ -252,5 +253,38 @@ Blight 20/0  1
 		local itemSet = build.itemsTab:NewItemSet()
 		table.insert(build.itemsTab.itemSetOrderList, itemSet.id)
 		assertReimportPreservesSkillSubstate("Weapon 1", "Driftwood Wand", "Weapon", "Animate Weapon", "skillMinionItemSet", itemSet.id)
+	end)
+
+	it("preserves Mercenary equipment and skills when importing a character", function()
+		local itemsTab = build.itemsTab
+		local mercenaryHelmetSlotName = MercenaryTools.itemSlotName("Helmet")
+		local equippedMercenaryHelmet = new("Item", "Rarity: Normal\nIron Hat")
+		itemsTab:AddItem(equippedMercenaryHelmet, true)
+		itemsTab.slots[mercenaryHelmetSlotName]:SetSelItemId(equippedMercenaryHelmet.id)
+
+		local sharedMercenaryHelmet = new("Item", "Rarity: Normal\nCone Helmet")
+		itemsTab:AddItem(sharedMercenaryHelmet, true)
+		local secondItemSet = itemsTab:NewItemSet()
+		table.insert(itemsTab.itemSetOrderList, secondItemSet.id)
+		secondItemSet[mercenaryHelmetSlotName].selItemId = sharedMercenaryHelmet.id
+		itemsTab.slots.Helmet:SetSelItemId(sharedMercenaryHelmet.id)
+
+		local mercenarySkills = { {
+			id = "InfernalBlowMercenary",
+			enabled = true,
+			count = 2,
+			supports = { { id = "IncreasedAreaOfEffectHigh", tier = 3 } },
+		} }
+		build.mercenaryTab.profile.skills = mercenarySkills
+
+		build.importTab:ImportItemsAndSkills(buildImportPayload({ }), true, true, true)
+
+		assert.are.equal(equippedMercenaryHelmet.id, itemsTab.activeItemSet[mercenaryHelmetSlotName].selItemId)
+		assert.are.equal(equippedMercenaryHelmet.id, itemsTab.slots[mercenaryHelmetSlotName].selItemId)
+		assert.are.equal(sharedMercenaryHelmet.id, secondItemSet[mercenaryHelmetSlotName].selItemId)
+		assert.is_not_nil(itemsTab.items[equippedMercenaryHelmet.id])
+		assert.is_not_nil(itemsTab.items[sharedMercenaryHelmet.id])
+		assert.are.equal(0, itemsTab.activeItemSet.Helmet.selItemId)
+		assert.same(mercenarySkills, build.mercenaryTab.profile.skills)
 	end)
 end)

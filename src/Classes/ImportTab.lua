@@ -10,6 +10,7 @@ local b_rshift = bit.rshift
 local band = bit.band
 local m_max = math.max
 local dkjson = require "dkjson"
+local MercenaryTools = require("Modules/MercenaryTools")
 
 
 
@@ -1372,9 +1373,22 @@ end
 function ImportTabClass:ImportItemsAndSkills(charData, clearItems, clearSkills, ignoreWeaponSwap)
 	charData = copyTable(charData)
 	if clearItems then
-		for _, slot in pairs(self.build.itemsTab.slots) do
-			if slot.selItemId ~= 0 and not slot.nodeId then
-				self.build.itemsTab:DeleteItem(self.build.itemsTab.items[slot.selItemId])
+		local itemsTab = self.build.itemsTab
+		local mercenaryItemIds = { }
+		for _, itemSet in pairs(itemsTab.itemSets) do
+			for slotName, slot in pairs(itemSet) do
+				if MercenaryTools.baseItemSlotName(slotName) and slot.selItemId ~= 0 then
+					mercenaryItemIds[slot.selItemId] = true
+				end
+			end
+		end
+		for slotName, slot in pairs(itemsTab.slots) do
+			if slot.selItemId ~= 0 and not slot.nodeId and not MercenaryTools.baseItemSlotName(slotName) then
+				if mercenaryItemIds[slot.selItemId] then
+					slot:SetSelItemId(0)
+				else
+					itemsTab:DeleteItem(itemsTab.items[slot.selItemId])
+				end
 			end
 		end
 	end

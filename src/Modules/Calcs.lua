@@ -642,8 +642,8 @@ function calcs.buildOutput(build, mode)
 				end
 			end
 		end
-		recordActorSkills(env.player)
-		recordActorSkills(env.mercenary)
+		local primaryActorKeys = { "player", "mercenary" }
+		for _, actorKey in ipairs(primaryActorKeys) do recordActorSkills(env[actorKey]) end
 
 		env.conditionsUsed = { }
 		env.enemyConditionsUsed = { }
@@ -700,7 +700,7 @@ function calcs.buildOutput(build, mode)
 				if tag.type == "IgnoreCond" then
 					break
 				elseif tag.type == "Condition" then
-					if actor == env.player then
+					if actor == env.player or actor == env.mercenary then
 						addVarTag(env.conditionsUsed, tag, mod)
 					else
 						addVarTag(env.minionConditionsUsed, tag, mod)
@@ -713,7 +713,7 @@ function calcs.buildOutput(build, mode)
 					end
 				elseif tag.type == "Multiplier" or tag.type == "MultiplierThreshold" then
 					if not tag.actor then
-						if actor == env.player then
+						if actor == env.player or actor == env.mercenary then
 							addVarTag(env.multipliersUsed, tag, mod)
 						end
 					elseif tag.actor == "enemy" then
@@ -721,7 +721,7 @@ function calcs.buildOutput(build, mode)
 					end
 				elseif tag.type == "PerStat" or tag.type == "StatThreshold" then
 					if not tag.actor then
-						if actor == env.player then
+						if actor == env.player or actor == env.mercenary then
 							addStatTag(env.perStatsUsed, tag, mod)
 						end
 					elseif tag.actor == "enemy" then
@@ -730,27 +730,33 @@ function calcs.buildOutput(build, mode)
 				end
 			end
 		end
-		for _, actor in ipairs({env.player, env.minion}) do
-			for modName, modList in pairs(actor.modDB.mods) do
-				for _, mod in ipairs(modList) do
-					addModTags(actor, mod)
+		for _, actorKey in ipairs({ "player", "mercenary", "minion", "mercenaryMinion" }) do
+			local actor = env[actorKey]
+			if actor then
+				for modName, modList in pairs(actor.modDB.mods) do
+					for _, mod in ipairs(modList) do
+						addModTags(actor, mod)
+					end
 				end
 			end
 		end
-		for _, activeSkill in pairs(env.player.activeSkillList) do
-			for _, mod in ipairs(activeSkill.baseSkillModList) do
-				addModTags(env.player, mod)
-			end
-			for _, mod in ipairs(activeSkill.skillModList) do
-				addTo(env.modsUsed, mod.name, mod)
-				for _, tag in ipairs(mod) do
-					addTo(env.tagTypesUsed, tag.type, mod)
+		for _, actorKey in ipairs(primaryActorKeys) do
+			local actor = env[actorKey]
+			for _, activeSkill in pairs(actor and actor.activeSkillList or { }) do
+				for _, mod in ipairs(activeSkill.baseSkillModList) do
+					addModTags(actor, mod)
 				end
-			end
-			if activeSkill.minion then
-				for _, activeSkill in pairs(activeSkill.minion.activeSkillList) do
-					for _, mod in ipairs(activeSkill.baseSkillModList) do
-						addModTags(env.minion, mod)
+				for _, mod in ipairs(activeSkill.skillModList) do
+					addTo(env.modsUsed, mod.name, mod)
+					for _, tag in ipairs(mod) do
+						addTo(env.tagTypesUsed, tag.type, mod)
+					end
+				end
+				if activeSkill.minion then
+					for _, minionSkill in pairs(activeSkill.minion.activeSkillList) do
+						for _, mod in ipairs(minionSkill.baseSkillModList) do
+							addModTags(activeSkill.minion, mod)
+						end
 					end
 				end
 			end

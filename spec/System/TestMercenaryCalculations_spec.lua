@@ -1,5 +1,7 @@
 describe("Permanent Mercenary calculations", function()
 	local MercenaryTools = require("Modules/MercenaryTools")
+	local configOptions = LoadModule("Modules/ConfigOptions")
+	local configVisibility = LoadModule("Modules/ConfigVisibility")
 	local function equipmentSlot(slotName)
 		return build.itemsTab.activeItemSet[MercenaryTools.itemSlotName(slotName)]
 	end
@@ -150,6 +152,59 @@ describe("Permanent Mercenary calculations", function()
 		local env = calculate()
 		assert.is_nil(env.mercenary)
 		assert.matches("No usable enabled Mercenary skill", table.concat(env.mercenaryCalculationErrors, "\n"))
+	end)
+
+	it("shows and applies Configuration settings required by the Mercenary", function()
+		configure("MeleeAOEMarauder", "MeleeAOEMarauderFireSlam", "InfernalCryMercenary")
+		local focusedDamage = {
+			name = "Damage", type = "INC", value = 20, source = "Mercenary Config Test", flags = 0, keywordFlags = 0,
+			{ type = "Condition", var = "Focused" },
+		}
+		local helmet = {
+			id = 9036, name = "Mercenary Config Test", type = "Helmet", base = { type = "Helmet" }, rarity = "RARE",
+			requirements = { dex = 1 }, grantedSkills = { }, modList = { focusedDamage },
+		}
+		build.itemsTab.items[helmet.id] = helmet
+		equipmentSlot("Helmet").selItemId = helmet.id
+
+		local env = calculate()
+		local baseDamage = env.mercenary.modDB:Sum("INC", nil, "Damage")
+		local focusedConditionSource
+		for _, mod in ipairs(env.conditionsUsed.Focused or { }) do
+			if mod.source == focusedDamage.source then focusedConditionSource = mod.source end
+		end
+		assert.are.equal(focusedDamage.source, focusedConditionSource)
+		assert.is_true(build.configTab.varControls.conditionFocused.shown())
+		assert.is_true(build.configTab.varControls.detonateDeadCorpseLife.shown())
+
+		local corpseLifeConfig
+		for _, varData in ipairs(configOptions) do
+			if varData.var == "detonateDeadCorpseLife" then corpseLifeConfig = varData break end
+		end
+		assert.is_true(configVisibility.isRelevantForBuild(assert(corpseLifeConfig), build))
+
+		build.configTab.input.conditionFocused = true
+		build.configTab.input.detonateDeadCorpseLife = 12345
+		env = calculate()
+		assert.is_true(env.mercenary.modDB:GetCondition("Focused"))
+		assert.are.equal(baseDamage + focusedDamage.value, env.mercenary.modDB:Sum("INC", nil, "Damage"))
+		assert.are.equal(12345, env.mercenary.mainSkill.skillData.corpseLife)
+	end)
+
+	it("applies the configured Onslaught buff to Mercenary attack DPS", function()
+		configure("EleBowRanger", "EleBowRangerFire", "BurningArrowMercenary")
+		local bow = new("Item", "Rarity: Normal\nCrude Bow")
+		bow.id = 9038
+		build.itemsTab.items[bow.id] = bow
+		equipmentSlot("Weapon 1").selItemId = bow.id
+
+		local baseline = assert(calculate().mercenary.output)
+		build.configTab.input.buffOnslaught = true
+		local configured = assert(calculate().mercenary)
+
+		assert.is_true(configured.modDB:GetCondition("Onslaught"))
+		assert.is_true(configured.output.Speed > baseline.Speed)
+		assert.is_true(configured.output.CombinedDPS > baseline.CombinedDPS)
 	end)
 
 	it("scales up to the current area without downscaling high-level Mercenaries", function()
@@ -649,8 +704,8 @@ describe("Permanent Mercenary calculations", function()
 		env = calculate()
 		assert.is_true(env.mercenary.modDB.conditions.UsingFlask)
 		assert.is_true(env.mercenary.modDB.conditions.UsingGraniteFlask)
-		assert.are.equal(baseArmour + 2025, env.mercenary.modDB:Sum("BASE", nil, "Armour"))
-		assert.are.equal(baseMovementSpeed + 16, env.mercenary.modDB:Sum("INC", nil, "MovementSpeed"))
+		assert.are.equal(baseArmour + 2475, env.mercenary.modDB:Sum("BASE", nil, "Armour"))
+		assert.are.equal(baseMovementSpeed + 19, env.mercenary.modDB:Sum("INC", nil, "MovementSpeed"))
 
 		linkGroup.enabled = false
 		env = calculate()
@@ -696,8 +751,15 @@ describe("Permanent Mercenary calculations", function()
 		assert.are.equal(40, env.mercenary.modDB:Sum("BASE", nil, "LifeRecoup"))
 
 		build.mercenaryTab.profile.lifeComparison = "AUTO"
-		build.configTab.input.customMods = string.format("%+d to maximum Life", env.mercenary.output.Life - env.player.output.Life)
-		build.configTab:BuildModList()
+		local equalizer = {
+			id = 9037, name = "Player Life Equalizer", type = "Helmet", base = { type = "Helmet" }, rarity = "RARE",
+			requirements = { }, grantedSkills = { }, sockets = { }, modList = { {
+				name = "Life", type = "BASE", value = env.mercenary.output.Life - env.player.output.Life,
+				source = "Test", flags = 0, keywordFlags = 0,
+			} },
+		}
+		build.itemsTab.items[equalizer.id] = equalizer
+		build.itemsTab.slots.Helmet:SetSelItemId(equalizer.id)
 		env = calculate()
 		assert.are.equal(env.player.output.Life, env.mercenary.output.Life)
 		assert.are.equal(0, env.player.modDB:Sum("BASE", nil, "takenFromMercenaryBeforeYou"))

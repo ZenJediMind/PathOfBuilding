@@ -7761,10 +7761,10 @@ return {
 		},
 		[17]={
 			list=false,
-			name="",
-			refTo="",
+			name="IdleSkill",
+			refTo="MercenarySkills",
 			type="Key",
-			width=20
+			width=150
 		},
 		[18]={
 			list=false,
@@ -7895,6 +7895,27 @@ return {
 			refTo="MonsterVarieties",
 			type="Key",
 			width=420
+		},
+		[12]={
+			list=true,
+			name="HouseSpawnChanceStats",
+			refTo="Stats",
+			type="Key",
+			width=250
+		},
+		[13]={
+			list=true,
+			name="AttributeSpawnChanceStats",
+			refTo="Stats",
+			type="Key",
+			width=250
+		},
+		[14]={
+			list=false,
+			name="HouseName",
+			refTo="",
+			type="String",
+			width=150
 		}
 	},
 	mercenaryinventories={

@@ -648,7 +648,13 @@ do
 	local effectIds = { }
 	for effectId in pairs(effects) do table.insert(effectIds, effectId) end
 	table.sort(effectIds)
-	local resolvedByActiveSkill, resolvedByDisplayName, withoutBase = 0, 0, { }
+	local baseSkillOverrides = {
+		-- AtlasEyrieArcherSnipe shares the Mercenary effect's ActiveSkill, but is an
+		-- NPC copy; Snipe is the maintained gem implementation.
+		SkeletonLargeMapBoneProjectile = "Snipe",
+	}
+	local resolvedByActiveSkill, resolvedByDisplayName, resolvedByOverride, withoutBase = 0, 0, 0, { }
+	local wroteSkill = false
 	for _, effectId in ipairs(effectIds) do
 		local effect = effects[effectId]
 		if not emitted[effect.Id] then
@@ -661,13 +667,24 @@ do
 				if byDisplayName and (not base or byDisplayName.rank < base.rank) then
 					base = byDisplayName
 				end
-				if base == byActiveSkill and base ~= nil then
+				local overrideId = baseSkillOverrides[effect.Id]
+				if overrideId then
+					local override = dat("GrantedEffects"):GetRow("Id", overrideId)
+					if not emitted[overrideId] or not override or baseRank(override) ~= 0 then
+						error("Mercenary base-skill override is not an exported gem: "..effect.Id.." -> "..overrideId)
+					end
+					base = { id = overrideId }
+					baseSkillOverrides[effect.Id] = nil
+					resolvedByOverride = resolvedByOverride + 1
+				elseif base == byActiveSkill and base ~= nil then
 					resolvedByActiveSkill = resolvedByActiveSkill + 1
 				elseif base then
 					resolvedByDisplayName = resolvedByDisplayName + 1
 				else
 					table.insert(withoutBase, effect.Id)
 				end
+				if wroteSkill then out:write("\n") end
+				wroteSkill = true
 				local state = { noGem = true, mercenary = true, mercenaryBaseSkillId = base and base.id }
 				directiveTable.skill(state, effect.Id.." "..effectNames[effect.Id], out)
 				local flags = { }
@@ -682,12 +699,13 @@ do
 				end
 				directiveTable.flags(state, table.concat(orderedFlags, " "), out)
 				directiveTable.mods(state, "", out)
-				out:write("\n\n")
+				out:write("\n")
 		end
 	end
+	for effectId in pairs(baseSkillOverrides) do error("Mercenary base-skill override references missing effect: "..effectId) end
 	out:close()
-	print(string.format("Mercenary skill bases: %d from a shared ActiveSkill, %d from a shared display name, %d without a base (%s).",
-		resolvedByActiveSkill, resolvedByDisplayName, #withoutBase, table.concat(withoutBase, ", ")))
+	print(string.format("Mercenary skill bases: %d from a shared ActiveSkill, %d from a shared display name, %d overridden, %d without a base (%s).",
+		resolvedByActiveSkill, resolvedByDisplayName, resolvedByOverride, #withoutBase, table.concat(withoutBase, ", ")))
 end
 
 local out = io.open("../Data/Gems.lua", "w")

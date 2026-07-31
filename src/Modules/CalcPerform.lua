@@ -1265,7 +1265,7 @@ local function initMinionModDB(env, activeSkill, output)
 	end
 	if parent.isMercenary then
 		minion.modDB.multipliers.UniqueItem = parent.modDB.multipliers.UniqueItem or 0
-		minion.modDB:NewMod("Damage", "MORE", env.data.mercenaryStatData.permanentMercenary.damageMore, "Permanent Mercenary")
+		minion.modDB:NewMod("Damage", "MORE", env.data.mercenaries.permanentMercenaryDamageMore, "Permanent Mercenary")
 		for _, value in ipairs(env.modDB:List(nil, "MercenaryMinionModifier")) do
 			minion.modDB:AddMod(value.mod)
 		end

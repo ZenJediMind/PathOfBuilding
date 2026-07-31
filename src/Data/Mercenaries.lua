@@ -22034,6 +22034,7 @@ return {
 			weaponType2="Shield"
 		}
 	},
+	permanentMercenaryDamageMore=-30,
 	skillFamilies={
 		FireballVariant={
 			id="FireballVariant"

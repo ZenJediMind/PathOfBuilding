@@ -163,16 +163,6 @@ local MercenaryTabClass = newClass("MercenaryTab", "ControlHost", "Control", fun
 		if skill then skill.count = m_min(m_max(tonumber(buf) or 1, 1), 99) end
 		self:Changed()
 	end)
-	self.controls.skillMainLabel = new("LabelControl", { "TOPLEFT", self.controls.skillDetailAnchor, "TOPLEFT" }, { 405, 32, 0, 16 }, "^7Calcs:")
-	self.controls.skillMain = new("CheckBoxControl", { "TOPLEFT", self.controls.skillDetailAnchor, "TOPLEFT" }, { 452, 30, 20 }, nil, function(state)
-		local skill = self.profile.skills[self.selectedSkillIndex]
-		if state and skill then
-			self.profile.mainSkillId = skill.id
-		elseif skill and self.profile.mainSkillId == skill.id then
-			self.profile.mainSkillId = nil
-		end
-		self:Changed()
-	end)
 	self.controls.skillPartLabel = new("LabelControl", { "TOPLEFT", self.controls.skillDetailAnchor, "TOPLEFT" }, { 0, 64, 0, 16 }, "^7Skill part:")
 	self.controls.skillPart = new("DropDownControl", { "TOPLEFT", self.controls.skillDetailAnchor, "TOPLEFT" }, { 85, 62, 180, 20 }, { }, function(_, value)
 		local selected = self.profile.skills[self.selectedSkillIndex]
@@ -268,7 +258,6 @@ function MercenaryTabClass:RefreshControls()
 	self.controls.skillEnabled.state = selected and selected.enabled ~= false or false
 	self.controls.skillFullDPS.state = selected and selected.includeInFullDPS or false
 	self.controls.skillCount:SetText(tostring(selected and selected.count or 1), false)
-	self.controls.skillMain.state = selected and self.profile.mainSkillId == selected.id or false
 	local selectedData = selected and self.data.skills[selected.id]
 	local selectedEffect = selected and self.build.data.skills[selected.id]
 	local partList = { }

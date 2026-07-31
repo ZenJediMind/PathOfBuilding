@@ -712,15 +712,9 @@ return {
 		ElementalWitchLightningNoble = true,
 		MeleeStrikesMarauderFire = true,
 	},
-	-- Figures the Mercenary actor needs that no exported table states. All of them
-	-- are hand-authored from in-game observation or the community datamine, and none
-	-- has been confirmed against the game.
+	-- Non-DAT behavior the Mercenary actor needs. The permanent damage penalty is
+	-- exported from Noble Blood's PassiveSkills row instead of being copied here.
 	permanentMercenary = {
-		-- Noble Blood's reminder text says a permanently hired Mercenary and its
-		-- Minions deal less Damage than a temporarily hired one without quantifying
-		-- it. Applied unconditionally, because every Mercenary PoB builds is a
-		-- permanently hired one.
-		damageMore = -30,
 		-- Damage over Time the Mercenary itself takes.
 		damageOverTimeTakenMore = -80,
 		-- A Taunted enemy deals less Damage to anyone other than whoever Taunted it,

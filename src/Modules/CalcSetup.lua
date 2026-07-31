@@ -265,7 +265,7 @@ function calcs.initMercenary(env)
 	mercenary.modDB:NewMod("MineThrowCount", "BASE", 1, "Base")
 	mercenary.modDB:NewMod("TrapThrowCount", "BASE", 1, "Base")
 	mercenary.modDB:NewMod("MaximumFortification", "BASE", env.data.characterConstants["base_max_fortification"], "Base")
-	mercenary.modDB:NewMod("Damage", "MORE", env.data.mercenaryStatData.permanentMercenary.damageMore, "Permanent Mercenary")
+	mercenary.modDB:NewMod("Damage", "MORE", env.data.mercenaries.permanentMercenaryDamageMore, "Permanent Mercenary")
 	addMercenaryMonsterStats(env, mercenary, monster, calculationErrors)
 	addMercenaryPassiveStats(mercenary, mercenaryBuild, calculationErrors)
 	for _, value in ipairs(env.modDB:List(nil, "MercenaryModifier")) do

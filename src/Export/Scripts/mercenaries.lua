@@ -231,6 +231,19 @@ for row in dat("MercenaryBuildExtraStats"):Rows() do
 	end
 end
 
+local permanentMercenaryDamageMore
+for passive in dat("PassiveSkills"):Rows() do
+	for index, stat in ipairs(passive.Stats or { }) do
+		if stat.Id == "permanenet_mercenary_damage_+%_final_and_minion_damage_+%_final_from_luminary" then
+			if permanentMercenaryDamageMore ~= nil then
+				error("Permanent Mercenary damage stat is present on more than one passive")
+			end
+			permanentMercenaryDamageMore = passive["Stat"..index]
+		end
+	end
+end
+if permanentMercenaryDamageMore == nil then error("Missing permanent Mercenary damage stat") end
+
 local function exportMonster(variety)
 	if not variety then
 		error("Mercenary class has no allied MonsterVariety")
@@ -303,6 +316,7 @@ local mercenaries = {
 		-- which leaves the Mercenary with none of them until it equips items.
 		disableDefaultMonsterStats = true,
 	},
+	permanentMercenaryDamageMore = permanentMercenaryDamageMore,
 	classes = { },
 	classOrder = { },
 	builds = { },
@@ -413,6 +427,10 @@ for _, row in ipairs(sortedRows("MercenaryClasses", function(value) return value
 end
 
 for _, row in ipairs(sortedRows("MercenaryBuilds", function(value) return value.Id end)) do
+	local idleSkillId = row.IdleSkill and rowId(row.IdleSkill.Id)
+	if idleSkillId ~= "DoLiterallyNothing" then
+		error("Unsupported Mercenary idle skill: "..row.Id.." -> "..tostring(idleSkillId))
+	end
 	local pools = {
 		{ skillIds = rowIds(row.Skill1), countMax = row.Skill1CountMax },
 		{ skillIds = rowIds(row.Skill2), countMax = row.Skill2CountMax },

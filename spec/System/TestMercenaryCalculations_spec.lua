@@ -332,9 +332,19 @@ describe("Permanent Mercenary calculations", function()
 		assert.is_true(env.mercenaryMinion.modDB:Flag(nil, "AlliesAurasCannotAffectSelf"))
 	end)
 
+	it("fails closed when an extracted Mercenary minion has no skill data", function()
+		configure("ChaosMinionWitch", "ChaosMinionWitchChaosHit", "SSMMercenaryRelic")
+		local env = calculate(83)
+		assert.is_nil(env.mercenary)
+		assert.matches("Unholy Relic has no exported skills", table.concat(env.mercenaryCalculationErrors or { }, "\n"))
+	end)
+
 	it("calculates exported permanent-Mercenary bases and hidden passives", function()
 		configure("MeleeAOEMarauder", "MeleeAOEMarauderFireSlam", "InfernalCryMercenary")
-		local mercenary = assert(calculate(83).mercenary)
+		local env = calculate(83)
+		local mercenary = assert(env.mercenary)
+		assert.are.equal(build.data.monsterConstants["base_critical_strike_multiplier"] - 100, mercenary.modDB:Sum("BASE", nil, "CritMultiplier"))
+		assert.are.equal(build.data.monsterConstants["critical_ailment_dot_multiplier_+"], mercenary.modDB:Sum("BASE", { skillCond = { CriticalStrike = true } }, "DotMultiplier"))
 		assert.are.near(298.29000854492, mercenary.averageDamage, 10 ^ -9)
 		assert.are.equal(3658, mercenary.output.Life)
 		assert.are.equal(61, mercenary.output.LifeRegen)
@@ -454,23 +464,30 @@ describe("Permanent Mercenary calculations", function()
 			local ok, errorMessage = xpcall(function() build.calcsTab:BuildOutput() end, debug.traceback)
 			assert.is_true(ok, skillId..": "..tostring(errorMessage))
 			local env = build.calcsTab.mainEnv
-			assert.is_table(env.mercenary, skillId)
-			assert.is_table(env.mercenary.mainSkill, skillId)
-			for skillType, flag in pairs(inheritedFlagBySkillType) do
-				if env.mercenary.mainSkill.skillTypes[skillType] then assert.is_true(env.mercenary.mainSkill.skillFlags[flag], skillId.." must inherit "..flag) end
-			end
-			if skillId == "ToxicRainMercenary" then assert.is_true(env.mercenary.mainSkill.skillFlags.projectile) end
-			for _, supportId in ipairs(build.data.mercenaries.skills[skillId].possibleSupportIds) do
-				if not testedSupports[supportId] then
-					local support = build.data.mercenaries.supports[supportId]
-					build.mercenaryTab.profile.skills[1].supports = { { id = supportId, tier = support.variant } }
-					build.spec.modFlag = true
-					build.buildFlag = true
-					ok, errorMessage = xpcall(function() build.calcsTab:BuildOutput() end, debug.traceback)
-					assert.is_true(ok, supportId.." on "..skillId..": "..tostring(errorMessage))
-					assert.is_table(build.calcsTab.mainEnv.mercenary, supportId.." on "..skillId)
-					testedSupports[supportId] = true
-					testedSupportCount = testedSupportCount + 1
+			local minionId = build.data.mercenaries.summonedMinions[skillId]
+			local noFallbackMinion = minionId and build.data.minions[minionId].noFallbackSkill
+			if noFallbackMinion then
+				assert.is_nil(env.mercenary, skillId)
+				assert.matches("has no exported skills", table.concat(env.mercenaryCalculationErrors or { }, "\n"), skillId)
+			else
+				assert.is_table(env.mercenary, skillId)
+				assert.is_table(env.mercenary.mainSkill, skillId)
+				for skillType, flag in pairs(inheritedFlagBySkillType) do
+					if env.mercenary.mainSkill.skillTypes[skillType] then assert.is_true(env.mercenary.mainSkill.skillFlags[flag], skillId.." must inherit "..flag) end
+				end
+				if skillId == "ToxicRainMercenary" then assert.is_true(env.mercenary.mainSkill.skillFlags.projectile) end
+				for _, supportId in ipairs(build.data.mercenaries.skills[skillId].possibleSupportIds) do
+					if not testedSupports[supportId] then
+						local support = build.data.mercenaries.supports[supportId]
+						build.mercenaryTab.profile.skills[1].supports = { { id = supportId, tier = support.variant } }
+						build.spec.modFlag = true
+						build.buildFlag = true
+						ok, errorMessage = xpcall(function() build.calcsTab:BuildOutput() end, debug.traceback)
+						assert.is_true(ok, supportId.." on "..skillId..": "..tostring(errorMessage))
+						assert.is_table(build.calcsTab.mainEnv.mercenary, supportId.." on "..skillId)
+						testedSupports[supportId] = true
+						testedSupportCount = testedSupportCount + 1
+					end
 				end
 			end
 		end

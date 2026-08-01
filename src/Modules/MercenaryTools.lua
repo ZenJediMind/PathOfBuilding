@@ -202,13 +202,10 @@ function MercenaryTools.requiredFoundAreaLevel(requiredLevel)
 	return math.ceil((tonumber(requiredLevel) or 0) * FOUND_AREA_LEVEL_REQUIREMENT_RATIO)
 end
 
--- MercenaryBuildExtraStats gives three values per passive with no levels attached.
--- The breakpoints are therefore an assumption: the three values are treated as the
--- value at the minimum level (1), the midpoint (50) and the level cap (100), so
--- that Value3 is actually reachable. Values are truncated because every consumer of
--- a passive stat is an integer mod value; if the game rounds instead, every passive
--- is low by up to 1.
-MercenaryTools.PASSIVE_STAT_LEVELS = { 1, 50, 100 }
+-- MercenaryBuildExtraStats exports the three values but not their tier boundaries.
+-- Keep the validated runtime tier policy here until those boundaries are exposed.
+-- Values are truncated because passive mods are integer values.
+MercenaryTools.PASSIVE_STAT_LEVELS = { 24, 68, 84 }
 
 function MercenaryTools.passiveStatValue(values, level)
 	local levels = MercenaryTools.PASSIVE_STAT_LEVELS

@@ -67,16 +67,18 @@ describe("Mercenary tools", function()
 		assert.are.equal(48, tools.requiredFoundAreaLevel(68))
 	end)
 
-	it("interpolates exported passive stats between the level 1, 50 and 100 anchors", function()
+	it("interpolates exported passive stats between the level 24, 68 and 84 anchors", function()
 		local values = { 60, 120, 160 }
 		assert.are.equal(60, tools.passiveStatValue(values, 1))
-		assert.are.equal(89, tools.passiveStatValue(values, 25))
-		assert.are.equal(120, tools.passiveStatValue(values, 50))
-		assert.are.equal(134, tools.passiveStatValue(values, 68))
-		assert.are.equal(160, tools.passiveStatValue(values, 100))
+		assert.are.equal(60, tools.passiveStatValue(values, 24))
+		assert.are.equal(95, tools.passiveStatValue(values, 50))
+		assert.are.equal(120, tools.passiveStatValue(values, 68))
+		assert.are.equal(140, tools.passiveStatValue(values, 76))
+		assert.are.equal(160, tools.passiveStatValue(values, 84))
 		-- Levels outside the anchor range clamp to the end values.
 		assert.are.equal(60, tools.passiveStatValue(values, 0))
 		assert.are.equal(160, tools.passiveStatValue(values, 120))
+		assert.are.equal(93, tools.passiveStatValue({ 38, 75, 100 }, 80))
 	end)
 
 	it("rejects invalid data without returning a partial profile", function()

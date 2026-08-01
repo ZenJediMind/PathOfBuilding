@@ -2808,8 +2808,9 @@ function calcs.offence(env, actor, activeSkill)
 			output.RuthlessBlowAilmentEffect = 1 - output.RuthlessBlowChance / 100 + output.RuthlessBlowChance / 100 * output.RuthlessBlowAilmentMultiplier
 
 			globalOutput.FistOfWarCooldown = skillModList:Sum("BASE", cfg, "FistOfWarCooldown") or 0
-			-- If Fist of War & Active Skill is a Slam Skill & NOT a Vaal Skill & NOT used by mirage or other
-			if globalOutput.FistOfWarCooldown ~= 0 and activeSkill.skillTypes[SkillType.Slam] and not activeSkill.skillTypes[SkillType.Vaal] and not activeSkill.skillTypes[SkillType.OtherThingUsesSkill] then
+			-- Fist of War eligibility is enforced by the active skill's support data;
+			-- retain the universal Vaal and skill-reuse exclusions here.
+			if globalOutput.FistOfWarCooldown ~= 0 and not activeSkill.skillTypes[SkillType.Vaal] and not activeSkill.skillTypes[SkillType.OtherThingUsesSkill] then
 				globalOutput.FistOfWarDamageMultiplier = skillModList:Sum("BASE", nil, "FistOfWarDamageMultiplier") / 100
 				globalOutput.FistOfWarUptimeRatio = m_min( (1 / globalOutput.Speed) / globalOutput.FistOfWarCooldown, 1) * 100
 				if globalBreakdown then

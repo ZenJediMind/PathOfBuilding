@@ -61,6 +61,7 @@ local function mercenarySupportEffect(env, support, supportedEffect, errors)
 		id = "MercenarySupport:"..support.id,
 		name = support.name,
 		modSource = "Mercenary Support:"..support.id,
+		mercenarySupportId = support.id,
 		support = true,
 		requireSkillTypes = copyTable(template and template.requireSkillTypes or { }, true),
 		excludeSkillTypes = copyTable(template and template.excludeSkillTypes or { }, true),
@@ -349,6 +350,7 @@ function calcs.initMercenary(env)
 			skillStageCount = isPrimary and selectedSkill.skillStageCount or nil,
 			skillMineCount = isPrimary and selectedSkill.skillMineCount or nil,
 			skillMinionSkill = isPrimary and selectedSkill.skillMinionSkill or nil,
+			mercenaryPossibleSupportIds = env.data.mercenaries.skills[grantedEffect.id] and env.data.mercenaries.skills[grantedEffect.id].possibleSupportIds,
 		}
 		local activeSkill = calcs.createActiveSkill({ grantedEffect = grantedEffect, level = instance.level, quality = 0, srcInstance = instance }, supports or { }, mercenary, selectedSkill)
 		activeSkill.mercenarySkill = selectedSkill

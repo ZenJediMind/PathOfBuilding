@@ -924,6 +924,20 @@ describe("Permanent Mercenary calculations", function()
 		assert.are.equal("ArrowNovaHigh", build.mercenaryTab.profile.skills[1].supports[1].id)
 	end)
 
+	it("applies Fist of War to Ashen Fissure", function()
+		configure("MeleeAOEMarauder", "MeleeAOEMarauderFireSlam", "FissureSlamMercenary", {
+			supports = { { id = "FistOfWarHigh", tier = 3 } },
+		})
+		local mercenary = assert(calculate(83).mercenary)
+		assert.is_nil(mercenary.mainSkill.skillTypes[SkillType.Slam])
+		local hasFistOfWar = false
+		for _, effect in ipairs(mercenary.mainSkill.effectList) do
+			if effect.grantedEffect.mercenarySupportId == "FistOfWarHigh" then hasFistOfWar = true break end
+		end
+		assert.is_true(hasFistOfWar)
+		assert.is_true(mercenary.output.FistOfWarUptimeRatio > 0)
+	end)
+
 	it("includes Mercenary Mirage Archer damage in Full DPS", function()
 		configure("EleBowRanger", "EleBowRangerFire", "BurningArrowMercenary", {
 			includeInFullDPS = true,

@@ -102,6 +102,10 @@ function calcLib.canGrantedEffectSupportActiveSkill(grantedEffect, activeSkill, 
 	if grantedEffect.fromItem and grantedEffect.support and (activeSkill.activeEffect.grantedEffect.fromItem or activeSkill.activeEffect.grantedEffect.modSource:sub(1, #"Item") == "Item" or (activeSkill.activeEffect.srcInstance and activeSkill.activeEffect.srcInstance.fromItem)) then
 		return false
 	end
+	if grantedEffect.mercenarySupportId then
+		-- MercenarySkills.PossibleSupports is the game's explicit compatibility list.
+		return activeSkill.mercenaryPossibleSupportIds and isValueInArray(activeSkill.mercenaryPossibleSupportIds, grantedEffect.mercenarySupportId) ~= nil
+	end
 
 	local effectiveSkillTypes
 	local effectiveMinionTypes

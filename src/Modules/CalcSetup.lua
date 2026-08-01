@@ -18,17 +18,6 @@ local m_floor = math.floor
 
 local tempTable1 = { }
 
-local function mercenarySkillLevel(grantedEffect, actorLevel)
-	local bestLevel, bestRequirement = 1, -1
-	for level, levelData in pairs(grantedEffect.levels or { }) do
-		local requirement = levelData.levelRequirement or 1
-		if type(level) == "number" and requirement <= actorLevel and (requirement > bestRequirement or requirement == bestRequirement and level > bestLevel) then
-			bestLevel, bestRequirement = level, requirement
-		end
-	end
-	return bestLevel
-end
-
 local function mercenarySupportEffect(env, support, supportedEffect, errors)
 	if not support then
 		t_insert(errors, "Missing exported Mercenary support data")
@@ -341,7 +330,7 @@ function calcs.initMercenary(env)
 		end
 		local instance = {
 			skillId = grantedEffect.id,
-			level = sourceItem and (sourceItem.level or mercenary.level) or mercenarySkillLevel(grantedEffect, mercenary.level),
+			level = sourceItem and (sourceItem.level or mercenary.level) or MercenaryTools.skillLevel(grantedEffect, mercenary.level),
 			quality = 0,
 			enabled = true,
 			mercenarySkill = selectedSkill,

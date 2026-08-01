@@ -5,6 +5,7 @@
 --
 local MercenaryTools = require("Modules/MercenaryTools")
 local skillOptions = require("Modules/SkillOptions")
+local gemTooltip = LoadModule("Classes/GemTooltip")
 
 local t_insert = table.insert
 local t_sort = table.sort
@@ -12,16 +13,18 @@ local m_floor = math.floor
 local m_min = math.min
 local m_max = math.max
 
-local GEM_COLOR_LETTER = { [1] = "R", [2] = "G", [3] = "B", [4] = "W" }
-
-local function gemColorLabel(gem)
-	local color = gem and (gem.color or gem.gemColor)
+local function gemColorLabel(color)
 	if not color then return "" end
-	return (data.skillColorMap[color] or colorCodes.NORMAL)..(GEM_COLOR_LETTER[color] or "W").."^7 "
+	return (data.skillColorMap[color] or colorCodes.NORMAL)
 end
 
 local function supportLabel(support)
-	return gemColorLabel(support)..(support and support.name or "?").." (Tier "..(support and support.variant or "?")..")"
+	return gemColorLabel(support and support.color)..(support and support.name or "?").." (Tier "..(support and support.variant or "?")..")"
+end
+
+local function mercenaryLevel(build, foundAreaLevel)
+	local currentAreaLevel = build.configTab and build.configTab.enemyLevel
+	return MercenaryTools.effectiveLevel(foundAreaLevel, currentAreaLevel)
 end
 
 local SUPPORTED_SLOTS = { }
@@ -75,7 +78,8 @@ end)
 
 function MercenarySkillListClass:GetRowValue(_, _, skill)
 	local skillData = self.mercenaryTab.data.skills[skill.id]
-	local label = gemColorLabel(skillData)..(skillData and skillData.name or skill.id or "?")
+	local skillEffect = self.mercenaryTab.build.data.skills[skill.id]
+	local label = gemColorLabel(skillEffect and skillEffect.color)..(skillData and skillData.name or skill.id or "?")
 	if skill.enabled == false then label = colorCodes.NEGATIVE..label.." (Disabled)" end
 	if skill.includeInFullDPS then label = label..colorCodes.CUSTOM.." (FullDPS)" end
 	if #(skill.supports or { }) > 0 then label = label.." ^7+ "..#skill.supports.." support"..(#skill.supports == 1 and "" or "s") end
@@ -100,6 +104,14 @@ end
 function MercenarySkillListClass:OnSelect(index)
 	self.mercenaryTab.selectedSkillIndex = index
 	self.mercenaryTab:RefreshControls()
+end
+
+function MercenarySkillListClass:AddValueTooltip(tooltip, _, skill)
+	local tab = self.mercenaryTab
+	if tooltip:CheckForUpdate(skill, tab.build.outputRevision, mercenaryLevel(tab.build, tab.profile.foundAreaLevel)) then
+		tooltip:Clear()
+		tab:AddSkillTooltip(tooltip, skill, false)
+	end
 end
 
 function MercenarySkillListClass:OnSelDelete(index)
@@ -199,6 +211,14 @@ local MercenaryTabClass = newClass("MercenaryTab", "ControlHost", "Control", fun
 	self.controls.skill = new("DropDownControl", { "TOPLEFT", self.controls.skillDetailAnchor, "TOPLEFT" }, { 85, 0, 380, 20 }, { }, function(_, value)
 		self:SetSkill(self.selectedSkillIndex, value and value.id)
 	end)
+	self.controls.skill.tooltipFunc = function(tooltip, mode, index, value)
+		if tooltip:CheckForUpdate(mode, index, value, self.build.outputRevision, mercenaryLevel(self.build, self.profile.foundAreaLevel), self.selectedSkillIndex) then
+			tooltip:Clear()
+			if value and value.id then
+				self:AddSkillTooltip(tooltip, value, mode == "HOVER")
+			end
+		end
+	end
 	self.controls.skillEnabledLabel = new("LabelControl", { "TOPLEFT", self.controls.skillDetailAnchor, "TOPLEFT" }, { 0, 32, 0, 16 }, "^7Enabled:")
 	self.controls.skillEnabled = new("CheckBoxControl", { "TOPLEFT", self.controls.skillDetailAnchor, "TOPLEFT" }, { 68, 30, 20 }, nil, function(state)
 		local skill = self.profile.skills[self.selectedSkillIndex]
@@ -250,6 +270,13 @@ local MercenaryTabClass = newClass("MercenaryTab", "ControlHost", "Control", fun
 		local control = new("DropDownControl", { "LEFT", clear, "RIGHT" }, { 2, 0, 380, 20 }, { }, function(_, value)
 			self:SetSupport(index, value and value.id)
 		end)
+		control.tooltipFunc = function(tooltip, mode, _, value)
+			if tooltip:CheckForUpdate(mode, value, self.build.outputRevision, self.supportSortRevision, mercenaryLevel(self.build, self.profile.foundAreaLevel), self.selectedSkillIndex) then
+				tooltip:Clear()
+				local support = value and value.id and self.data.supports[value.id]
+				self:AddSupportTooltip(tooltip, support, index, mode == "HOVER")
+			end
+		end
 		local onKeyDown = control.OnKeyDown
 		control.OnKeyDown = function(dropdown, key)
 			if not dropdown.dropped and (key == "LEFTBUTTON" or key == "RIGHTBUTTON" or key == "DOWN") then
@@ -270,6 +297,144 @@ local MercenaryTabClass = newClass("MercenaryTab", "ControlHost", "Control", fun
 	self.controls.errors = new("TextListControl", { "TOPLEFT", self.controls.errorsHeader, "BOTTOMLEFT" }, { 0, 4, 760, 110 }, { { x = 4, align = "LEFT" } }, self.errors)
 	self:RefreshControls()
 end)
+
+local function makeMercenarySkillGem(build, skillData, actorLevel)
+	local grantedEffect = build.data.skills[skillData.id]
+	if not grantedEffect or not grantedEffect.levels then return end
+	local sourceGem = build.data.gemForSkill and build.data.gems[build.data.gemForSkill[grantedEffect]]
+	local effect = copyTable(grantedEffect, true)
+	effect.name = skillData.name or effect.name
+	effect.description = skillData.description or effect.description
+	if skillData.icon and skillData.icon ~= "" then effect.icon = skillData.icon end
+	effect.stats = effect.stats or { }
+	effect.constantStats = effect.constantStats or { }
+	local secondary = skillData.secondarySkillId and build.data.skills[skillData.secondarySkillId]
+	if secondary then
+		secondary = copyTable(secondary, true)
+	end
+	local level = MercenaryTools.skillLevel(effect, actorLevel)
+	return {
+		level = level,
+		actorLevel = actorLevel,
+		color = data.skillColorMap[effect.color] or colorCodes.NORMAL,
+		quality = 0,
+		gemData = {
+			name = effect.name,
+			grantedEffect = effect,
+			secondaryGrantedEffect = secondary,
+			tags = sourceGem and copyTable(sourceGem.tags or { }, true) or { },
+			tagString = sourceGem and sourceGem.tagString or "Mercenary Skill",
+			naturalMaxLevel = #effect.levels,
+			reqStr = 0,
+			reqDex = 0,
+			reqInt = 0,
+		},
+	}
+end
+
+local function makeMercenarySupportGem(build, support)
+	if not support then return end
+	local templateId = build.data.mercenaryStatData.supportTemplates[support.id]
+	local template = templateId and build.data.skills[templateId]
+	local effect = {
+		name = support.name,
+		icon = support.icon,
+		support = true,
+		statDescriptionScope = template and template.statDescriptionScope or "gem_stat_descriptions",
+		stats = { },
+		constantStats = { },
+		levels = { { levelRequirement = 1 } },
+		statMap = build.data.mercenarySupportStatMap,
+	}
+	for _, stat in ipairs(support.stats or { }) do
+		t_insert(effect.constantStats, { stat.id, stat.value })
+	end
+	return {
+		level = 1,
+		quality = 0,
+		gemData = {
+			name = support.name,
+			grantedEffect = effect,
+			tags = { },
+			tagString = "Mercenary Support, Tier "..tostring(support.variant),
+			naturalMaxLevel = 1,
+			reqStr = 0,
+			reqDex = 0,
+			reqInt = 0,
+		},
+	}
+end
+
+local function addMercenaryComparison(tab, tooltip, preview, header)
+	if not preview then return end
+	local calcTab = tab.build.calcsTab
+	local calcFunc, _, baseOutputs = calcTab and calcTab.GetMiscCalculator and calcTab:GetMiscCalculator()
+	local baseOutput = baseOutputs and baseOutputs.MERCENARY
+	if not calcFunc or not baseOutput or not calcTab.mainEnv then return end
+	local ok, output = pcall(calcFunc, { comparisonActor = "MERCENARY" }, tab.sortGemsByDPSField == "FullDPS")
+	if ok and output then
+		tab.build:AddStatComparesToTooltip(tooltip, baseOutput, output, header, nil, "MERCENARY")
+	else
+		tooltip:AddLine(16, colorCodes.WARNING.."Mercenary comparison unavailable")
+	end
+end
+
+function MercenaryTabClass:AddSkillTooltip(tooltip, value, preview)
+	local skillData = value and self.data.skills[value.id]
+	local actorLevel = mercenaryLevel(self.build, self.profile.foundAreaLevel)
+	local gemInstance = skillData and makeMercenarySkillGem(self.build, skillData, actorLevel)
+	if not gemInstance then
+		tooltip:AddLine(16, colorCodes.WARNING.."No exported Mercenary skill data")
+		return
+	end
+	gemTooltip.AddGemTooltip(tooltip, self.build, gemInstance, { skipRequirements = true })
+	if preview then
+		local selected = self.profile.skills[self.selectedSkillIndex]
+		if selected then
+			local oldId, oldSupports = selected.id, selected.supports
+			local oldEnabled, oldFullDPS, oldCount = selected.enabled, selected.includeInFullDPS, selected.count
+			local oldSkillPart, oldStageCount = selected.skillPart, selected.skillStageCount
+			local oldMineCount, oldMinionSkill = selected.skillMineCount, selected.skillMinionSkill
+			local oldMainSkillId = self.profile.mainSkillId
+			selected.id = value.id
+			selected.supports = { }
+			selected.enabled = true
+			selected.includeInFullDPS = false
+			selected.count = 1
+			selected.skillPart = self.build.data.mercenaryStatData.defaultSkillParts[value.id] or 1
+			selected.skillStageCount = nil
+			selected.skillMineCount = nil
+			selected.skillMinionSkill = nil
+			self.profile.mainSkillId = value.id
+			addMercenaryComparison(self, tooltip, true, "^7Selecting this skill will give you:")
+			selected.id, selected.supports = oldId, oldSupports
+			selected.enabled, selected.includeInFullDPS, selected.count = oldEnabled, oldFullDPS, oldCount
+			selected.skillPart, selected.skillStageCount = oldSkillPart, oldStageCount
+			selected.skillMineCount, selected.skillMinionSkill = oldMineCount, oldMinionSkill
+			self.profile.mainSkillId = oldMainSkillId
+		end
+	end
+end
+
+function MercenaryTabClass:AddSupportTooltip(tooltip, support, index, preview)
+	local gemInstance = support and makeMercenarySupportGem(self.build, support)
+	if not gemInstance then
+		if index then tooltip:AddLine(16, "^7Remove this support") end
+		return
+	end
+	gemTooltip.AddGemTooltip(tooltip, self.build, gemInstance, { skipRequirements = true })
+	if preview then
+		local selected = self.profile.skills[self.selectedSkillIndex]
+		local selectedData = selected and self.data.skills[selected.id]
+		if selected and selectedData and selectedData.possibleSupportIds then
+			local supportIndex = m_min(index, #selected.supports + 1)
+			local oldSupport = selected.supports[supportIndex]
+			selected.supports[supportIndex] = { id = support.id, tier = support.variant }
+			addMercenaryComparison(self, tooltip, true, "^7Selecting this support will give you:")
+			selected.supports[supportIndex] = oldSupport
+		end
+	end
+end
 
 function MercenaryTabClass:Changed()
 	self.modFlag = true
@@ -401,7 +566,8 @@ function MercenaryTabClass:RefreshControls()
 	local mercBuild = self.data.builds[self.profile.buildId]
 	for _, skillId in ipairs(mercBuild and mercBuild.skillIds or { }) do
 		local skill = self.data.skills[skillId]
-		t_insert(skillList, { id = skillId, label = skill.name })
+		local skillEffect = self.build.data.skills[skillId]
+		t_insert(skillList, { id = skillId, label = gemColorLabel(skillEffect and skillEffect.color)..skill.name })
 	end
 	self.skillOptions = skillList
 	self.controls.skillList.list = self.profile.skills

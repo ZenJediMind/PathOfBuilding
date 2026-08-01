@@ -276,6 +276,58 @@ describe("Mercenary equipment validation", function()
 		assert.is_nil(row:find("(Calcs)", 1, true))
 	end)
 
+	it("shows player-style stat tooltips for Mercenary skills and supports", function()
+		selectBuild("MeleeAOEMarauderFireSlam")
+		tab:SetSkill(1, "ConsecratedPathMercenary")
+		local expectedSkillColor = data.skillColorMap[build.data.skills.ConsecratedPathMercenary.color]
+		local skillRow = tab.controls.skillList:GetRowValue(1, 1, tab.profile.skills[1])
+		assert.are.equal(expectedSkillColor, skillRow:sub(1, #expectedSkillColor))
+		local skillOption
+		for _, option in ipairs(tab.controls.skill.list) do
+			if option.id == "ConsecratedPathMercenary" then skillOption = option break end
+		end
+		assert(skillOption)
+		assert.are.equal(expectedSkillColor, skillOption.label:sub(1, #expectedSkillColor))
+		local tooltip = new("Tooltip")
+		local function tooltipText()
+			local lines = { }
+			for _, line in ipairs(tooltip.lines) do if line.text then table.insert(lines, line.text) end end
+			return table.concat(lines, "\n")
+		end
+
+		tab.controls.skillList:AddValueTooltip(tooltip, 1, tab.profile.skills[1])
+		local skillTooltipText = tooltipText()
+		assert.matches("Consecrated Path", skillTooltipText)
+		assert.matches("Level:", skillTooltipText)
+		assert.matches("Slams the ground", skillTooltipText)
+
+		tooltip:Clear(true)
+		tab.controls.skill.tooltipFunc(tooltip, "HOVER", 1, { id = "ConsecratedPathMercenary" })
+		assert.matches("Consecrated Path", tooltipText())
+
+		tooltip:Clear(true)
+		local support = assert(tab.supportControls[1].list[2])
+		tab.supportControls[1].tooltipFunc(tooltip, "HOVER", 2, support)
+		local supportTooltipText = tooltipText()
+		assert.is_true(supportTooltipText:find(tab.data.supports[support.id].name, 1, true) ~= nil)
+		assert.is_true(supportTooltipText:find("Mercenary Support, Tier ", 1, true) ~= nil)
+		assert.matches("Supported Skills gain", supportTooltipText)
+	end)
+
+	it("uses the Mercenary effective level in skill tooltips", function()
+		selectBuild("TrapsMinesShadowLightning", 80)
+		build.configTab.enemyLevel = 60
+		tab:SetSkill(1, "LightningTrapMercenary")
+		local tooltip = new("Tooltip")
+		tab.controls.skillList:AddValueTooltip(tooltip, 1, tab.profile.skills[1])
+		local displayedLevel
+		for _, line in ipairs(tooltip.lines) do
+			displayedLevel = displayedLevel or line.text and line.text:match("Level: %^7(%d+)")
+		end
+		local actorLevel = MercenaryTools.effectiveLevel(80, 60)
+		assert.are.equal(MercenaryTools.skillLevel(build.data.skills.LightningTrapMercenary, actorLevel), tonumber(displayedLevel))
+	end)
+
 	it("sorts Mercenary supports by the selected DPS output", function()
 		selectBuild("MeleeAOEMarauderFireSlam")
 		tab:SetSkill(1, "ConsecratedPathMercenary")

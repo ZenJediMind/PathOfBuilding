@@ -70,6 +70,17 @@ function MercenaryTools.maxSupportLimit(mercenaryData)
 end
 local supportLimit = MercenaryTools.supportLimit
 
+function MercenaryTools.skillLevel(grantedEffect, actorLevel)
+	local bestLevel, bestRequirement = 1, -1
+	for level, levelData in pairs(grantedEffect and grantedEffect.levels or { }) do
+		local requirement = levelData.levelRequirement or 1
+		if type(level) == "number" and requirement <= actorLevel and (requirement > bestRequirement or requirement == bestRequirement and level > bestLevel) then
+			bestLevel, bestRequirement = level, requirement
+		end
+	end
+	return bestLevel
+end
+
 local function listProducesSkillData(mods, key)
 	for _, modOrGroup in ipairs(mods or { }) do
 		for _, mod in ipairs(modOrGroup.name and { modOrGroup } or modOrGroup) do

@@ -30,6 +30,30 @@ function MercenaryTools.contains(values, wanted)
 end
 local contains = MercenaryTools.contains
 
+function MercenaryTools.classGroups(mercenaryData)
+	local groups = { }
+	local groupsByClassId = { }
+	local groupsByLabel = { }
+	for _, classId in ipairs(mercenaryData.classOrder or { }) do
+		local class = mercenaryData.classes[classId]
+		local name = class.name:gsub("^%[DNT%]%s*", "")
+		name = name:gsub("^Merc ", ""):gsub(" Merc ", " "):gsub("%s+%d+$", "")
+		local label = name.." ("..class.attributeName..")"
+		local group = groupsByLabel[label]
+		if not group then
+			group = { id = label, label = label, classIds = { }, buildIds = { } }
+			groupsByLabel[label] = group
+			table.insert(groups, group)
+		end
+		table.insert(group.classIds, classId)
+		groupsByClassId[classId] = group
+		for _, buildId in ipairs(class.buildIds or { }) do
+			table.insert(group.buildIds, buildId)
+		end
+	end
+	return groups, groupsByClassId
+end
+
 -- How many supports a skill accepts, and the largest limit any skill accepts. Both
 -- come from the hand-authored `supportCounts` policy attached to the Mercenary data.
 function MercenaryTools.supportLimit(mercenaryData, skill)
@@ -201,8 +225,26 @@ function MercenaryTools.importWarrant(jsonText, mercenaryData, classId)
 		return nil, "Paste a Warrant item JSON object"
 	elseif #jsonText > MAX_WARRANT_BYTES then
 		return nil, "Warrant JSON exceeds 256 KiB"
-	elseif not mercenaryData or not mercenaryData.classes or not mercenaryData.classes[classId] then
+	elseif not mercenaryData or not mercenaryData.classes then
 		return nil, "Select the Mercenary class before importing a Warrant"
+	end
+	local classIds = type(classId) == "table" and classId or { classId }
+	if not classIds[1] then
+		return nil, "Select the Mercenary class before importing a Warrant"
+	end
+	local classes, allowedSkillIds, seenSkillIds = { }, { }, { }
+	for _, selectedClassId in ipairs(classIds) do
+		local class = mercenaryData.classes[selectedClassId]
+		if not class then
+			return nil, "Select the Mercenary class before importing a Warrant"
+		end
+		table.insert(classes, class)
+		for _, skillId in ipairs(class.skillIds or { }) do
+			if not seenSkillIds[skillId] then
+				seenSkillIds[skillId] = true
+				table.insert(allowedSkillIds, skillId)
+			end
+		end
 	end
 
 	local decoded, decodePosition, decodeError = dkjson.decode(jsonText)
@@ -218,18 +260,17 @@ function MercenaryTools.importWarrant(jsonText, mercenaryData, classId)
 		return nil, "A Warrant must contain between 1 and 6 Mercenary skills"
 	end
 
-	local class = mercenaryData.classes[classId]
 	local result = { skills = { } }
 	local usedSkills = { }
 	for skillIndex, apiSkill in ipairs(item.mercenarySkills) do
 		if type(apiSkill) ~= "table" then
 			return nil, "Mercenary skill "..skillIndex.." is not an object"
 		end
-		local skillId, skillError = resolveUnique(mercenaryData.skillsByHash, apiSkill.hash, "skill", class.skillIds)
+		local skillId, skillError = resolveUnique(mercenaryData.skillsByHash, apiSkill.hash, "skill", allowedSkillIds)
 		if not skillId then
 			return nil, skillError
-		elseif not contains(class.skillIds, skillId) then
-			return nil, "Skill "..skillId.." is not valid for class "..class.id
+		elseif not contains(allowedSkillIds, skillId) then
+			return nil, "Skill "..skillId.." is not valid for class "..classes[1].id
 		elseif usedSkills[skillId] then
 			return nil, "Duplicate Mercenary skill: "..skillId
 		end

@@ -35,6 +35,25 @@ describe("Mercenary tools", function()
 		assert.is_nil(tools.baseItemSlotName(1))
 	end)
 
+	it("groups numbered class variants for the picker", function()
+		local groups, byClassId = tools.classGroups({
+			classOrder = { "templar2", "witch2", "templar1", "scion" },
+			classes = {
+				templar2 = { name = "[DNT] Merc Templar 2", attributeName = "Str / Int", buildIds = { "build2" } },
+				witch2 = { name = "[DNT] Witch Merc 2", attributeName = "Int", buildIds = { "build3" } },
+				templar1 = { name = "[DNT] Merc Templar 1", attributeName = "Str / Int", buildIds = { "build1" } },
+				scion = { name = "[DNT] Merc Scion 1", attributeName = "Str / Dex / Int", buildIds = { "scionBuild" } },
+			},
+		})
+		assert.are.equal(3, #groups)
+		assert.are.equal("Templar (Str / Int)", groups[1].label)
+		assert.same({ "templar2", "templar1" }, groups[1].classIds)
+		assert.same({ "build2", "build1" }, groups[1].buildIds)
+		assert.are.equal(groups[1], byClassId.templar1)
+		assert.are.equal("Scion (Str / Dex / Int)", groups[3].label)
+		assert.are.equal(byClassId.scion, groups[3])
+	end)
+
 	it("imports bounded Warrant data and resolves support hash by tier", function()
 		local imported, err = tools.importWarrant([[{
 			"mercenarySkills": [{ "hash": 10, "supports": [{ "hash": 20, "tier": 2 }] }]
@@ -180,7 +199,20 @@ end)
 
 describe("Generated Mercenary data", function()
 	it("has deterministic orders and resolvable references", function()
+		local tools = require("Modules/MercenaryTools")
 		local mercenaries = data.mercenaries
+		local classGroups = select(1, tools.classGroups(mercenaries))
+		local classLabels = { }
+		for _, group in ipairs(classGroups) do table.insert(classLabels, group.label) end
+		assert.same({
+			"Templar (Str / Int)",
+			"Witch (Int)",
+			"Shadow (Dex / Int)",
+			"Ranger (Dex)",
+			"Marauder (Str)",
+			"Duelist (Str / Dex)",
+			"Scion (Str / Dex / Int)",
+		}, classLabels)
 		local function has(values, wanted)
 			for _, value in ipairs(values) do if value == wanted then return true end end
 			return false

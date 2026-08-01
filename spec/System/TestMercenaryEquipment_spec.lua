@@ -256,6 +256,51 @@ describe("Mercenary equipment validation", function()
 		assert.are.equal(1, tab.profile.skills[1].count)
 	end)
 
+	it("reuses player gem sort options and persists Mercenary preferences", function()
+		local skillOptions = require("Modules/SkillOptions")
+		assert.are.same(skillOptions.sortGemTypeList, tab.controls.sortGemsByDPSFieldControl.list)
+		local xml = { }
+		tab.sortGemsByDPS = false
+		tab.sortGemsByDPSField = "TotalDPS"
+		tab:Save(xml)
+		assert.are.equal("false", xml.attrib.sortGemsByDPS)
+		assert.are.equal("TotalDPS", xml.attrib.sortGemsByDPSField)
+	end)
+
+	it("matches the player skill tip sizing without exposing Calcs state in row text", function()
+		tab.profile.skills[1] = { id = "ConsecratedPathMercenary", enabled = true, supports = { } }
+		tab.profile.mainSkillId = "ConsecratedPathMercenary"
+		tab:RefreshControls()
+		local row = tab.controls.skillList:GetRowValue(1, 1, tab.profile.skills[1])
+		assert.are.equal(14, tab.controls.skillTip.height)
+		assert.is_nil(row:find("(Calcs)", 1, true))
+	end)
+
+	it("sorts Mercenary supports by the selected DPS output", function()
+		selectBuild("MeleeAOEMarauderFireSlam")
+		tab:SetSkill(1, "ConsecratedPathMercenary")
+		local selected = tab.profile.skills[1]
+		local preferredId = tab.supportControls[1].list[2].id
+		local originalCalculator = build.calcsTab.GetMiscCalculator
+		local ok, err = pcall(function()
+			build.calcsTab.GetMiscCalculator = function()
+				return function()
+					local supportId = selected.supports[1] and selected.supports[1].id
+					local dps = supportId == preferredId and 100 or 10
+					return { CombinedDPS = dps, FullDPS = dps }
+				end
+			end
+			tab.sortGemsByDPS = true
+			tab.sortGemsByDPSField = "CombinedDPS"
+			tab:QueueSupportSort(1)
+			while tab.supportSortCoroutine do tab:ProcessSupportSort() end
+			assert.are.equal(preferredId, tab.supportControls[1].list[1].id)
+			assert.is_nil(selected.supports[1])
+		end)
+		build.calcsTab.GetMiscCalculator = originalCalculator
+		assert.is_true(ok, err)
+	end)
+
 	it("keeps support selections contiguous", function()
 		tab:SetSkill(1, "ConsecratedPathMercenary")
 		local supportId = assert(tab.data.skills.ConsecratedPathMercenary.possibleSupportIds[1])

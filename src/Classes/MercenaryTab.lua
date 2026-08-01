@@ -1,7 +1,7 @@
 -- Path of Building
 --
 -- Class: Mercenary Tab
--- Permanent Mercenary configuration, persistence, import, and equipment validation.
+-- Permanent Mercenary configuration, persistence, and equipment validation.
 --
 local MercenaryTools = require("Modules/MercenaryTools")
 local skillOptions = require("Modules/SkillOptions")
@@ -130,7 +130,6 @@ local MercenaryTabClass = newClass("MercenaryTab", "ControlHost", "Control", fun
 	self.supportSortStatus = ""
 	self.selectedSkillIndex = 1
 	self.errors = { }
-	self.importError = nil
 
 	self.controls.classLabel = new("LabelControl", { "TOPLEFT", self, "TOPLEFT" }, { 12, 12, 0, 16 }, "^7Mercenary class:")
 	self.controls.class = new("DropDownControl", { "LEFT", self.controls.classLabel, "RIGHT" }, { 8, 0, 240, 20 }, { }, function(_, value)
@@ -267,12 +266,7 @@ local MercenaryTabClass = newClass("MercenaryTab", "ControlHost", "Control", fun
 		self.supportControls[index] = createSupportRow(index)
 	end
 
-	self.controls.warrantLabel = new("LabelControl", { "TOPLEFT", self.controls.optionSection, "BOTTOMLEFT" }, { 0, 12, 0, 16 }, "^7Warrant item JSON:")
-	self.controls.warrant = new("EditControl", { "TOPLEFT", self.controls.warrantLabel, "BOTTOMLEFT" }, { 0, 4, 620, 84 }, "", nil, "\t\n", nil, nil, 14, true)
-	self.controls.importWarrant = new("ButtonControl", { "TOPLEFT", self.controls.warrant, "TOPRIGHT" }, { 8, 0, 125, 20 }, "Import Warrant", function()
-		self:ImportWarrant()
-	end)
-	self.controls.errorsHeader = new("LabelControl", { "TOPLEFT", self.controls.warrant, "BOTTOMLEFT" }, { 0, 12, 0, 16 }, "^7Warnings (informational):")
+	self.controls.errorsHeader = new("LabelControl", { "TOPLEFT", self.controls.optionSection, "BOTTOMLEFT" }, { 0, 12, 0, 16 }, "^7Warnings (informational):")
 	self.controls.errors = new("TextListControl", { "TOPLEFT", self.controls.errorsHeader, "BOTTOMLEFT" }, { 0, 4, 760, 110 }, { { x = 4, align = "LEFT" } }, self.errors)
 	self:RefreshControls()
 end)
@@ -492,59 +486,9 @@ function MercenaryTabClass:SetSupport(index, supportId)
 	self:Changed()
 end
 
-function MercenaryTabClass:ImportWarrant()
-	self.importError = nil
-	local classGroup = self.classGroupsByClassId[self.profile.classId]
-	local importClassIds = self.profile.buildId and { self.profile.classId } or classGroup and classGroup.classIds
-	local imported, err = MercenaryTools.importWarrant(self.controls.warrant.buf, self.data, importClassIds)
-	if not imported then
-		self.importError = err
-		self:RefreshErrors()
-		return
-	end
-	local matchingBuilds = { }
-	for _, buildId in ipairs(classGroup and classGroup.buildIds or { }) do
-		local mercBuild = self.data.builds[buildId]
-		local matches = true
-		for _, skill in ipairs(imported.skills) do
-			matches = matches and MercenaryTools.contains(mercBuild.skillIds, skill.id)
-		end
-		if matches then t_insert(matchingBuilds, buildId) end
-	end
-	if self.profile.buildId and MercenaryTools.contains(matchingBuilds, self.profile.buildId) then
-		matchingBuilds = { self.profile.buildId }
-	end
-	if #matchingBuilds ~= 1 then
-		self.importError = #matchingBuilds == 0 and "Warrant skills do not match a build for the selected class" or "Warrant skills match multiple builds; select the exact build first"
-		self:RefreshErrors()
-		return
-	end
-	local importedSkills = MercenaryTools.copyImportedSkills(imported)
-	local candidate = {
-		buildId = matchingBuilds[1],
-		foundAreaLevel = self.profile.foundAreaLevel,
-		mainSkillId = importedSkills[1].id,
-		skills = importedSkills,
-	}
-	local candidateErrors = MercenaryTools.validateProfile(candidate, self.data)
-	if #candidateErrors > 0 then
-		self.importError = table.concat(candidateErrors, "; ")
-		self:RefreshErrors()
-		return
-	end
-	self.profile.buildId = candidate.buildId
-	self.profile.classId = self.data.builds[candidate.buildId].classId
-	self.profile.skills = candidate.skills
-	self.profile.mainSkillId = candidate.mainSkillId
-	self.selectedSkillIndex = 1
-	self.controls.warrant:SetText("")
-	self:Changed()
-end
-
 function MercenaryTabClass:Reset()
 	self.profile = { foundAreaLevel = 68, skills = { }, lifeComparison = "AUTO" }
 	self.selectedSkillIndex = 1
-	self.importError = nil
 	self:Changed()
 end
 
@@ -666,7 +610,6 @@ function MercenaryTabClass:GetErrors()
 			end
 		end
 	end
-	if self.importError then t_insert(errors, self.importError) end
 	local mainEnv = self.build.calcsTab and self.build.calcsTab.mainEnv
 	for _, calculationError in ipairs(mainEnv and mainEnv.mercenaryCalculationErrors or { }) do
 		t_insert(errors, calculationError)

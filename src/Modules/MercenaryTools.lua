@@ -1,5 +1,3 @@
-local dkjson = require("dkjson")
-
 local MercenaryTools = { }
 
 MercenaryTools.equipmentSlots = { "Weapon 1", "Weapon 2", "Helmet", "Body Armour", "Gloves", "Boots", "Amulet", "Ring 1", "Ring 2", "Belt" }
@@ -17,7 +15,6 @@ function MercenaryTools.comparisonBaseOutput(playerOutput, actorOutputs, slotNam
 	return actorOutputs and actorOutputs[actor] or playerOutput
 end
 
-local MAX_WARRANT_BYTES = 256 * 1024
 local MAX_SKILLS = 6
 
 function MercenaryTools.contains(values, wanted)
@@ -72,48 +69,6 @@ function MercenaryTools.maxSupportLimit(mercenaryData)
 	return maximum
 end
 local supportLimit = MercenaryTools.supportLimit
-
-local function hashMatches(index, hash)
-	return index[tostring(hash)] or { }
-end
-
-local function resolveUnique(index, hash, kind, allowed)
-	if type(hash) ~= "number" and type(hash) ~= "string" then
-		return nil, kind.." hash is missing"
-	end
-	local matches = { }
-	for _, id in ipairs(hashMatches(index, hash)) do
-		if not allowed or contains(allowed, id) then table.insert(matches, id) end
-	end
-	if #matches == 0 then
-		return nil, "Unknown "..kind.." hash: "..tostring(hash)
-	elseif #matches > 1 then
-		return nil, "Ambiguous "..kind.." hash: "..tostring(hash)
-	end
-	return matches[1]
-end
-
-local function resolveSupport(mercenaryData, hash, tier, allowed)
-	if type(hash) ~= "number" and type(hash) ~= "string" then
-		return nil, "Support hash is missing"
-	end
-	local matches = hashMatches(mercenaryData.supportsByHash, hash)
-	if #matches == 0 then
-		return nil, "Unknown support hash: "..tostring(hash)
-	end
-	local tierMatches = { }
-	for _, supportId in ipairs(matches) do
-		if contains(allowed, supportId) and mercenaryData.supports[supportId].variant == tier then
-			table.insert(tierMatches, supportId)
-		end
-	end
-	if #tierMatches == 0 then
-		return nil, "Support hash "..tostring(hash).." does not have tier "..tostring(tier)
-	elseif #tierMatches > 1 then
-		return nil, "Ambiguous support hash/tier: "..tostring(hash).."/"..tostring(tier)
-	end
-	return tierMatches[1]
-end
 
 local function listProducesSkillData(mods, key)
 	for _, modOrGroup in ipairs(mods or { }) do
@@ -217,105 +172,6 @@ function MercenaryTools.passiveStatValue(values, level)
 	return math.floor(second + (third - second) * (clampedLevel - levels[2]) / (levels[3] - levels[2]))
 end
 
-function MercenaryTools.importWarrant(jsonText, mercenaryData, classId)
-	if type(jsonText) ~= "string" or jsonText == "" then
-		return nil, "Paste a Warrant item JSON object"
-	elseif #jsonText > MAX_WARRANT_BYTES then
-		return nil, "Warrant JSON exceeds 256 KiB"
-	elseif not mercenaryData or not mercenaryData.classes then
-		return nil, "Select the Mercenary class before importing a Warrant"
-	end
-	local classIds = type(classId) == "table" and classId or { classId }
-	if not classIds[1] then
-		return nil, "Select the Mercenary class before importing a Warrant"
-	end
-	local classes, allowedSkillIds, seenSkillIds = { }, { }, { }
-	for _, selectedClassId in ipairs(classIds) do
-		local class = mercenaryData.classes[selectedClassId]
-		if not class then
-			return nil, "Select the Mercenary class before importing a Warrant"
-		end
-		table.insert(classes, class)
-		for _, skillId in ipairs(class.skillIds or { }) do
-			if not seenSkillIds[skillId] then
-				seenSkillIds[skillId] = true
-				table.insert(allowedSkillIds, skillId)
-			end
-		end
-	end
-
-	local decoded, decodePosition, decodeError = dkjson.decode(jsonText)
-	if not decoded then
-		return nil, "Invalid Warrant JSON: "..tostring(decodeError)
-	elseif jsonText:sub(decodePosition):find("%S") then
-		return nil, "Invalid Warrant JSON: trailing data"
-	end
-	local item = decoded.item or decoded
-	if type(item) ~= "table" or type(item.mercenarySkills) ~= "table" then
-		return nil, "Warrant JSON has no Item.mercenarySkills array"
-	elseif #item.mercenarySkills == 0 or #item.mercenarySkills > MAX_SKILLS then
-		return nil, "A Warrant must contain between 1 and 6 Mercenary skills"
-	end
-
-	local result = { skills = { } }
-	local usedSkills = { }
-	for skillIndex, apiSkill in ipairs(item.mercenarySkills) do
-		if type(apiSkill) ~= "table" then
-			return nil, "Mercenary skill "..skillIndex.." is not an object"
-		end
-		local skillId, skillError = resolveUnique(mercenaryData.skillsByHash, apiSkill.hash, "skill", allowedSkillIds)
-		if not skillId then
-			return nil, skillError
-		elseif not contains(allowedSkillIds, skillId) then
-			return nil, "Skill "..skillId.." is not valid for class "..classes[1].id
-		elseif usedSkills[skillId] then
-			return nil, "Duplicate Mercenary skill: "..skillId
-		end
-		usedSkills[skillId] = true
-
-		local apiSupports = apiSkill.supports or { }
-		local skill = mercenaryData.skills[skillId]
-		local maxSupports = supportLimit(mercenaryData, skill)
-		if type(apiSupports) ~= "table" or #apiSupports > maxSupports then
-			return nil, "Skill "..skillId.." has more than "..maxSupports.." supports"
-		end
-		local importedSkill = {
-			id = skillId,
-			enabled = true,
-			includeInFullDPS = false,
-			count = 1,
-			supports = { },
-		}
-		local usedSupports, usedFamilies = { }, { }
-		for supportIndex, apiSupport in ipairs(apiSupports) do
-			if type(apiSupport) ~= "table" then
-				return nil, "Support "..supportIndex.." for "..skillId.." is not an object"
-			end
-			local tier = tonumber(apiSupport.tier)
-			if not tier or tier % 1 ~= 0 or tier < 1 then
-				return nil, "Invalid support tier on skill "..skillId
-			end
-			local supportId, supportError = resolveSupport(mercenaryData, apiSupport.hash, tier, skill.possibleSupportIds)
-			if not supportId then
-				return nil, supportError
-			end
-			local support = mercenaryData.supports[supportId]
-			if not contains(skill.possibleSupportIds, supportId) then
-				return nil, "Support "..supportId.." is not valid for skill "..skillId
-			elseif usedSupports[supportId] then
-				return nil, "Duplicate support "..supportId.." on skill "..skillId
-			elseif support.familyId and usedFamilies[support.familyId] then
-				return nil, "Duplicate support family "..support.familyId.." on skill "..skillId
-			end
-			usedSupports[supportId] = true
-			if support.familyId then usedFamilies[support.familyId] = true end
-			table.insert(importedSkill.supports, { id = supportId, tier = tier })
-		end
-		table.insert(result.skills, importedSkill)
-	end
-	return result
-end
-
 function MercenaryTools.validateProfile(profile, mercenaryData)
 	local errors = { }
 	local build = profile and mercenaryData and mercenaryData.builds[profile.buildId]
@@ -392,24 +248,6 @@ function MercenaryTools.validateProfile(profile, mercenaryData)
 		table.insert(errors, "Selected Calcs skill is disabled")
 	end
 	return errors
-end
-
-function MercenaryTools.copyImportedSkills(imported)
-	local result = { }
-	for _, skill in ipairs(imported.skills or { }) do
-		local copy = {
-			id = skill.id,
-			enabled = skill.enabled,
-			includeInFullDPS = skill.includeInFullDPS,
-			count = skill.count,
-			supports = { },
-		}
-		for _, support in ipairs(skill.supports or { }) do
-			table.insert(copy.supports, { id = support.id, tier = support.tier })
-		end
-		table.insert(result, copy)
-	end
-	return result
 end
 
 return MercenaryTools

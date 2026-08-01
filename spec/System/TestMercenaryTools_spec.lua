@@ -1,10 +1,6 @@
 describe("Mercenary tools", function()
 	local tools = require("Modules/MercenaryTools")
 	local data = {
-		classes = {
-			class = { name = "Test", skillIds = { "skill" } },
-			ambiguous = { name = "Ambiguous", skillIds = { "skill", "other_skill" } },
-		},
 		builds = { build = {
 			skillIds = { "skill", "other_skill" },
 			skillPools = { { skillIds = { "skill", "other_skill" }, countMax = 1 } },
@@ -21,12 +17,6 @@ describe("Mercenary tools", function()
 			support_no_family = { variant = 1 },
 		},
 		supportCounts = { Low = { maximum = 2 }, High = { maximum = 5 } },
-		skillsByHash = { ["10"] = { "skill", "other_skill" } },
-		supportsByHash = {
-			["20"] = { "support_t1", "support_t2", "support_t3" },
-			["21"] = { "other_support" },
-			["22"] = { "support_no_family" },
-		},
 	}
 
 	it("identifies Mercenary item slots without assuming string table keys", function()
@@ -54,12 +44,7 @@ describe("Mercenary tools", function()
 		assert.are.equal(byClassId.scion, groups[3])
 	end)
 
-	it("imports bounded Warrant data and resolves support hash by tier", function()
-		local imported, err = tools.importWarrant([[{
-			"mercenarySkills": [{ "hash": 10, "supports": [{ "hash": 20, "tier": 2 }] }]
-		}]], data, "class")
-		assert.is_nil(err)
-		assert.same({ id = "support_t2", tier = 2 }, imported.skills[1].supports[1])
+	it("calculates effective Mercenary levels and found-area requirements", function()
 		assert.are.equal(68, tools.effectiveLevel(50, 84))
 		assert.are.equal(100, tools.effectiveLevel(100, 85))
 		assert.are.equal(100, tools.effectiveLevel(150, 85))
@@ -79,60 +64,6 @@ describe("Mercenary tools", function()
 		assert.are.equal(60, tools.passiveStatValue(values, 0))
 		assert.are.equal(160, tools.passiveStatValue(values, 120))
 		assert.are.equal(93, tools.passiveStatValue({ 38, 75, 100 }, 80))
-	end)
-
-	it("rejects invalid data without returning a partial profile", function()
-		local imported, err = tools.importWarrant([[{
-			"mercenarySkills": [{ "hash": 10, "supports": [{ "hash": 20, "tier": 4 }] }]
-		}]], data, "class")
-		assert.is_nil(imported)
-		assert.matches("does not have tier 4", err, nil, true)
-	end)
-
-	it("scopes hash resolution to the selected class", function()
-		local noClass, noClassError = tools.importWarrant([[{"mercenarySkills":[{"hash":10}]}]], data)
-		assert.is_nil(noClass)
-		assert.matches("Select the Mercenary class", noClassError, nil, true)
-		local imported, err = tools.importWarrant([[{"mercenarySkills":[{"hash":10}]}]], data, "class")
-		assert.is_nil(err)
-		assert.are.equal("skill", imported.skills[1].id)
-		local rejected, ambiguousError = tools.importWarrant([[{"mercenarySkills":[{"hash":10}]}]], data, "ambiguous")
-		assert.is_nil(rejected)
-		assert.matches("Ambiguous skill hash", ambiguousError, nil, true)
-	end)
-
-	it("rejects malformed and oversized Warrant JSON", function()
-		assert.is_nil(select(1, tools.importWarrant("{", data, "class")))
-		local trailing, trailingError = tools.importWarrant([[{"mercenarySkills":[{"hash":10}]} garbage]], data, "class")
-		assert.is_nil(trailing)
-		assert.matches("trailing data", trailingError, nil, true)
-		local imported, err = tools.importWarrant(string.rep(" ", 256 * 1024 + 1), data, "class")
-		assert.is_nil(imported)
-		assert.matches("exceeds 256 KiB", err, nil, true)
-	end)
-
-	it("accepts supports without a family", function()
-		local imported, err = tools.importWarrant([[{"mercenarySkills":[{"hash":10,"supports":[{"hash":22,"tier":1}]}]}]], data, "class")
-		assert.is_nil(err)
-		assert.are.equal("support_no_family", imported.skills[1].supports[1].id)
-	end)
-
-	it("rejects duplicate skills, supports, and support families", function()
-		local duplicateSkill, duplicateSkillError = tools.importWarrant([[{"mercenarySkills":[{"hash":10},{"hash":10}]}]], data, "class")
-		assert.is_nil(duplicateSkill)
-		assert.matches("Duplicate Mercenary skill", duplicateSkillError, nil, true)
-		local duplicateSupport, duplicateSupportError = tools.importWarrant([[{"mercenarySkills":[{"hash":10,"supports":[{"hash":20,"tier":1},{"hash":20,"tier":1}]}]}]], data, "class")
-		assert.is_nil(duplicateSupport)
-		assert.matches("Duplicate support", duplicateSupportError, nil, true)
-		local duplicateFamily, duplicateFamilyError = tools.importWarrant([[{"mercenarySkills":[{"hash":10,"supports":[{"hash":20,"tier":1},{"hash":20,"tier":2}]}]}]], data, "class")
-		assert.is_nil(duplicateFamily)
-		assert.matches("Duplicate support family", duplicateFamilyError, nil, true)
-	end)
-
-	it("enforces the exported support-count maximum", function()
-		local imported, err = tools.importWarrant([[{"mercenarySkills":[{"hash":10,"supports":[{"hash":20,"tier":1},{"hash":21,"tier":1},{"hash":20,"tier":3}]}]}]], data, "class")
-		assert.is_nil(imported)
-		assert.matches("more than 2 supports", err, nil, true)
 	end)
 
 	it("validates saved profiles without repairing invalid data", function()

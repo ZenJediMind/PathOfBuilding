@@ -1016,11 +1016,6 @@ describe("Permanent Mercenary calculations", function()
 			build.mercenaryTab:Save(saved)
 			return saved
 		end
-		local beforeImport = savedState()
-		build.mercenaryTab.controls.warrant:SetText("{")
-		build.mercenaryTab:ImportWarrant()
-		assert.are.same(beforeImport, savedState())
-		assert.matches("Invalid Warrant JSON", build.mercenaryTab.importError)
 		local saved = savedState()
 		build.mercenaryTab:Reset()
 		build.mercenaryTab:Load(saved)

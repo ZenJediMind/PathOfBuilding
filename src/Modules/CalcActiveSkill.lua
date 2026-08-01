@@ -721,7 +721,7 @@ function calcs.buildActiveSkillModList(env, activeSkill)
 			end
 			if minion.minionData.noFallbackSkill then
 				-- Do not invent the generic Melee fallback for an explicitly exported Mercenary minion.
-				activeSkill.unsupportedMinionReason = minion.minionData.name.." has no exported skills"
+				activeSkill.unsupportedReason = minion.minionData.name.." has no exported skills"
 				activeSkill.minion = nil
 				skillFlags.haveMinion = false
 				return

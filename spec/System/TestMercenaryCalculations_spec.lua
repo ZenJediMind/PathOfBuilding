@@ -74,6 +74,12 @@ describe("Permanent Mercenary calculations", function()
 		build.characterLevelAutoMode = false
 	end)
 
+	it("keeps grouped Mercenary classes after refreshing controls", function()
+		build.mercenaryTab:Changed()
+		assert.are.equal(7, #build.mercenaryTab.controls.class.list)
+		assert.are.equal("Templar (Str / Int)", build.mercenaryTab.controls.class.list[1].label)
+	end)
+
 	it("calculates the selected actor and explicitly selected Full DPS", function()
 		configure("TrapsMinesShadow", "TrapsMinesShadowLightning", "LightningTrapMercenary", {
 			includeInFullDPS = true,

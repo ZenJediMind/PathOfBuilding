@@ -4,10 +4,25 @@
 -- Permanent Mercenary configuration, persistence, import, and equipment validation.
 --
 local MercenaryTools = require("Modules/MercenaryTools")
+local skillOptions = require("Modules/SkillOptions")
 
 local t_insert = table.insert
+local t_sort = table.sort
+local m_floor = math.floor
 local m_min = math.min
 local m_max = math.max
+
+local GEM_COLOR_LETTER = { [1] = "R", [2] = "G", [3] = "B", [4] = "W" }
+
+local function gemColorLabel(gem)
+	local color = gem and (gem.color or gem.gemColor)
+	if not color then return "" end
+	return (data.skillColorMap[color] or colorCodes.NORMAL)..(GEM_COLOR_LETTER[color] or "W").."^7 "
+end
+
+local function supportLabel(support)
+	return gemColorLabel(support)..(support and support.name or "?").." (Tier "..(support and support.variant or "?")..")"
+end
 
 local SUPPORTED_SLOTS = { }
 for _, slotName in ipairs(MercenaryTools.equipmentSlots) do SUPPORTED_SLOTS[slotName] = true end
@@ -41,7 +56,7 @@ local UNIQUE_SLOT_DESCRIPTION = {
 }
 
 local MercenarySkillListClass = newClass("MercenarySkillListControl", "ListControl", function(self, anchor, rect, mercenaryTab)
-	self.ListControl(anchor, rect, 20, "VERTICAL", true, mercenaryTab.profile.skills)
+	self.ListControl(anchor, rect, 16, "VERTICAL", true, mercenaryTab.profile.skills)
 	self.mercenaryTab = mercenaryTab
 	self.label = "^7Skill Groups:"
 	self.controls.delete = new("ButtonControl", { "BOTTOMRIGHT", self, "TOPRIGHT" }, { 0, -2, 60, 18 }, "Delete", function()
@@ -60,12 +75,26 @@ end)
 
 function MercenarySkillListClass:GetRowValue(_, _, skill)
 	local skillData = self.mercenaryTab.data.skills[skill.id]
-	local label = skillData and skillData.name or skill.id or "?"
+	local label = gemColorLabel(skillData)..(skillData and skillData.name or skill.id or "?")
 	if skill.enabled == false then label = colorCodes.NEGATIVE..label.." (Disabled)" end
-	if self.mercenaryTab.profile.mainSkillId == skill.id then label = label..colorCodes.RELIC.." (Calcs)" end
 	if skill.includeInFullDPS then label = label..colorCodes.CUSTOM.." (FullDPS)" end
 	if #(skill.supports or { }) > 0 then label = label.." ^7+ "..#skill.supports.." support"..(#skill.supports == 1 and "" or "s") end
 	return label
+end
+
+function MercenarySkillListClass:OnHoverKeyUp(key)
+	local skill = self.ListControl:GetHoverValue()
+	if not skill then return end
+	local skillData = self.mercenaryTab.data.skills[skill.id]
+	if itemLib.wiki.matchesKey(key) then
+		if skillData then itemLib.wiki.openGem(skillData.name) end
+	elseif key == "RIGHTBUTTON" and IsKeyDown("CTRL") then
+		skill.includeInFullDPS = not skill.includeInFullDPS
+		self.mercenaryTab:Changed()
+	elseif key == "LEFTBUTTON" and IsKeyDown("CTRL") then
+		skill.enabled = skill.enabled == false
+		self.mercenaryTab:Changed()
+	end
 end
 
 function MercenarySkillListClass:OnSelect(index)
@@ -87,24 +116,33 @@ local MercenaryTabClass = newClass("MercenaryTab", "ControlHost", "Control", fun
 	self.Control()
 	self.build = build
 	self.data = build.data.mercenaries
+	self.classGroups, self.classGroupsByClassId = MercenaryTools.classGroups(self.data)
 	self.profile = {
 		foundAreaLevel = 68,
 		skills = { },
 		lifeComparison = "AUTO",
 	}
+	self.sortGemsByDPS = true
+	self.sortGemsByDPSField = "CombinedDPS"
+	self.supportSortRevision = 0
+	self.supportSortCache = { }
+	self.supportSortCoroutine = nil
+	self.supportSortStatus = ""
 	self.selectedSkillIndex = 1
 	self.errors = { }
 	self.importError = nil
 
 	self.controls.classLabel = new("LabelControl", { "TOPLEFT", self, "TOPLEFT" }, { 12, 12, 0, 16 }, "^7Mercenary class:")
 	self.controls.class = new("DropDownControl", { "LEFT", self.controls.classLabel, "RIGHT" }, { 8, 0, 240, 20 }, { }, function(_, value)
-		self.profile.classId = value and value.id
+		local classGroup = value
+		self.profile.classId = classGroup and classGroup.classIds[1]
 		self.profile.buildId = nil
 		self.profile.skills = { }
 		self.profile.mainSkillId = nil
 		self.selectedSkillIndex = 1
 		self:Changed()
 	end)
+	self.controls.class:SetList(self.classGroups)
 	self.controls.buildLabel = new("LabelControl", { "TOPLEFT", self.controls.classLabel, "BOTTOMLEFT" }, { 0, 12, 0, 16 }, "^7Class and build:")
 	self.controls.build = new("DropDownControl", { "LEFT", self.controls.buildLabel, "RIGHT" }, { 8, 0, 300, 20 }, { }, function(_, value)
 		self.profile.buildId = value and value.id
@@ -137,6 +175,23 @@ local MercenaryTabClass = newClass("MercenaryTab", "ControlHost", "Control", fun
 	end)
 
 	self.controls.skillList = new("MercenarySkillListControl", { "TOPLEFT", self.controls.editEquipment, "BOTTOMLEFT" }, { 0, 38, 360, 300 }, self)
+	self.controls.skillTip = new("LabelControl", { "TOPLEFT", self.controls.skillList, "BOTTOMLEFT" }, { 0, 8, 0, 14 }, [[
+^7Usage Tips:
+- Ctrl + Click to enable/disable skill groups.
+- Ctrl + Right click to include/exclude in Full DPS calculations.
+]])
+	self.controls.optionSection = new("SectionControl", { "TOPLEFT", self.controls.skillList, "BOTTOMLEFT" }, { 0, 60, 360, 70 }, "Gem Options")
+	self.controls.sortGemsByDPS = new("CheckBoxControl", { "TOPLEFT", self.controls.optionSection, "TOPLEFT" }, { 170, 20, 20 }, "Sort gems by DPS:", function(state)
+		self.sortGemsByDPS = state
+		self:InvalidateSupportSort()
+		self:RefreshSupportLists()
+	end, nil, true)
+	self.controls.sortGemsByDPSFieldControl = new("DropDownControl", { "LEFT", self.controls.sortGemsByDPS, "RIGHT" }, { 10, 0, 140, 20 }, skillOptions.sortGemTypeList, function(_, value)
+		self.sortGemsByDPSField = value.type
+		self:InvalidateSupportSort()
+		self:RefreshSupportLists()
+	end)
+	self.controls.sortGemsByDPSFieldControl:SelByValue(self.sortGemsByDPSField, "type")
 	self.controls.skillDetailAnchor = new("Control", { "TOPLEFT", self.controls.skillList, "TOPRIGHT" }, { 20, 0, 0, 0 })
 	self.controls.skillDetailAnchor.shown = function()
 		return self.profile.skills[self.selectedSkillIndex] ~= nil
@@ -180,6 +235,9 @@ local MercenaryTabClass = newClass("MercenaryTab", "ControlHost", "Control", fun
 		local skill = self.profile.skills[self.selectedSkillIndex]
 		return "^7Supports for "..(skill and self.data.skills[skill.id] and self.data.skills[skill.id].name or "selected skill")..":"
 	end)
+	self.controls.supportSortStatus = new("LabelControl", { "LEFT", self.controls.supportsHeader, "RIGHT" }, { 8, 0, 0, 16 }, function()
+		return self.supportSortCoroutine and "^7Sorting "..self.supportSortStatus or ""
+	end)
 	self.supportControls = { }
 	local function createSupportRow(index)
 		local y = 124 + (index - 1) * 22
@@ -193,6 +251,14 @@ local MercenaryTabClass = newClass("MercenaryTab", "ControlHost", "Control", fun
 		local control = new("DropDownControl", { "LEFT", clear, "RIGHT" }, { 2, 0, 380, 20 }, { }, function(_, value)
 			self:SetSupport(index, value and value.id)
 		end)
+		local onKeyDown = control.OnKeyDown
+		control.OnKeyDown = function(dropdown, key)
+			if not dropdown.dropped and (key == "LEFTBUTTON" or key == "RIGHTBUTTON" or key == "DOWN") then
+				self:QueueSupportSort(index)
+			end
+			return onKeyDown(dropdown, key)
+		end
+		control.supportIndex = index
 		self.controls["support"..index.."Clear"] = clear
 		self.controls["support"..index] = control
 		return control
@@ -201,7 +267,7 @@ local MercenaryTabClass = newClass("MercenaryTab", "ControlHost", "Control", fun
 		self.supportControls[index] = createSupportRow(index)
 	end
 
-	self.controls.warrantLabel = new("LabelControl", { "TOPLEFT", self.controls.skillList, "BOTTOMLEFT" }, { 0, 40, 0, 16 }, "^7Warrant item JSON:")
+	self.controls.warrantLabel = new("LabelControl", { "TOPLEFT", self.controls.optionSection, "BOTTOMLEFT" }, { 0, 12, 0, 16 }, "^7Warrant item JSON:")
 	self.controls.warrant = new("EditControl", { "TOPLEFT", self.controls.warrantLabel, "BOTTOMLEFT" }, { 0, 4, 620, 84 }, "", nil, "\t\n", nil, nil, 14, true)
 	self.controls.importWarrant = new("ButtonControl", { "TOPLEFT", self.controls.warrant, "TOPRIGHT" }, { 8, 0, 125, 20 }, "Import Warrant", function()
 		self:ImportWarrant()
@@ -214,21 +280,121 @@ end)
 function MercenaryTabClass:Changed()
 	self.modFlag = true
 	self.build.buildFlag = true
+	self:InvalidateSupportSort()
 	self:RefreshControls()
 end
 
-function MercenaryTabClass:RefreshControls()
-	local classes = { }
-	for _, classId in ipairs(self.data.classOrder) do
-		local class = self.data.classes[classId]
-		t_insert(classes, { id = classId, label = class.name:gsub("^%[DNT%]%s*", "").." ("..class.attributeName..")" })
+function MercenaryTabClass:InvalidateSupportSort()
+	self.supportSortRevision = self.supportSortRevision + 1
+	self.supportSortCache = { }
+	self.supportSortCoroutine = nil
+	self.supportSortStatus = ""
+end
+
+function MercenaryTabClass:BuildSupportList(selectedData)
+	local supportList = { { label = "<No support>", id = nil } }
+	for _, supportId in ipairs(selectedData and selectedData.possibleSupportIds or { }) do
+		local support = self.data.supports[supportId]
+		if support then
+			t_insert(supportList, { id = supportId, tier = support.variant, label = supportLabel(support) })
+		end
 	end
-	self.controls.class:SetList(classes)
-	self.controls.class:SelByValue(self.profile.classId, "id")
+	return supportList
+end
+
+function MercenaryTabClass:RefreshSupportLists()
+	local selected = self.profile.skills[self.selectedSkillIndex]
+	local selectedData = selected and self.data.skills[selected.id]
+	local supportList = self:BuildSupportList(selectedData)
+	local maxSupports = MercenaryTools.supportLimit(self.data, selectedData)
+	for index, control in ipairs(self.supportControls) do
+		control:SetList(copyTable(supportList, true))
+		control:SelByValue(selected and selected.supports[index] and selected.supports[index].id, "id")
+		control.enabled = selected ~= nil
+		control.shown = index <= maxSupports
+		self.controls["support"..index.."Clear"].shown = control.shown
+	end
+end
+
+local function supportDPS(output, field)
+	if not output then return 0 end
+	return (field == "FullDPS" and output.FullDPS ~= nil and output.FullDPS)
+		or (output.Minion and output.Minion.CombinedDPS)
+		or (output[field] ~= nil and output[field])
+		or 0
+end
+
+function MercenaryTabClass:ApplySupportSort(index, list)
+	local control = self.supportControls[index]
+	if not control then return end
+	control:SetList(copyTable(list, true))
+	local selected = self.profile.skills[self.selectedSkillIndex]
+	control:SelByValue(selected and selected.supports[index] and selected.supports[index].id, "id")
+end
+
+function MercenaryTabClass:QueueSupportSort(index)
+	if not self.sortGemsByDPS then return end
+	local control = self.supportControls[index]
+	local selected = self.profile.skills[self.selectedSkillIndex]
+	if not control or not selected or not control.list or #control.list < 2 then return end
+	local key = table.concat({ self.supportSortRevision, self.build.outputRevision or 0, selected.id, index, self.sortGemsByDPSField }, ":")
+	local cached = self.supportSortCache[index]
+	if cached and cached.key == key then
+		self:ApplySupportSort(index, cached.list)
+		return
+	end
+	local originalList = copyTable(control.list, true)
+	local revision = self.supportSortRevision
+	local skillIndex = self.selectedSkillIndex
+	self.supportSortStatus = "0%"
+	self.supportSortCoroutine = coroutine.create(function()
+		local calcTab = self.build.calcsTab
+		local calcFunc = calcTab and calcTab.GetMiscCalculator and select(1, calcTab:GetMiscCalculator())
+		if not calcFunc then return end
+		local useFullDPS = self.sortGemsByDPSField == "FullDPS"
+		local startTime = GetTime()
+		for entryIndex, entry in ipairs(originalList) do
+			local oldSupport = selected.supports[index]
+			selected.supports[index] = entry.id and { id = entry.id, tier = entry.tier } or nil
+			local ok, output = pcall(calcFunc, { comparisonActor = "MERCENARY" }, useFullDPS)
+			selected.supports[index] = oldSupport
+			if not ok then error(output) end
+			entry.dps = supportDPS(output, self.sortGemsByDPSField)
+			self.supportSortStatus = ("%d%%"):format(m_floor(entryIndex / #originalList * 100))
+			if GetTime() - startTime > 50 then
+				coroutine.yield()
+				startTime = GetTime()
+			end
+		end
+		t_sort(originalList, function(a, b)
+			if a.dps ~= b.dps then return a.dps > b.dps end
+			local aLabel, bLabel = StripEscapes(a.label or ""), StripEscapes(b.label or "")
+			return aLabel == bLabel and tostring(a.id or "") < tostring(b.id or "") or aLabel < bLabel
+		end)
+		self.supportSortCache[index] = { key = key, list = originalList }
+		self.supportSortStatus = ""
+		if self.supportSortRevision == revision and self.selectedSkillIndex == skillIndex then
+			self:ApplySupportSort(index, originalList)
+		end
+	end)
+end
+
+function MercenaryTabClass:ProcessSupportSort()
+	if not self.supportSortCoroutine then return end
+	local ok, err = coroutine.resume(self.supportSortCoroutine)
+	if launch.devMode and not ok then error(err) end
+	if coroutine.status(self.supportSortCoroutine) == "dead" then
+		self.supportSortCoroutine = nil
+		self.supportSortStatus = ""
+	end
+end
+
+function MercenaryTabClass:RefreshControls()
+	local classGroup = self.classGroupsByClassId[self.profile.classId]
+	self.controls.class:SelByValue(classGroup and classGroup.id, "id")
 
 	local builds = { }
-	local class = self.data.classes[self.profile.classId]
-	for _, buildId in ipairs(class and class.buildIds or { }) do
+	for _, buildId in ipairs(classGroup and classGroup.buildIds or { }) do
 		local mercBuild = self.data.builds[buildId]
 		t_insert(builds, { id = buildId, classId = mercBuild.classId, label = mercBuild.name })
 	end
@@ -280,20 +446,9 @@ function MercenaryTabClass:RefreshControls()
 	self.controls.skillMinionSkill.enabled = #minionSkillList > 1
 	self.controls.skillMinionSkill.shown = #minionSkillList > 0
 	self.controls.skillMinionSkillLabel.shown = #minionSkillList > 0
-	local supportList = { { label = "<No support>", id = nil } }
-	for _, supportId in ipairs(selectedData and selectedData.possibleSupportIds or { }) do
-		local support = self.data.supports[supportId]
-		t_insert(supportList, { id = supportId, label = support.name.." (Tier "..support.variant..")" })
-	end
-	local maxSupports = MercenaryTools.supportLimit(self.data, selectedData)
-	for index, control in ipairs(self.supportControls) do
-		control:SetList(supportList)
-		control:SelByValue(selected and selected.supports[index] and selected.supports[index].id, "id")
-		control.enabled = selected ~= nil
-		-- Only offer as many rows as the selected skill accepts supports.
-		control.shown = index <= maxSupports
-		self.controls["support"..index.."Clear"].shown = control.shown
-	end
+	self.controls.sortGemsByDPS.state = self.sortGemsByDPS
+	self.controls.sortGemsByDPSFieldControl:SelByValue(self.sortGemsByDPSField, "type")
+	self:RefreshSupportLists()
 	self:RefreshErrors()
 end
 
@@ -339,15 +494,16 @@ end
 
 function MercenaryTabClass:ImportWarrant()
 	self.importError = nil
-	local imported, err = MercenaryTools.importWarrant(self.controls.warrant.buf, self.data, self.profile.classId)
+	local classGroup = self.classGroupsByClassId[self.profile.classId]
+	local importClassIds = self.profile.buildId and { self.profile.classId } or classGroup and classGroup.classIds
+	local imported, err = MercenaryTools.importWarrant(self.controls.warrant.buf, self.data, importClassIds)
 	if not imported then
 		self.importError = err
 		self:RefreshErrors()
 		return
 	end
 	local matchingBuilds = { }
-	local class = self.data.classes[self.profile.classId]
-	for _, buildId in ipairs(class.buildIds) do
+	for _, buildId in ipairs(classGroup and classGroup.buildIds or { }) do
 		local mercBuild = self.data.builds[buildId]
 		local matches = true
 		for _, skill in ipairs(imported.skills) do
@@ -377,6 +533,7 @@ function MercenaryTabClass:ImportWarrant()
 		return
 	end
 	self.profile.buildId = candidate.buildId
+	self.profile.classId = self.data.builds[candidate.buildId].classId
 	self.profile.skills = candidate.skills
 	self.profile.mainSkillId = candidate.mainSkillId
 	self.selectedSkillIndex = 1
@@ -535,6 +692,12 @@ function MercenaryTabClass:Load(xml)
 		lifeComparison = xml.attrib.lifeComparison or "AUTO",
 		skills = { },
 	}
+	if xml.attrib.sortGemsByDPS then
+		self.sortGemsByDPS = xml.attrib.sortGemsByDPS ~= "false"
+	end
+	self.controls.sortGemsByDPS.state = self.sortGemsByDPS
+	self.controls.sortGemsByDPSFieldControl:SelByValue(xml.attrib.sortGemsByDPSField or "CombinedDPS", "type")
+	self.sortGemsByDPSField = self.controls.sortGemsByDPSFieldControl:GetSelValueByKey("type")
 	local mercBuild = self.data.builds[self.profile.buildId]
 	self.profile.classId = mercBuild and mercBuild.classId
 	for _, child in ipairs(xml) do
@@ -568,6 +731,8 @@ function MercenaryTabClass:Save(xml)
 		foundAreaLevel = tostring(self.profile.foundAreaLevel or 68),
 		mainSkillId = self.profile.mainSkillId,
 		lifeComparison = self.profile.lifeComparison,
+		sortGemsByDPS = tostring(self.sortGemsByDPS),
+		sortGemsByDPSField = self.sortGemsByDPSField,
 	}
 	for _, skill in ipairs(self.profile.skills) do
 		local child = { elem = "Skill", attrib = {
@@ -590,6 +755,7 @@ end
 
 function MercenaryTabClass:Draw(viewPort, inputEvents)
 	self.x, self.y, self.width, self.height = viewPort.x, viewPort.y, viewPort.width, viewPort.height
+	self:ProcessSupportSort()
 	self:RefreshErrors()
 	self:ProcessControlsInput(inputEvents, viewPort)
 	main:DrawBackground(viewPort)

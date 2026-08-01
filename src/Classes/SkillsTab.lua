@@ -10,6 +10,8 @@ local t_remove = table.remove
 local m_min = math.min
 local m_max = math.max
 
+local skillOptions = require("Modules/SkillOptions")
+
 local groupSlotDropList = {
 	{ label = "None" },
 	{ label = "Weapon 1", slotName = "Weapon 1" },
@@ -61,18 +63,6 @@ local showSupportGemTypeList = {
 	{ label = "All", show = "ALL" },
 	{ label = "Non-Exceptional", show = "NORMAL" },
 	{ label = "Exceptional", show = "EXCEPTIONAL" },
-}
-
-local sortGemTypeList = {
-	{ label = "Full DPS", type = "FullDPS" },
-	{ label = "Combined DPS", type = "CombinedDPS" },
-	{ label = "Hit DPS", type = "TotalDPS" },
-	{ label = "Average Hit", type = "AverageDamage" },
-	{ label = "DoT DPS", type = "TotalDot" },
-	{ label = "Bleed DPS", type = "BleedDPS" },
-	{ label = "Ignite DPS", type = "IgniteDPS" },
-	{ label = "Poison DPS", type = "TotalPoisonDPS" },
-	{ label = "Effective Hit Pool", type = "TotalEHP" },
 }
 
 ---@class SkillsTab: UndoHandler, ControlHost, Control
@@ -128,7 +118,7 @@ function SkillsTabClass:SkillsTab(build)
 	self.controls.sortGemsByDPS = new("CheckBoxControl"):CheckBoxControl({ "TOPLEFT", self.controls.groupList, "BOTTOMLEFT" }, { optionInputsX, optionInputsY + 70, 20 }, "Sort gems by DPS:", function(state)
 		self.sortGemsByDPS = state
 	end, nil, true)
-	self.controls.sortGemsByDPSFieldControl = new("DropDownControl"):DropDownControl({ "LEFT", self.controls.sortGemsByDPS, "RIGHT" }, { 10, 0, 140, 20 }, sortGemTypeList, function(index, value)
+	self.controls.sortGemsByDPSFieldControl = new("DropDownControl"):DropDownControl({ "LEFT", self.controls.sortGemsByDPS, "RIGHT" }, { 10, 0, 140, 20 }, skillOptions.sortGemTypeList, function(index, value)
 		self.sortGemsByDPSField = value.type
 	end)
 	self.controls.defaultLevel = new("DropDownControl"):DropDownControl({ "TOPLEFT", self.controls.groupList, "BOTTOMLEFT" }, { optionInputsX, optionInputsY + 94, 170, 20 }, defaultGemLevelList, function(index, value)

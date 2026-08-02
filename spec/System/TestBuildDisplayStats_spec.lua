@@ -31,6 +31,28 @@ describe("Build display stats", function()
 		assert.are.equals("^7123", build:FormatStat({ fmt = ".1f", compactValue = true }, 123))
 	end)
 
+	it("shows offensive stats in the Mercenary sidebar", function()
+		local _, _, _, mercenaryDisplayStats = LoadModule("Modules/BuildDisplayStats")
+		build.controls.statBox.list = { }
+		build:AddDisplayStatList(mercenaryDisplayStats, {
+			mainSkill = { skillFlags = { attack = true, hit = true } },
+			output = {
+				Speed = 1.5,
+				PreEffectiveCritChance = 12.34,
+				CritChance = 10,
+				CritMultiplier = 2,
+				HitChance = 95,
+				CrabBarriersMax = 0,
+				CrabBarriers = 0,
+			},
+			modDB = { Flag = function() return false end },
+		})
+
+		for _, label in ipairs({ "Attack Rate", "Crit Chance", "Effective Crit Chance", "Crit Multiplier", "Hit Chance" }) do
+			assert.is_truthy(getSidebarStat(label), label)
+		end
+	end)
+
 	it("shows guard suffixes for EHP and max hit values", function()
 		build.skillsTab:PasteSocketGroup("Steelskin 20/0  1")
 		runCallback("OnFrame")

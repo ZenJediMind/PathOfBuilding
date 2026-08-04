@@ -74,6 +74,27 @@ describe("Permanent Mercenary calculations", function()
 		build.characterLevelAutoMode = false
 	end)
 
+	it("calculates the selected Mercenary loadout independently", function()
+		configure("TrapsMinesShadow", "TrapsMinesShadowLightning", "LightningTrapMercenary")
+		local firstId = build.mercenaryTab.activeMercenarySetId
+		local firstEnv = calculate()
+		assert.are.equal("LightningTrapMercenary", firstEnv.mercenary.mainSkill.activeEffect.grantedEffect.id)
+
+		local second = build.mercenaryTab:NewMercenarySet()
+		table.insert(build.mercenaryTab.mercenarySetOrderList, second.id)
+		build.mercenaryTab:SetActiveMercenarySet(second.id)
+		build.mercenaryTab.profile.classId = "TrapsMinesShadow"
+		build.mercenaryTab.profile.buildId = "TrapsMinesShadowLightning"
+		build.mercenaryTab.profile.mainSkillId = "ZealotryMercenary"
+		build.mercenaryTab.profile.skills = { { id = "ZealotryMercenary", enabled = true, supports = { } } }
+		local secondEnv = calculate()
+		assert.are.equal("ZealotryMercenary", secondEnv.mercenary.mainSkill.activeEffect.grantedEffect.id)
+
+		build.mercenaryTab:SetActiveMercenarySet(firstId)
+		local firstAgainEnv = calculate()
+		assert.are.equal("LightningTrapMercenary", firstAgainEnv.mercenary.mainSkill.activeEffect.grantedEffect.id)
+	end)
+
 	it("keeps grouped Mercenary classes after refreshing controls", function()
 		build.mercenaryTab:Changed()
 		assert.are.equal(7, #build.mercenaryTab.controls.class.list)
@@ -939,7 +960,7 @@ describe("Permanent Mercenary calculations", function()
 	end)
 
 	it("includes Mercenary Mirage Archer damage in Full DPS", function()
-		configure("EleBowRanger", "EleBowRangerFire", "BurningArrowMercenary", {
+		configure("EleBowRanger", "EleBowRangerFire", "CausticArrowMercenary", {
 			includeInFullDPS = true,
 			supports = { { id = "MirageArcherHigh", tier = 3 } },
 		})

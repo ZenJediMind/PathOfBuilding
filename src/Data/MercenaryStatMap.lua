@@ -525,7 +525,6 @@ return {
 		["ignite_art_variation"] = true,
 		["ignores_proximity_shield"] = true,
 		["ignores_trap_and_mine_cooldown_limit"] = true,
-		["infinite_minion_duration"] = true,
 		["is_area_damage"] = true,
 		["is_dominated"] = true,
 		["is_ranged_attack_totem"] = true,

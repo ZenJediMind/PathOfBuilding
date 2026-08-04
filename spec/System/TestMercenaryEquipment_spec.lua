@@ -267,6 +267,79 @@ describe("Mercenary equipment validation", function()
 		assert.are.equal("TotalDPS", xml.attrib.sortGemsByDPSField)
 	end)
 
+	it("keeps unlimited Mercenary loadouts independent while sharing equipment", function()
+		local sharedHelmet = MercenaryTools.itemSlotName("Helmet")
+		itemSet[sharedHelmet].selItemId = 9019
+		tab.profile.buildId = "MeleeAOEMarauderFireSlam"
+		tab.profile.skills = { { id = "InfernalBlowMercenary", enabled = true, supports = { } } }
+		tab.profile.mainSkillId = "InfernalBlowMercenary"
+		tab.profile.title = "First"
+		tab:RefreshControls()
+
+		local firstId = tab.activeMercenarySetId
+		for index = 1, 16 do
+			local set = tab:NewMercenarySet()
+			set.title = "Loadout "..index
+			table.insert(tab.mercenarySetOrderList, set.id)
+		end
+		assert.are.equal(17, #tab.mercenarySetOrderList)
+		local manager = new("MercenarySetListControl", nil, {0, 0, 350, 200}, tab)
+		assert.is_table(manager.controls.copy)
+		assert.is_table(manager.controls.delete)
+
+		local secondId = tab.mercenarySetOrderList[2]
+		tab:RefreshControls()
+		tab.controls.setSelect:SetSel(2)
+		assert.are.equal(secondId, tab.activeMercenarySetId)
+		tab.profile.buildId = "TrapsMinesShadowLightning"
+		tab.profile.foundAreaLevel = 80
+		tab.profile.skills = { { id = "LightningTrapMercenary", enabled = true, supports = { } } }
+		tab.profile.mainSkillId = "LightningTrapMercenary"
+		tab:RefreshControls()
+		assert.are.equal(9019, build.itemsTab.activeItemSet[sharedHelmet].selItemId)
+
+		tab.controls.setSelect:SetSel(1)
+		assert.are.equal("MeleeAOEMarauderFireSlam", tab.profile.buildId)
+		assert.are.equal("InfernalBlowMercenary", tab.profile.mainSkillId)
+		assert.are.equal(9019, build.itemsTab.activeItemSet[sharedHelmet].selItemId)
+
+		local xml = { }
+		tab:Save(xml)
+		assert.are.equal("1", xml.attrib.activeMercenarySet)
+		local savedSetCount = 0
+		for _, child in ipairs(xml) do
+			if child.elem == "MercenarySet" then savedSetCount = savedSetCount + 1 end
+		end
+		assert.are.equal(17, savedSetCount)
+
+		tab:Load(xml)
+		assert.are.equal(17, #tab.mercenarySetOrderList)
+		assert.are.equal(firstId, tab.activeMercenarySetId)
+		assert.are.equal("InfernalBlowMercenary", tab.profile.mainSkillId)
+		assert.are.equal(9019, build.itemsTab.activeItemSet[sharedHelmet].selItemId)
+	end)
+
+	it("loads the previous single-profile Mercenary XML format", function()
+		tab:Load({
+			attrib = {
+				buildId = "TrapsMinesShadowLightning",
+				foundAreaLevel = "80",
+				mainSkillId = "LightningTrapMercenary",
+				lifeComparison = "PLAYER",
+			},
+			{ elem = "Skill", attrib = {
+				id = "LightningTrapMercenary",
+				enabled = "true",
+				includeInFullDPS = "false",
+				count = "1",
+			} },
+		})
+		assert.are.equal(1, #tab.mercenarySetOrderList)
+		assert.are.equal("TrapsMinesShadowLightning", tab.profile.buildId)
+		assert.are.equal("PLAYER", tab.profile.lifeComparison)
+		assert.are.equal("LightningTrapMercenary", tab.profile.skills[1].id)
+	end)
+
 	it("matches the player skill tip sizing without exposing Calcs state in row text", function()
 		tab.profile.skills[1] = { id = "ConsecratedPathMercenary", enabled = true, supports = { } }
 		tab.profile.mainSkillId = "ConsecratedPathMercenary"

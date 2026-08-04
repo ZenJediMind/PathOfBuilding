@@ -129,11 +129,11 @@ local MercenaryTabClass = newClass("MercenaryTab", "ControlHost", "Control", fun
 	self.build = build
 	self.data = build.data.mercenaries
 	self.classGroups, self.classGroupsByClassId = MercenaryTools.classGroups(self.data)
-	self.profile = {
-		foundAreaLevel = 68,
-		skills = { },
-		lifeComparison = "AUTO",
-	}
+	self.mercenarySets = { }
+	self.mercenarySetOrderList = { 1 }
+	self:NewMercenarySet(1)
+	self.activeMercenarySetId = 1
+	self.profile = self.mercenarySets[1]
 	self.sortGemsByDPS = true
 	self.sortGemsByDPSField = "CombinedDPS"
 	self.supportSortRevision = 0
@@ -154,6 +154,17 @@ local MercenaryTabClass = newClass("MercenaryTab", "ControlHost", "Control", fun
 		self:Changed()
 	end)
 	self.controls.class:SetList(self.classGroups)
+	self.controls.setLabel = new("LabelControl", { "LEFT", self.controls.class, "RIGHT" }, { 20, 0, 0, 16 }, "^7Mercenary set:")
+	self.controls.setSelect = new("DropDownControl", { "LEFT", self.controls.setLabel, "RIGHT" }, { 8, 0, 210, 20 }, { }, function(_, value)
+		if value then self:SetActiveMercenarySet(value.id) end
+	end)
+	self.controls.setSelect.enableDroppedWidth = true
+	self.controls.setSelect.enabled = function()
+		return #self.mercenarySetOrderList > 1
+	end
+	self.controls.setManage = new("ButtonControl", { "LEFT", self.controls.setSelect, "RIGHT" }, { 4, 0, 90, 20 }, "Manage...", function()
+		self:OpenMercenarySetManagePopup()
+	end)
 	self.controls.buildLabel = new("LabelControl", { "TOPLEFT", self.controls.classLabel, "BOTTOMLEFT" }, { 0, 12, 0, 16 }, "^7Class and build:")
 	self.controls.build = new("DropDownControl", { "LEFT", self.controls.buildLabel, "RIGHT" }, { 8, 0, 300, 20 }, { }, function(_, value)
 		self.profile.buildId = value and value.id
@@ -549,6 +560,16 @@ function MercenaryTabClass:ProcessSupportSort()
 end
 
 function MercenaryTabClass:RefreshControls()
+	local setList = { }
+	for _, setId in ipairs(self.mercenarySetOrderList) do
+		local set = self.mercenarySets[setId]
+		if set then
+			t_insert(setList, { id = setId, label = set.title or "Default" })
+		end
+	end
+	self.controls.setSelect:SetList(setList)
+	self.controls.setSelect:SelByValue(self.activeMercenarySetId, "id")
+
 	local classGroup = self.classGroupsByClassId[self.profile.classId]
 	self.controls.class:SelByValue(classGroup and classGroup.id, "id")
 
@@ -619,6 +640,57 @@ function MercenaryTabClass:AddSkill()
 	end
 end
 
+function MercenaryTabClass:NewMercenarySet(setId, title)
+	local set = {
+		id = setId,
+		title = title,
+		foundAreaLevel = 68,
+		skills = { },
+		lifeComparison = "AUTO",
+	}
+	if not set.id then
+		set.id = 1
+		while self.mercenarySets[set.id] do
+			set.id = set.id + 1
+		end
+	end
+	self.mercenarySets[set.id] = set
+	return set
+end
+
+function MercenaryTabClass:SetActiveMercenarySet(setId)
+	if not self.mercenarySetOrderList[1] then
+		self.mercenarySetOrderList[1] = 1
+		self:NewMercenarySet(1)
+	end
+
+	if self.activeMercenarySetId and self.profile and self.mercenarySets[self.activeMercenarySetId] then
+		self.profile.id = self.activeMercenarySetId
+		self.mercenarySets[self.activeMercenarySetId] = self.profile
+	end
+	if not setId or not self.mercenarySets[setId] then
+		setId = self.mercenarySetOrderList[1]
+	end
+
+	self.activeMercenarySetId = setId
+	self.profile = self.mercenarySets[setId]
+	self.selectedSkillIndex = 1
+	self.modFlag = true
+	self.build.buildFlag = true
+	if self.controls.skillList then
+		self:RefreshControls()
+	end
+end
+
+function MercenaryTabClass:OpenMercenarySetManagePopup()
+	main:OpenPopup(370, 290, "Manage Mercenary Loadouts", {
+		new("MercenarySetListControl", nil, {0, 50, 350, 200}, self),
+		new("ButtonControl", nil, {0, 260, 90, 20}, "Done", function()
+			main:ClosePopup()
+		end),
+	})
+end
+
 function MercenaryTabClass:SetSkill(index, skillId)
 	self.selectedSkillIndex = index
 	local existing = self.profile.skills[index]
@@ -653,7 +725,7 @@ function MercenaryTabClass:SetSupport(index, supportId)
 end
 
 function MercenaryTabClass:Reset()
-	self.profile = { foundAreaLevel = 68, skills = { }, lifeComparison = "AUTO" }
+	self.profile = self:NewMercenarySet(self.activeMercenarySetId, self.profile.title)
 	self.selectedSkillIndex = 1
 	self:Changed()
 end
@@ -794,70 +866,107 @@ function MercenaryTabClass:RefreshErrors()
 end
 
 function MercenaryTabClass:Load(xml)
-	self.profile = {
-		buildId = xml.attrib.buildId,
-		foundAreaLevel = tonumber(xml.attrib.foundAreaLevel) or 68,
-		mainSkillId = xml.attrib.mainSkillId,
-		lifeComparison = xml.attrib.lifeComparison or "AUTO",
-		skills = { },
-	}
+	local function loadSkill(node, profile)
+		local skill = {
+			id = node.attrib.id,
+			enabled = node.attrib.enabled ~= "false",
+			includeInFullDPS = node.attrib.includeInFullDPS == "true",
+			count = tonumber(node.attrib.count) or node.attrib.count or 1,
+			skillPart = tonumber(node.attrib.skillPart),
+			skillStageCount = tonumber(node.attrib.skillStageCount),
+			skillMineCount = tonumber(node.attrib.skillMineCount),
+			skillMinionSkill = tonumber(node.attrib.skillMinionSkill),
+			supports = { },
+		}
+		for _, supportNode in ipairs(node) do
+			if supportNode.elem == "Support" then
+				t_insert(skill.supports, { id = supportNode.attrib.id, tier = tonumber(supportNode.attrib.tier) })
+			end
+		end
+		t_insert(profile.skills, skill)
+	end
+	local function loadProfile(node, profile)
+		profile.buildId = node.attrib.buildId
+		profile.foundAreaLevel = tonumber(node.attrib.foundAreaLevel) or 68
+		profile.mainSkillId = node.attrib.mainSkillId
+		profile.lifeComparison = node.attrib.lifeComparison or "AUTO"
+		local mercBuild = self.data.builds[profile.buildId]
+		profile.classId = mercBuild and mercBuild.classId
+		for _, child in ipairs(node) do
+			if child.elem == "Skill" then loadSkill(child, profile) end
+		end
+	end
+
+	self.activeMercenarySetId = nil
+	self.profile = nil
+	self.mercenarySets = { }
+	self.mercenarySetOrderList = { }
 	if xml.attrib.sortGemsByDPS then
 		self.sortGemsByDPS = xml.attrib.sortGemsByDPS ~= "false"
 	end
 	self.controls.sortGemsByDPS.state = self.sortGemsByDPS
 	self.controls.sortGemsByDPSFieldControl:SelByValue(xml.attrib.sortGemsByDPSField or "CombinedDPS", "type")
 	self.sortGemsByDPSField = self.controls.sortGemsByDPSFieldControl:GetSelValueByKey("type")
-	local mercBuild = self.data.builds[self.profile.buildId]
-	self.profile.classId = mercBuild and mercBuild.classId
+	local loadedSets = false
 	for _, child in ipairs(xml) do
-		if child.elem == "Skill" then
-			local skill = {
-				id = child.attrib.id,
-				enabled = child.attrib.enabled ~= "false",
-				includeInFullDPS = child.attrib.includeInFullDPS == "true",
-				count = tonumber(child.attrib.count) or child.attrib.count or 1,
-				skillPart = tonumber(child.attrib.skillPart),
-				skillStageCount = tonumber(child.attrib.skillStageCount),
-				skillMineCount = tonumber(child.attrib.skillMineCount),
-				skillMinionSkill = tonumber(child.attrib.skillMinionSkill),
-				supports = { },
-			}
-			for _, supportNode in ipairs(child) do
-				if supportNode.elem == "Support" then
-					t_insert(skill.supports, { id = supportNode.attrib.id, tier = tonumber(supportNode.attrib.tier) })
-				end
-			end
-			t_insert(self.profile.skills, skill)
+		if child.elem == "MercenarySet" then
+			local setId = tonumber(child.attrib.id) or 1
+			while self.mercenarySets[setId] do setId = setId + 1 end
+			local profile = self:NewMercenarySet(setId, child.attrib.title)
+			loadProfile(child, profile)
+			t_insert(self.mercenarySetOrderList, setId)
+			loadedSets = true
 		end
 	end
+	if not loadedSets then
+		local profile = self:NewMercenarySet(1)
+		loadProfile(xml, profile)
+		t_insert(self.mercenarySetOrderList, 1)
+	end
+	self:SetActiveMercenarySet(tonumber(xml.attrib.activeMercenarySet) or 1)
 	self.modFlag = false
 	self:RefreshControls()
 end
 
 function MercenaryTabClass:Save(xml)
 	xml.attrib = {
-		buildId = self.profile.buildId,
-		foundAreaLevel = tostring(self.profile.foundAreaLevel or 68),
-		mainSkillId = self.profile.mainSkillId,
-		lifeComparison = self.profile.lifeComparison,
+		activeMercenarySet = tostring(self.activeMercenarySetId),
 		sortGemsByDPS = tostring(self.sortGemsByDPS),
 		sortGemsByDPSField = self.sortGemsByDPSField,
 	}
-	for _, skill in ipairs(self.profile.skills) do
-		local child = { elem = "Skill", attrib = {
-			id = skill.id,
-			enabled = tostring(skill.enabled ~= false),
-			includeInFullDPS = tostring(skill.includeInFullDPS == true),
-			count = tostring(skill.count or 1),
-			skillPart = skill.skillPart and tostring(skill.skillPart),
-			skillStageCount = skill.skillStageCount and tostring(skill.skillStageCount),
-			skillMineCount = skill.skillMineCount and tostring(skill.skillMineCount),
-			skillMinionSkill = skill.skillMinionSkill and tostring(skill.skillMinionSkill),
-		} }
-		for _, support in ipairs(skill.supports or { }) do
-			t_insert(child, { elem = "Support", attrib = { id = support.id, tier = tostring(support.tier) } })
+	if self.activeMercenarySetId and self.profile then
+		self.profile.id = self.activeMercenarySetId
+		self.mercenarySets[self.activeMercenarySetId] = self.profile
+	end
+	for _, setId in ipairs(self.mercenarySetOrderList) do
+		local profile = self.mercenarySets[setId]
+		if profile then
+			local setNode = { elem = "MercenarySet", attrib = {
+				id = tostring(setId),
+				title = profile.title,
+				buildId = profile.buildId,
+				foundAreaLevel = tostring(profile.foundAreaLevel or 68),
+				mainSkillId = profile.mainSkillId,
+				lifeComparison = profile.lifeComparison,
+			} }
+			for _, skill in ipairs(profile.skills or { }) do
+				local child = { elem = "Skill", attrib = {
+					id = skill.id,
+					enabled = tostring(skill.enabled ~= false),
+					includeInFullDPS = tostring(skill.includeInFullDPS == true),
+					count = tostring(skill.count or 1),
+					skillPart = skill.skillPart and tostring(skill.skillPart),
+					skillStageCount = skill.skillStageCount and tostring(skill.skillStageCount),
+					skillMineCount = skill.skillMineCount and tostring(skill.skillMineCount),
+					skillMinionSkill = skill.skillMinionSkill and tostring(skill.skillMinionSkill),
+				} }
+				for _, support in ipairs(skill.supports or { }) do
+					t_insert(child, { elem = "Support", attrib = { id = support.id, tier = tostring(support.tier) } })
+				end
+				t_insert(setNode, child)
+			end
+			t_insert(xml, setNode)
 		end
-		t_insert(xml, child)
 	end
 	self.modFlag = false
 end

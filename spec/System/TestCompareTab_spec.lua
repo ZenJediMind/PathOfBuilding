@@ -1,4 +1,47 @@
 describe("CompareTab", function()
+	it("imports Mercenary builds and preserves their Calcs skill selection", function()
+		local MercenaryTools = require("Modules/MercenaryTools")
+		newBuild()
+		local item = new("Item", "Rarity: Normal\nCrude Bow")
+		item.id = 999903
+		build.itemsTab.items[item.id] = item
+		build.itemsTab.activeItemSet[MercenaryTools.itemSlotName("Weapon 1")].selItemId = item.id
+		build.mercenaryTab.profile = {
+			classId = "EleBowRanger",
+			buildId = "EleBowRangerClones",
+			foundAreaLevel = 68,
+			mainSkillId = "MirrorArrowMercenary",
+			lifeComparison = "AUTO",
+			skills = {
+				{ id = "MirrorArrowMercenary", enabled = true, includeInFullDPS = true, supports = { } },
+				{ id = "IceShotMercenary", enabled = true, includeInFullDPS = false, supports = { } },
+			},
+		}
+		build.mercenaryTab:Changed()
+		build.calcsTab.input.actor = "MERCENARY"
+		build.configTab.input.enemyLevel = 83
+		build.configTab:BuildModList()
+		build.calcsTab:BuildOutput()
+
+		local compareTab = build.compareTab
+		assert.is_true(compareTab:ImportBuild(assert(build:SaveDB("mercenary-compare")), "Mercenary"))
+		local entry = assert(compareTab:GetActiveCompare())
+		compareTab:UpdateSetSelectors(entry)
+		assert.is_true(compareTab.controls.cmpMainSkill:IsShown())
+		assert.are.equal(2, #compareTab.controls.cmpMainSkill.list)
+		compareTab.controls.cmpMainSkill:SetSel(2)
+		assert.are.equal("IceShotMercenary", entry.mercenaryTab.profile.mainSkillId)
+		entry.mercenaryTab.profile.mainSkillId = "MirrorArrowMercenary"
+		entry.mercenaryTab:Changed()
+		compareTab.compareViewMode = "CALCS"
+		compareTab:RefreshCalcsSkillControls(entry)
+		assert.is_true(entry.calcsTab:IsMercenaryActor())
+		assert.is_true(compareTab.controls.cmpCalcsMainSkill:IsShown())
+		assert.are.equal(2, #compareTab.controls.cmpCalcsMainSkill.list)
+		compareTab.controls.cmpCalcsMainSkill:SetSel(2)
+		assert.are.equal("IceShotMercenary", entry.mercenaryTab.profile.mainSkillId)
+	end)
+
 	it("hides skill detail controls after removing the final comparison", function()
 		newBuild()
 		local compareTab = build.compareTab

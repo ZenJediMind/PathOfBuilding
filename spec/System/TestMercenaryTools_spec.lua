@@ -87,6 +87,17 @@ describe("Mercenary tools", function()
 		assert.matches("must be an integer", table.concat(tools.validateProfile(profile, data), "\n"))
 	end)
 
+	it("reports a selected skill with no id instead of crashing", function()
+		local ok, errors = pcall(tools.validateProfile, {
+			buildId = "build",
+			foundAreaLevel = 68,
+			mainSkillId = "skill",
+			skills = { { enabled = true, supports = { } } },
+		}, data)
+		assert.is_true(ok)
+		assert.matches("Invalid skill", table.concat(errors, "\n"))
+	end)
+
 	it("rejects unsafe Full DPS counts", function()
 		for _, count in ipairs({ 0, 1.5, 100, "2" }) do
 			local errors = table.concat(tools.validateProfile({

@@ -1114,6 +1114,7 @@ function buildMode:ResetModFlags()
 	self.spec.modFlag = false
 	self.skillsTab.modFlag = false
 	self.itemsTab.modFlag = false
+	self.mercenaryTab.modFlag = false
 	self.calcsTab.modFlag = false
 end
 

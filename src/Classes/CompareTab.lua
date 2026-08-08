@@ -357,6 +357,7 @@ function CompareTabClass:InitControls()
 	self.controls.cmpSocketGroup = new("DropDownControl"):DropDownControl({"LEFT", self.controls.cmpSkillLabel, "RIGHT"}, {4, 0, 200, 20}, {}, function(index, value)
 		local entry = self:GetActiveCompare()
 		if entry then
+			if entry.calcsTab:IsMercenaryActor() then return end
 			entry:SetMainSocketGroup(index)
 		end
 	end)
@@ -369,6 +370,11 @@ function CompareTabClass:InitControls()
 	self.controls.cmpMainSkill = new("DropDownControl"):DropDownControl({"LEFT", self.controls.cmpSocketGroup, "RIGHT"}, {4, 0, 225, 20}, {}, function(index, value)
 		local entry = self:GetActiveCompare()
 		if entry then
+			if entry.calcsTab:IsMercenaryActor() then
+				if value and value.skillId then entry.mercenaryTab.profile.mainSkillId = value.skillId end
+				entry.mercenaryTab:Changed()
+				return
+			end
 			local mainSocketGroup = entry.skillsTab.socketGroupList[entry.mainSocketGroup]
 			if mainSocketGroup then
 				mainSocketGroup.mainActiveSkill = index
@@ -383,6 +389,11 @@ function CompareTabClass:InitControls()
 	self.controls.cmpSkillPart = new("DropDownControl"):DropDownControl({"LEFT", self.controls.cmpMainSkill, "RIGHT"}, {4, 0, 200, 20}, {}, function(index, value)
 		local entry = self:GetActiveCompare()
 		if entry then
+			if entry.calcsTab:IsMercenaryActor() then
+				local skill = entry.calcsTab:GetMercenaryCalcsSkill()
+				if skill then skill.skillPart = index; entry.mercenaryTab:Changed() end
+				return
+			end
 			local mainSocketGroup = entry.skillsTab.socketGroupList[entry.mainSocketGroup]
 			if mainSocketGroup then
 				local displaySkillList = mainSocketGroup.displaySkillList
@@ -404,6 +415,11 @@ function CompareTabClass:InitControls()
 	self.controls.cmpStageCount = new("EditControl"):EditControl({ "LEFT", self.controls.cmpStageCountLabel, "RIGHT" }, { 4, 0, 52, 20 }, "", nil, "%D", 5, function(buf)
 		local entry = self:GetActiveCompare()
 		if entry then
+			if entry.calcsTab:IsMercenaryActor() then
+				local skill = entry.calcsTab:GetMercenaryCalcsSkill()
+				if skill then skill.skillStageCount = tonumber(buf); entry.mercenaryTab:Changed() end
+				return
+			end
 			local mainSocketGroup = entry.skillsTab.socketGroupList[entry.mainSocketGroup]
 			if mainSocketGroup then
 				local displaySkillList = mainSocketGroup.displaySkillList
@@ -425,6 +441,11 @@ function CompareTabClass:InitControls()
 	self.controls.cmpMineCount = new("EditControl"):EditControl({ "LEFT", self.controls.cmpMineCountLabel, "RIGHT" }, { 4, 0, 52, 20 }, "", nil, "%D", 5, function(buf)
 		local entry = self:GetActiveCompare()
 		if entry then
+			if entry.calcsTab:IsMercenaryActor() then
+				local skill = entry.calcsTab:GetMercenaryCalcsSkill()
+				if skill then skill.skillMineCount = tonumber(buf); entry.mercenaryTab:Changed() end
+				return
+			end
 			local mainSocketGroup = entry.skillsTab.socketGroupList[entry.mainSocketGroup]
 			if mainSocketGroup then
 				local displaySkillList = mainSocketGroup.displaySkillList
@@ -468,6 +489,11 @@ function CompareTabClass:InitControls()
 	self.controls.cmpMinionSkill = new("DropDownControl"):DropDownControl({"LEFT", self.controls.cmpMinion, "RIGHT"}, {4, 0, 140, 20}, {}, function(index, value)
 		local entry = self:GetActiveCompare()
 		if entry then
+			if entry.calcsTab:IsMercenaryActor() then
+				local skill = entry.calcsTab:GetMercenaryCalcsSkill()
+				if skill then skill.skillMinionSkill = index; entry.mercenaryTab:Changed() end
+				return
+			end
 			local mainSocketGroup = entry.skillsTab.socketGroupList[entry.mainSocketGroup]
 			if mainSocketGroup then
 				local displaySkillList = mainSocketGroup.displaySkillList
@@ -493,6 +519,7 @@ function CompareTabClass:InitControls()
 	}
 	-- Primary build calcs skill controls
 	self.controls.primCalcsSocketGroup = new("DropDownControl"):DropDownControl(nil, {0, 0, 200, 18}, {}, function(index, value)
+		if self.primaryBuild.calcsTab:IsMercenaryActor() then return end
 		self.primaryBuild.calcsTab.input.skill_number = index
 		self.primaryBuild.buildFlag = true
 	end)
@@ -501,6 +528,11 @@ function CompareTabClass:InitControls()
 	self.controls.primCalcsSocketGroup.enableDroppedWidth = true
 
 	self.controls.primCalcsMainSkill = new("DropDownControl"):DropDownControl(nil, {0, 0, 200, 18}, {}, function(index, value)
+		if self.primaryBuild.calcsTab:IsMercenaryActor() then
+			if value and value.skillId then self.primaryBuild.mercenaryTab.profile.mainSkillId = value.skillId end
+			self.primaryBuild.mercenaryTab:Changed()
+			return
+		end
 		local mainSocketGroup = self.primaryBuild.skillsTab.socketGroupList[self.primaryBuild.calcsTab.input.skill_number]
 		if mainSocketGroup then
 			mainSocketGroup.mainActiveSkillCalcs = index
@@ -510,6 +542,11 @@ function CompareTabClass:InitControls()
 	self.controls.primCalcsMainSkill.shown = false
 
 	self.controls.primCalcsSkillPart = new("DropDownControl"):DropDownControl(nil, {0, 0, 150, 18}, {}, function(index, value)
+		if self.primaryBuild.calcsTab:IsMercenaryActor() then
+			local skill = self.primaryBuild.calcsTab:GetMercenaryCalcsSkill()
+			if skill then skill.skillPart = index; self.primaryBuild.mercenaryTab:Changed() end
+			return
+		end
 		local mainSocketGroup = self.primaryBuild.skillsTab.socketGroupList[self.primaryBuild.calcsTab.input.skill_number]
 		if mainSocketGroup then
 			local displaySkillList = mainSocketGroup.displaySkillListCalcs
@@ -523,6 +560,11 @@ function CompareTabClass:InitControls()
 	self.controls.primCalcsSkillPart.shown = false
 
 	self.controls.primCalcsStageCount = new("EditControl"):EditControl(nil, {0, 0, 52, 18}, "", nil, "%D", 5, function(buf)
+		if self.primaryBuild.calcsTab:IsMercenaryActor() then
+			local skill = self.primaryBuild.calcsTab:GetMercenaryCalcsSkill()
+			if skill then skill.skillStageCount = tonumber(buf); self.primaryBuild.mercenaryTab:Changed() end
+			return
+		end
 		local mainSocketGroup = self.primaryBuild.skillsTab.socketGroupList[self.primaryBuild.calcsTab.input.skill_number]
 		if mainSocketGroup then
 			local displaySkillList = mainSocketGroup.displaySkillListCalcs
@@ -536,6 +578,11 @@ function CompareTabClass:InitControls()
 	self.controls.primCalcsStageCount.shown = false
 
 	self.controls.primCalcsMineCount = new("EditControl"):EditControl(nil, {0, 0, 52, 18}, "", nil, "%D", 5, function(buf)
+		if self.primaryBuild.calcsTab:IsMercenaryActor() then
+			local skill = self.primaryBuild.calcsTab:GetMercenaryCalcsSkill()
+			if skill then skill.skillMineCount = tonumber(buf); self.primaryBuild.mercenaryTab:Changed() end
+			return
+		end
 		local mainSocketGroup = self.primaryBuild.skillsTab.socketGroupList[self.primaryBuild.calcsTab.input.skill_number]
 		if mainSocketGroup then
 			local displaySkillList = mainSocketGroup.displaySkillListCalcs
@@ -575,6 +622,11 @@ function CompareTabClass:InitControls()
 	self.controls.primCalcsMinion.shown = false
 
 	self.controls.primCalcsMinionSkill = new("DropDownControl"):DropDownControl(nil, {0, 0, 140, 18}, {}, function(index, value)
+		if self.primaryBuild.calcsTab:IsMercenaryActor() then
+			local skill = self.primaryBuild.calcsTab:GetMercenaryCalcsSkill()
+			if skill then skill.skillMinionSkillCalcs = index; self.primaryBuild.mercenaryTab:Changed() end
+			return
+		end
 		local mainSocketGroup = self.primaryBuild.skillsTab.socketGroupList[self.primaryBuild.calcsTab.input.skill_number]
 		if mainSocketGroup then
 			local displaySkillList = mainSocketGroup.displaySkillListCalcs
@@ -597,6 +649,7 @@ function CompareTabClass:InitControls()
 	self.controls.cmpCalcsSocketGroup = new("DropDownControl"):DropDownControl(nil, {0, 0, 200, 18}, {}, function(index, value)
 		local entry = self:GetActiveCompare()
 		if entry then
+			if entry.calcsTab:IsMercenaryActor() then return end
 			entry.calcsTab.input.skill_number = index
 			entry.buildFlag = true
 		end
@@ -608,6 +661,11 @@ function CompareTabClass:InitControls()
 	self.controls.cmpCalcsMainSkill = new("DropDownControl"):DropDownControl(nil, {0, 0, 200, 18}, {}, function(index, value)
 		local entry = self:GetActiveCompare()
 		if entry then
+			if entry.calcsTab:IsMercenaryActor() then
+				if value and value.skillId then entry.mercenaryTab.profile.mainSkillId = value.skillId end
+				entry.mercenaryTab:Changed()
+				return
+			end
 			local mainSocketGroup = entry.skillsTab.socketGroupList[entry.calcsTab.input.skill_number]
 			if mainSocketGroup then
 				mainSocketGroup.mainActiveSkillCalcs = index
@@ -620,6 +678,11 @@ function CompareTabClass:InitControls()
 	self.controls.cmpCalcsSkillPart = new("DropDownControl"):DropDownControl(nil, {0, 0, 150, 18}, {}, function(index, value)
 		local entry = self:GetActiveCompare()
 		if entry then
+			if entry.calcsTab:IsMercenaryActor() then
+				local skill = entry.calcsTab:GetMercenaryCalcsSkill()
+				if skill then skill.skillPart = index; entry.mercenaryTab:Changed() end
+				return
+			end
 			local mainSocketGroup = entry.skillsTab.socketGroupList[entry.calcsTab.input.skill_number]
 			if mainSocketGroup then
 				local displaySkillList = mainSocketGroup.displaySkillListCalcs
@@ -636,6 +699,11 @@ function CompareTabClass:InitControls()
 	self.controls.cmpCalcsStageCount = new("EditControl"):EditControl(nil, {0, 0, 52, 18}, "", nil, "%D", 5, function(buf)
 		local entry = self:GetActiveCompare()
 		if entry then
+			if entry.calcsTab:IsMercenaryActor() then
+				local skill = entry.calcsTab:GetMercenaryCalcsSkill()
+				if skill then skill.skillStageCount = tonumber(buf); entry.mercenaryTab:Changed() end
+				return
+			end
 			local mainSocketGroup = entry.skillsTab.socketGroupList[entry.calcsTab.input.skill_number]
 			if mainSocketGroup then
 				local displaySkillList = mainSocketGroup.displaySkillListCalcs
@@ -652,6 +720,11 @@ function CompareTabClass:InitControls()
 	self.controls.cmpCalcsMineCount = new("EditControl"):EditControl(nil, {0, 0, 52, 18}, "", nil, "%D", 5, function(buf)
 		local entry = self:GetActiveCompare()
 		if entry then
+			if entry.calcsTab:IsMercenaryActor() then
+				local skill = entry.calcsTab:GetMercenaryCalcsSkill()
+				if skill then skill.skillMineCount = tonumber(buf); entry.mercenaryTab:Changed() end
+				return
+			end
 			local mainSocketGroup = entry.skillsTab.socketGroupList[entry.calcsTab.input.skill_number]
 			if mainSocketGroup then
 				local displaySkillList = mainSocketGroup.displaySkillListCalcs
@@ -700,6 +773,11 @@ function CompareTabClass:InitControls()
 	self.controls.cmpCalcsMinionSkill = new("DropDownControl"):DropDownControl(nil, {0, 0, 140, 18}, {}, function(index, value)
 		local entry = self:GetActiveCompare()
 		if entry then
+			if entry.calcsTab:IsMercenaryActor() then
+				local skill = entry.calcsTab:GetMercenaryCalcsSkill()
+				if skill then skill.skillMinionSkillCalcs = index; entry.mercenaryTab:Changed() end
+				return
+			end
 			local mainSocketGroup = entry.skillsTab.socketGroupList[entry.calcsTab.input.skill_number]
 			if mainSocketGroup then
 				local displaySkillList = mainSocketGroup.displaySkillListCalcs
@@ -2271,7 +2349,11 @@ function CompareTabClass:RefreshCalcsSkillControls(compareEntry)
 		mainSkillMinionLibrary = { shown = false },
 		mainSkillMinionSkill = self.controls.primCalcsMinionSkill,
 	}
-	self.primaryBuild:RefreshSkillSelectControls(primControls, self.primaryBuild.calcsTab.input.skill_number, "Calcs")
+	if self.primaryBuild.calcsTab:IsMercenaryActor() then
+		self.primaryBuild.calcsTab:RefreshMercenarySkillSelectControls(primControls, "Calcs")
+	else
+		self.primaryBuild:RefreshSkillSelectControls(primControls, self.primaryBuild.calcsTab.input.skill_number, "Calcs")
+	end
 	self.controls.primCalcsSocketGroup.shown = true
 	self.controls.primCalcsMode.shown = true
 	self.controls.primCalcsMode:SelByValue(self.primaryBuild.calcsTab.input.misc_buffMode, "buffMode")
@@ -2288,7 +2370,11 @@ function CompareTabClass:RefreshCalcsSkillControls(compareEntry)
 		mainSkillMinionLibrary = { shown = false },
 		mainSkillMinionSkill = self.controls.cmpCalcsMinionSkill,
 	}
-	compareEntry:RefreshSkillSelectControls(cmpControls, compareEntry.calcsTab.input.skill_number, "Calcs")
+	if compareEntry.calcsTab:IsMercenaryActor() then
+		compareEntry.calcsTab:RefreshMercenarySkillSelectControls(cmpControls, "Calcs")
+	else
+		compareEntry:RefreshSkillSelectControls(cmpControls, compareEntry.calcsTab.input.skill_number, "Calcs")
+	end
 	self.controls.cmpCalcsSocketGroup.shown = true
 	self.controls.cmpCalcsMode.shown = true
 	self.controls.cmpCalcsMode:SelByValue(compareEntry.calcsTab.input.misc_buffMode, "buffMode")

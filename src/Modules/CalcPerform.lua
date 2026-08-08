@@ -3336,7 +3336,14 @@ function calcs.perform(env, skipEHP)
 					local inc = skillModList:Sum("INC", skillCfg, "CurseEffect") + enemyDB:Sum("INC", nil, "CurseEffectOnSelf")
 					if activeSkill.skillTypes[SkillType.Aura] then inc = inc + skillModList:Sum("INC", skillCfg, "AuraEffect") end
 					local more = skillModList:More(skillCfg, "CurseEffect") * (mark and 1 or enemyDB:More(nil, "CurseEffectOnSelf"))
-					local curse = { name = buff.name, priority = determineCursePriority(buff.name, activeSkill), isMark = mark }
+					local curse = {
+						name = buff.name,
+						priority = determineCursePriority(buff.name, activeSkill),
+						isMark = mark,
+						ignoreHexLimit = (mercenary.modDB:Flag(activeSkill.skillCfg, "CursesIgnoreHexLimit") or activeSkill.skillData.ignoreHexLimit) and not mark or false,
+						socketedCursesHexLimit = mercenary.modDB:Flag(activeSkill.skillCfg, "SocketedCursesAdditionalLimit"),
+						socketedCursesHexLimitValue = mercenary.modDB:Sum("BASE", nil, "SocketedCursesHexLimitValue"),
+					}
 					local curseMult = (1 + inc / 100) * more
 					if buff.type == "Curse" then
 					curse.modList = new("ModList"):ModList()
@@ -3440,7 +3447,14 @@ function calcs.perform(env, skipEHP)
 					local mark = activeSkill.skillTypes[SkillType.Mark]
 					local inc = skillModList:Sum("INC", skillCfg, "CurseEffect") + enemyDB:Sum("INC", nil, "CurseEffectOnSelf")
 					local more = skillModList:More(skillCfg, "CurseEffect") * (mark and 1 or enemyDB:More(nil, "CurseEffectOnSelf"))
-					local curse = { name = buff.name, priority = determineCursePriority(buff.name, activeSkill), isMark = mark }
+					local curse = {
+						name = buff.name,
+						priority = determineCursePriority(buff.name, activeSkill),
+						isMark = mark,
+						ignoreHexLimit = (env.mercenaryMinion.modDB:Flag(activeSkill.skillCfg, "CursesIgnoreHexLimit") or activeSkill.skillData.ignoreHexLimit) and not mark or false,
+						socketedCursesHexLimit = env.mercenaryMinion.modDB:Flag(activeSkill.skillCfg, "SocketedCursesAdditionalLimit"),
+						socketedCursesHexLimitValue = env.mercenaryMinion.modDB:Sum("BASE", nil, "SocketedCursesHexLimitValue"),
+					}
 					local temp = new("ModList")
 					temp:ScaleAddList(buff.modList, (1 + inc / 100) * more)
 					if buff.type == "Curse" then
@@ -3782,7 +3796,7 @@ function calcs.perform(env, skipEHP)
 		end
 	end
 
-	for _, source in ipairs({curses, minionCurses}) do
+	for _, source in ipairs({ curses, minionCurses, mercenaryCurses, mercenaryMinionCurses }) do
 		for _, curse in ipairs(source) do
 			if curse.ignoreHexLimit then
 				local skipAddingCurse = false
@@ -3801,7 +3815,7 @@ function calcs.perform(env, skipEHP)
 				end
 			end
 			if curse.socketedCursesHexLimit then
-				local socketedCursesHexLimitValue = modDB:Sum("BASE", nil, "SocketedCursesHexLimitValue")
+				local socketedCursesHexLimitValue = curse.socketedCursesHexLimitValue or modDB:Sum("BASE", nil, "SocketedCursesHexLimitValue")
 				local skipAddingCurse = false
 				for i = 1, #curseSlots do
 					if curseSlots[i].name == curse.name then

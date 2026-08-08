@@ -945,6 +945,34 @@ describe("Permanent Mercenary calculations", function()
 		assert.are.equal("ArrowNovaHigh", build.mercenaryTab.profile.skills[1].supports[1].id)
 	end)
 
+	it("propagates Mercenary supports to summoned minion skills", function()
+		configure("EleBowRanger", "EleBowRangerClones", "MirrorArrowMercenary", {
+			includeInFullDPS = true,
+		})
+		local bow = new("Item", "Rarity: Normal\nCrude Bow")
+		local quiver = new("Item", "Rarity: Normal\nSerrated Arrow Quiver")
+		bow.id, quiver.id = 9016, 9017
+		build.itemsTab.items[bow.id], build.itemsTab.items[quiver.id] = bow, quiver
+		equipmentSlot("Weapon 1").selItemId, equipmentSlot("Weapon 2").selItemId = bow.id, quiver.id
+
+		local baseline = assert(calculate())
+		local baselineMinionDPS = assert(baseline.mercenaryMinion.output.TotalDPS)
+		local baselineFullDPS = assert(baseline.mercenary.output.FullDPS)
+		local support = assert(build.data.mercenaries.supports.AddedColdHigh)
+		build.mercenaryTab.profile.skills[1].supports = { { id = support.id, tier = support.variant } }
+		build.mercenaryTab:Changed()
+
+		local supported = assert(calculate())
+		local minionSkill = assert(supported.mercenaryMinion.mainSkill)
+		local hasSupport = false
+		for _, effect in ipairs(minionSkill.effectList) do
+			if effect.grantedEffect.mercenarySupportId == support.id then hasSupport = true break end
+		end
+		assert.is_true(hasSupport)
+		assert.is_true(supported.mercenaryMinion.output.TotalDPS > baselineMinionDPS)
+		assert.is_true(supported.mercenary.output.FullDPS > baselineFullDPS)
+	end)
+
 	it("applies Fist of War to Ashen Fissure", function()
 		configure("MeleeAOEMarauder", "MeleeAOEMarauderFireSlam", "FissureSlamMercenary", {
 			supports = { { id = "FistOfWarHigh", tier = 3 } },
@@ -957,6 +985,45 @@ describe("Permanent Mercenary calculations", function()
 		end
 		assert.is_true(hasFistOfWar)
 		assert.is_true(mercenary.output.FistOfWarUptimeRatio > 0)
+	end)
+
+	it("counts Barrage of Volley Fire first and final volley projectiles", function()
+		configure("NonEleBowRanger", "NonEleBowRangerPhys", "BarrageAltMercenary", { skillPart = 2 })
+		local bow = new("Item", "Rarity: Normal\nCrude Bow")
+		bow.id = 9018
+		build.itemsTab.items[bow.id] = bow
+		equipmentSlot("Weapon 1").selItemId = bow.id
+
+		local skill = assert(calculate(83).mercenary.mainSkill)
+		assert.are.equal("All Projectiles", skill.skillPartName)
+		assert.are.equal(6, skill.skillData.barrageFinalVolleyAdditionalProjectiles)
+		assert.are.equal(16, skill.skillData.dpsMultiplier)
+	end)
+
+	it("counts both initial Vaal Double Strike hits", function()
+		configure("MeleeAOEStrikeDuelist", "MeleeAOEStrikeDuelistRangeStrikes", "VaalDoubleStrikeMercenary")
+		local sword = new("Item", "Rarity: Normal\nRusted Sword")
+		sword.id = 9019
+		build.itemsTab.items[sword.id] = sword
+		equipmentSlot("Weapon 1").selItemId = sword.id
+		local skill = assert(calculate(83).mercenary.mainSkill)
+		assert.are.equal(2, skill.skillData.dpsMultiplier)
+	end)
+
+	it("counts Vaal Ice Shot Mirage Sharpshooters", function()
+		configure("EleBowRanger", "EleBowRangerClones", "VaalIceShotMercenary", {
+			supports = { { id = "MultipleProjectilesHigh", tier = 3 } },
+		})
+		local bow = new("Item", "Rarity: Normal\nCrude Bow")
+		local quiver = new("Item", "Rarity: Normal\nSerrated Arrow Quiver")
+		bow.id, quiver.id = 9020, 9021
+		build.itemsTab.items[bow.id], build.itemsTab.items[quiver.id] = bow, quiver
+		equipmentSlot("Weapon 1").selItemId, equipmentSlot("Weapon 2").selItemId = bow.id, quiver.id
+		local env = calculate(83)
+		local skill = assert(env.mercenary.mainSkill)
+		assert.are.equal(6, skill.skillData.vaalIceShotMirageCount)
+		assert.is_true(env.mercenary.output.ProjectileCount > 1)
+		assert.are.equal(7, skill.skillData.dpsMultiplier)
 	end)
 
 	it("includes Mercenary Mirage Archer damage in Full DPS", function()

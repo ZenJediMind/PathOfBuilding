@@ -671,6 +671,7 @@ function MercenaryTabClass:SetActiveMercenarySet(setId)
 	if not setId or not self.mercenarySets[setId] then
 		setId = self.mercenarySetOrderList[1]
 	end
+	if self.activeMercenarySetId ~= setId then self:InvalidateSupportSort() end
 
 	self.activeMercenarySetId = setId
 	self.profile = self.mercenarySets[setId]
@@ -876,6 +877,7 @@ function MercenaryTabClass:Load(xml)
 			skillStageCount = tonumber(node.attrib.skillStageCount),
 			skillMineCount = tonumber(node.attrib.skillMineCount),
 			skillMinionSkill = tonumber(node.attrib.skillMinionSkill),
+			skillMinionSkillCalcs = tonumber(node.attrib.skillMinionSkillCalcs),
 			supports = { },
 		}
 		for _, supportNode in ipairs(node) do
@@ -959,6 +961,7 @@ function MercenaryTabClass:Save(xml)
 					skillStageCount = skill.skillStageCount and tostring(skill.skillStageCount),
 					skillMineCount = skill.skillMineCount and tostring(skill.skillMineCount),
 					skillMinionSkill = skill.skillMinionSkill and tostring(skill.skillMinionSkill),
+					skillMinionSkillCalcs = skill.skillMinionSkillCalcs and tostring(skill.skillMinionSkillCalcs),
 				} }
 				for _, support in ipairs(skill.supports or { }) do
 					t_insert(child, { elem = "Support", attrib = { id = support.id, tier = tostring(support.tier) } })

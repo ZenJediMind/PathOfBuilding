@@ -204,7 +204,7 @@ function MercenaryTools.validateProfile(profile, mercenaryData)
 		if selected.count ~= nil and (type(selected.count) ~= "number" or selected.count % 1 ~= 0 or selected.count < 1 or selected.count > 99) then
 			table.insert(errors, "Full DPS count for "..tostring(selected.id).." must be an integer from 1 to 99")
 		end
-		if selected.enabled ~= false then
+		if selected.enabled ~= false and selected.id then
 			enabledSkills = enabledSkills + 1
 			enabledSkillsById[selected.id] = true
 		end
@@ -228,17 +228,18 @@ function MercenaryTools.validateProfile(profile, mercenaryData)
 		end
 		local seenSupports, seenFamilies = { }, { }
 		for _, selectedSupport in ipairs(selected.supports or { }) do
-			local support = mercenaryData.supports[selectedSupport.id]
-			if not support or not skill or not contains(skill.possibleSupportIds, selectedSupport.id) then
-				table.insert(errors, "Invalid support for skill "..tostring(selected.id)..": "..tostring(selectedSupport.id))
+			local supportId = selectedSupport and selectedSupport.id
+			local support = mercenaryData.supports[supportId]
+			if not support or not skill or not contains(skill.possibleSupportIds, supportId) then
+				table.insert(errors, "Invalid support for skill "..tostring(selected.id)..": "..tostring(supportId))
 			elseif selectedSupport.tier ~= support.variant then
 				table.insert(errors, "Invalid tier for support "..selectedSupport.id)
-			elseif seenSupports[selectedSupport.id] then
+			elseif seenSupports[supportId] then
 				table.insert(errors, "Duplicate support "..selectedSupport.id.." on skill "..tostring(selected.id))
 			elseif support.familyId and seenFamilies[support.familyId] then
 				table.insert(errors, "Duplicate support family "..support.familyId.." on skill "..tostring(selected.id))
 			end
-			seenSupports[selectedSupport.id] = true
+			if supportId then seenSupports[supportId] = true end
 			if support and support.familyId then seenFamilies[support.familyId] = true end
 		end
 	end

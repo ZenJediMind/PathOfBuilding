@@ -340,6 +340,7 @@ function calcs.initMercenary(env)
 			skillStageCount = isPrimary and selectedSkill.skillStageCount or nil,
 			skillMineCount = isPrimary and selectedSkill.skillMineCount or nil,
 			skillMinionSkill = isPrimary and selectedSkill.skillMinionSkill or nil,
+			skillMinionSkillCalcs = isPrimary and (selectedSkill.skillMinionSkillCalcs or selectedSkill.skillMinionSkill) or nil,
 			mercenaryPossibleSupportIds = env.data.mercenaries.skills[grantedEffect.id] and env.data.mercenaries.skills[grantedEffect.id].possibleSupportIds,
 		}
 		local activeSkill = calcs.createActiveSkill({ grantedEffect = grantedEffect, level = instance.level, quality = 0, srcInstance = instance }, supports or { }, mercenary, selectedSkill)
@@ -360,7 +361,7 @@ function calcs.initMercenary(env)
 		if selectedSkill.enabled ~= false then
 			local grantedEffect = env.data.skills[selectedSkill.id]
 			if not grantedEffect then
-				t_insert(calculationErrors, "Missing generated Mercenary skill: "..selectedSkill.id)
+				t_insert(calculationErrors, "Missing generated Mercenary skill: "..tostring(selectedSkill.id))
 			else
 				validateMercenarySkillStats(env, grantedEffect, calculationErrors)
 				for _, statId in ipairs(grantedEffect.stats or { }) do

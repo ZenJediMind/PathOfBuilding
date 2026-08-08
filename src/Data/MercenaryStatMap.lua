@@ -34,6 +34,12 @@ end
 
 return {
 	statMap = {
+		["barrage_final_volley_fires_x_additional_projectiles_simultaneously"] = {
+			skill("barrageFinalVolleyAdditionalProjectiles", nil),
+		},
+		["maximum_number_of_vaal_ice_shot_mirages"] = {
+			skill("vaalIceShotMirageCount", nil),
+		},
 		["%_chance_to_gain_frenzy_charge_on_trap_triggered_by_an_enemy"] = {
 			flag("UseFrenzyCharges"),
 			skill("frenzyChargeOnTrapTriggerChance", nil),
@@ -439,7 +445,6 @@ return {
 		["arctic_breath_maximum_number_of_skulls_allowed"] = true,
 		["attack_is_melee_override"] = true,
 		["attack_is_not_melee_override"] = true,
-		["barrage_final_volley_fires_x_additional_projectiles_simultaneously"] = true,
 		["base_circle_of_power_mana_spend_per_upgrade"] = true,
 		["base_deal_no_attack_damage"] = true,
 		["base_deal_no_damage"] = true,
@@ -539,7 +544,6 @@ return {
 		["maximum_number_of_blades_left_in_ground"] = true,
 		["maximum_number_of_snapping_adder_projectiles"] = true,
 		["maximum_number_of_summoned_doubles"] = true,
-		["maximum_number_of_vaal_ice_shot_mirages"] = true,
 		["melee_defer_damage_prediction"] = true,
 		["mine_cannot_rearm"] = true,
 		["mine_detonates_instantly"] = true,
@@ -731,8 +735,6 @@ return {
 	preDamageFuncInputs = {
 		BallLightningAltX = { "duration", "strikeInterval" },
 		BallLightningAltY = { "duration", "strikeInterval" },
-		Barrage = { },
-		BarrageAltX = { },
 		BladeVortex = { "hitFrequency", "hitFrequencyPerBlade" },
 		BladefallAltZ = { "hitFrequency", "incVolleyFrequency" },
 		BlastRain = { },
@@ -805,6 +807,20 @@ return {
 		ElementalHitColdOnlyMercenaryEncounter = 3,
 	},
 	skillOverrides = {
+		BarrageMercenary = {
+			preDamageFunc = function(activeSkill, output)
+				if activeSkill.skillPart == 2 then
+					activeSkill.skillData.dpsMultiplier = output.ProjectileCount + 2 * (activeSkill.skillData.barrageFinalVolleyAdditionalProjectiles or 0)
+				end
+			end,
+		},
+		BarrageAltMercenary = {
+			preDamageFunc = function(activeSkill, output)
+				if activeSkill.skillPart == 2 then
+					activeSkill.skillData.dpsMultiplier = output.ProjectileCount + 2 * (activeSkill.skillData.barrageFinalVolleyAdditionalProjectiles or 0)
+				end
+			end,
+		},
 		ActionSpeedAuraMercenary = {
 			statMap = {
 				["action_speed_-%"] = {
@@ -896,6 +912,18 @@ return {
 					div = 60,
 				},
 			},
+		},
+		-- The generated skill data exposes the extra hit but no runtime DPS
+		-- multiplier, so keep the Mercenary multiplier explicit here.
+		VaalDoubleStrikeMercenary = {
+			baseMods = {
+				skill("dpsMultiplier", 2),
+			},
+		},
+		VaalIceShotMercenary = {
+			preDamageFunc = function(activeSkill, output)
+				activeSkill.skillData.dpsMultiplier = 1 + (activeSkill.skillData.vaalIceShotMirageCount or 0)
+			end,
 		},
 		BladeVortexAltMercenary = {
 			preDamageFunc = calculateCorruptedBlood,

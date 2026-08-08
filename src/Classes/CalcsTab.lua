@@ -150,6 +150,14 @@ function CalcsTabClass:CalcsTab(build)
 		} },
 		{ label = "Minion Skill", flag = "haveMinion", { controlName = "mainSkillMinionSkill",
 			control = new("DropDownControl"):DropDownControl(nil, {0, 0, 200, 16}, nil, function(index, value)
+				if self:IsMercenaryActor() then
+					local skill = self:GetMercenaryCalcsSkill()
+					if skill then
+						skill.skillMinionSkillCalcs = index
+						self.build.mercenaryTab:Changed()
+					end
+					return
+				end
 				local mainSocketGroup = self.build.skillsTab.socketGroupList[self.input.skill_number]
 				local srcInstance = mainSocketGroup.displaySkillListCalcs[mainSocketGroup.mainActiveSkillCalcs].activeEffect.srcInstance
 				srcInstance.skillMinionSkillCalcs = index
@@ -177,7 +185,7 @@ Effective DPS: Curses and enemy properties (such as resistances and status condi
 		{ label = "Curses and Debuffs", flag = "effective", textSize = 12, { format = "{output:CurseList}", { breakdown = "SkillDebuffs" } }, },
 	}}}, function(section)
 		self.build:RefreshSkillSelectControls(section.controls, self.input.skill_number, "Calcs")
-		self:RefreshMercenarySkillSelectControls(section.controls)
+		self:RefreshMercenarySkillSelectControls(section.controls, "Calcs")
 		section.controls.actor:SelByValue(self.input.actor, "actorId")
 		section.controls.mode:SelByValue(self.input.misc_buffMode, "buffMode")
 	end)
@@ -206,8 +214,9 @@ function CalcsTabClass:GetMercenaryCalcsSkill()
 	end
 end
 
-function CalcsTabClass:RefreshMercenarySkillSelectControls(controls)
+function CalcsTabClass:RefreshMercenarySkillSelectControls(controls, suffix)
 	if not self:IsMercenaryActor() then return end
+	local minionSkillField = suffix == "Calcs" and "skillMinionSkillCalcs" or "skillMinionSkill"
 	local profile = self.build.mercenaryTab.profile
 	controls.mainSocketGroup:SetList({ { label = "Mercenary Inherent Skills" } })
 	controls.mainSocketGroup.selIndex = 1
@@ -231,10 +240,41 @@ function CalcsTabClass:RefreshMercenarySkillSelectControls(controls)
 	controls.mainSkillMinion.shown = false
 	controls.mainSkillMinionLibrary.shown = false
 	controls.mainSkillMinionSkill.shown = false
-	if self.input.actor ~= "MERCENARY" then return end
 	local selectedSkill = self:GetMercenaryCalcsSkill()
+	local mercenary = self.calcsEnv and self.calcsEnv.mercenary
+	local mercenaryMinion = self.calcsEnv and self.calcsEnv.mercenaryMinion
+	if self.input.actor == "MERCENARY_MINION" then
+		local activeSkill = mercenary and mercenary.mainSkill
+		mercenaryMinion = mercenaryMinion or activeSkill and activeSkill.minion
+		if not mercenaryMinion then return end
+		local selectedIndex = selectedSkill and (selectedSkill[minionSkillField] or (suffix == "Calcs" and selectedSkill.skillMinionSkill)) or 1
+		local minionSkillList = { }
+		for index, minionSkill in ipairs(mercenaryMinion.activeSkillList or { }) do
+			minionSkillList[#minionSkillList + 1] = { index = index, label = minionSkill.activeEffect.grantedEffect.name }
+		end
+		if #minionSkillList > 0 then
+			controls.mainSkillMinionSkill:SetList(minionSkillList)
+			controls.mainSkillMinionSkill:SelByValue(selectedIndex, "index")
+			controls.mainSkillMinionSkill.enabled = #minionSkillList > 1
+			controls.mainSkillMinionSkill.shown = true
+		end
+		return
+	end
+	if self.input.actor ~= "MERCENARY" then return end
 	local grantedEffect = selectedSkill and self.build.data.skills[selectedSkill.id]
 	local activeSkill = self.calcsEnv and self.calcsEnv.mercenary and self.calcsEnv.mercenary.mainSkill
+	mercenaryMinion = mercenaryMinion or activeSkill and activeSkill.minion
+	if mercenaryMinion and #mercenaryMinion.activeSkillList > 0 then
+		local minionSkillList = { }
+		local selectedIndex = selectedSkill and (selectedSkill[minionSkillField] or (suffix == "Calcs" and selectedSkill.skillMinionSkill)) or 1
+		for index, minionSkill in ipairs(mercenaryMinion.activeSkillList) do
+			minionSkillList[#minionSkillList + 1] = { index = index, label = minionSkill.activeEffect.grantedEffect.name }
+		end
+		controls.mainSkillMinionSkill:SetList(minionSkillList)
+		controls.mainSkillMinionSkill:SelByValue(selectedIndex, "index")
+		controls.mainSkillMinionSkill.enabled = #minionSkillList > 1
+		controls.mainSkillMinionSkill.shown = true
+	end
 	if grantedEffect and grantedEffect.parts and #grantedEffect.parts > 1 then
 		local partList = { }
 		for index, part in ipairs(grantedEffect.parts) do t_insert(partList, { label = part.name, index = index }) end

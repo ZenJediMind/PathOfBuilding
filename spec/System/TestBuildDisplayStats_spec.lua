@@ -31,7 +31,7 @@ describe("Build display stats", function()
 		assert.are.equals("^7123", build:FormatStat({ fmt = ".1f", compactValue = true }, 123))
 	end)
 
-	it("shows offensive stats in the Mercenary sidebar", function()
+	it("shows Mercenary sidebar stats", function()
 		local _, _, _, mercenaryDisplayStats = LoadModule("Modules/BuildDisplayStats")
 		build.controls.statBox.list = { }
 		build:AddDisplayStatList(mercenaryDisplayStats, {
@@ -42,6 +42,14 @@ describe("Build display stats", function()
 				CritChance = 10,
 				CritMultiplier = 2,
 				HitChance = 95,
+				FireResist = 75,
+				FireResistOverCap = 15,
+				ColdResist = 75,
+				ColdResistOverCap = 20,
+				LightningResist = 75,
+				LightningResistOverCap = 25,
+				ChaosResist = 20,
+				ChaosResistOverCap = 5,
 				CrabBarriersMax = 0,
 				CrabBarriers = 0,
 			},
@@ -50,6 +58,16 @@ describe("Build display stats", function()
 
 		for _, label in ipairs({ "Attack Rate", "Crit Chance", "Effective Crit Chance", "Crit Multiplier", "Hit Chance" }) do
 			assert.is_truthy(getSidebarStat(label), label)
+		end
+		for _, stat in ipairs({
+			{ label = "Fire Resistance", overCap = 15 },
+			{ label = "Cold Resistance", overCap = 20 },
+			{ label = "Lightning Resistance", overCap = 25 },
+			{ label = "Chaos Resistance", overCap = 5 },
+		}) do
+			local value = getSidebarStat(stat.label)
+			assert.is_truthy(value, stat.label)
+			assert.is_truthy(value:find("(+" .. stat.overCap .. "%)", 1, true), stat.label)
 		end
 	end)
 

@@ -215,6 +215,7 @@ function ItemsTabClass:ItemsTab(build)
 		slot.mercenarySlotName = baseSlotName
 		self.slots[slot.slotName] = slot
 		t_insert(self.mercenarySlots, slot)
+		self.slotOrder[slot.slotName] = #self.orderedSlots + #self.mercenarySlots
 		t_insert(self.controls, slot)
 	end
 	for _, baseSlotName in ipairs(MercenaryTools.equipmentSlots) do
@@ -2560,19 +2561,24 @@ end
 
 -- Returns the first slot in which the given item is equipped
 function ItemsTabClass:GetEquippedSlotForItem(item)
-	for _, slot in ipairs(self.orderedSlots) do
-		if not slot.inactive then
-			if slot.selItemId == item.id then
-				return slot
-			end
-			for _, itemSetId in ipairs(self.itemSetOrderList) do
-				local itemSet = self.itemSets[itemSetId]
-				if itemSetId ~= self.activeItemSetId and itemSet[slot.slotName] and itemSet[slot.slotName].selItemId == item.id then
-					return slot, itemSet
+	local function findEquippedSlot(slots)
+		for _, slot in ipairs(slots or { }) do
+			if not slot.inactive then
+				if slot.selItemId == item.id then
+					return slot
+				end
+				for _, itemSetId in ipairs(self.itemSetOrderList) do
+					local itemSet = self.itemSets[itemSetId]
+					if itemSetId ~= self.activeItemSetId and itemSet[slot.slotName] and itemSet[slot.slotName].selItemId == item.id then
+						return slot, itemSet
+					end
 				end
 			end
 		end
 	end
+	local slot, itemSet = findEquippedSlot(self.orderedSlots)
+	if slot then return slot, itemSet end
+	return findEquippedSlot(self.mercenarySlots)
 end
 
 function ItemsTabClass:GetComparisonSlotNameForItem(item)

@@ -15,6 +15,7 @@ function MercenaryTools.comparisonBaseOutput(playerOutput, actorOutputs, slotNam
 	return actorOutputs and actorOutputs[actor] or playerOutput
 end
 
+local MAX_WARRANT_BYTES = 256 * 1024
 local MAX_SKILLS = 6
 
 function MercenaryTools.contains(values, wanted)
@@ -183,6 +184,164 @@ function MercenaryTools.passiveStatValue(values, level)
 	return math.floor(second + (third - second) * (clampedLevel - levels[2]) / (levels[3] - levels[2]))
 end
 
+local function splitWarrantBlocks(text)
+	local blocks, block = { }, { }
+	for line in (text.."\n"):gmatch("(.-)\n") do
+		line = line:match("^%s*(.-)%s*$")
+		if line:match("^%-+$") then
+			if #block > 0 then table.insert(blocks, block) end
+			block = { }
+		elseif line ~= "" then
+			table.insert(block, line)
+		end
+	end
+	if #block > 0 then table.insert(blocks, block) end
+	return blocks
+end
+
+local function namedRecords(records, ids, name)
+	local matches = { }
+	if ids then
+		for _, id in ipairs(ids) do
+			local record = records[id]
+			if record and record.name == name then table.insert(matches, id) end
+		end
+	else
+		for id, record in pairs(records or { }) do
+			if record.name == name then table.insert(matches, id) end
+		end
+		table.sort(matches)
+	end
+	return matches
+end
+
+function MercenaryTools.importWarrant(text, mercenaryData)
+	if type(text) ~= "string" or text:match("^%s*$") then
+		return nil, "Paste a Mercenary Warrant item text"
+	elseif #text > MAX_WARRANT_BYTES then
+		return nil, "Mercenary Warrant text exceeds 256 KiB"
+	elseif not mercenaryData or not mercenaryData.builds or not mercenaryData.skills or not mercenaryData.supports then
+		return nil, "Mercenary data is unavailable"
+	end
+
+	text = text:gsub("\r\n", "\n"):gsub("\r", "\n")
+	local blocks = splitWarrantBlocks(text)
+	local hasWarrant, buildName, foundAreaLevel = false, nil, nil
+	for _, block in ipairs(blocks) do
+		for _, line in ipairs(block) do
+			hasWarrant = hasWarrant or line == "Mercenary Warrant"
+			local value = line:match("^Build:%s*(.-)%s*$")
+			if value then
+				buildName = value
+			end
+			value = line:match("^Mercenary Level:%s*(%d+)%s*$")
+			if value then
+				foundAreaLevel = tonumber(value)
+			end
+		end
+	end
+	if not hasWarrant then return nil, "Text is not a Mercenary Warrant" end
+	if not buildName then return nil, "Mercenary Warrant is missing its Build line" end
+	if not foundAreaLevel then return nil, "Mercenary Warrant is missing its Mercenary Level line" end
+	if foundAreaLevel < 1 or foundAreaLevel > 100 then
+		return nil, "Mercenary Level must be an integer between 1 and 100"
+	end
+
+	local buildIds = namedRecords(mercenaryData.builds, mercenaryData.buildOrder, buildName)
+	if #buildIds == 0 then
+		return nil, "Unknown Mercenary build: "..buildName
+	elseif #buildIds > 1 then
+		return nil, "Ambiguous Mercenary build: "..buildName
+	end
+	local build = mercenaryData.builds[buildIds[1]]
+	local importedSkills, startedSkills = { }, false
+	local sawBuildLine, sawLevelLine = false, false
+	for _, block in ipairs(blocks) do
+		local firstLine = block[1]
+		if firstLine and firstLine:match("^Right click this item") then break end
+
+		local hasMetadataLine = false
+		for _, line in ipairs(block) do
+			if line:match("^Build:") then
+				sawBuildLine = true
+				hasMetadataLine = true
+			end
+			if line:match("^Mercenary Level:") then
+				sawLevelLine = true
+				hasMetadataLine = true
+			end
+		end
+		local metadataReady = sawBuildLine and sawLevelLine
+		if metadataReady and not hasMetadataLine then
+			local skillIds = namedRecords(mercenaryData.skills, build.skillIds, firstLine)
+			if #skillIds == 0 then
+				return nil, "Unknown Mercenary skill for "..buildName..": "..tostring(firstLine)
+			elseif #skillIds > 1 then
+				return nil, "Ambiguous Mercenary skill for "..buildName..": "..firstLine
+			elseif #importedSkills >= MAX_SKILLS then
+				return nil, "A Mercenary Warrant cannot contain more than 6 skills"
+			end
+
+			local skillId = skillIds[1]
+			local skill = mercenaryData.skills[skillId]
+			local importedSkill = {
+				id = skillId,
+				enabled = true,
+				includeInFullDPS = false,
+				count = 1,
+				supports = { },
+			}
+			local seenSupports, seenFamilies = { }, { }
+			for lineIndex = 2, #block do
+				local supportName, tierText = block[lineIndex]:match("^(.+)%s+%(%s*Tier:%s*(%d+)%s*%)$")
+				if not supportName then
+					return nil, "Invalid support line for "..skill.name..": "..block[lineIndex]
+				end
+				local tier = tonumber(tierText)
+				local supportIds = { }
+				for _, supportId in ipairs(skill.possibleSupportIds or { }) do
+					local support = mercenaryData.supports[supportId]
+					if support and support.name == supportName and support.variant == tier then
+						table.insert(supportIds, supportId)
+					end
+				end
+				if #supportIds == 0 then
+					return nil, "Support "..supportName.." (Tier: "..tier..") is not valid for "..skill.name
+				elseif #supportIds > 1 then
+					return nil, "Ambiguous support "..supportName.." (Tier: "..tier..") for "..skill.name
+				end
+				local supportId = supportIds[1]
+				local support = mercenaryData.supports[supportId]
+				if seenSupports[supportId] then
+					return nil, "Duplicate support "..supportName.." on "..skill.name
+				elseif support.familyId and seenFamilies[support.familyId] then
+					return nil, "Duplicate support family "..support.familyId.." on "..skill.name
+				end
+				seenSupports[supportId] = true
+				if support.familyId then seenFamilies[support.familyId] = true end
+				table.insert(importedSkill.supports, { id = supportId, tier = tier })
+			end
+			table.insert(importedSkills, importedSkill)
+			startedSkills = true
+		elseif startedSkills and firstLine then
+			return nil, "Unexpected text after Mercenary skills: "..firstLine
+		end
+	end
+	if #importedSkills == 0 then return nil, "Mercenary Warrant contains no recognized skills" end
+
+	local profile = {
+		classId = build.classId,
+		buildId = build.id,
+		foundAreaLevel = foundAreaLevel,
+		importedWarrant = true,
+		mainSkillId = importedSkills[1].id,
+		skills = importedSkills,
+	}
+	local errors = MercenaryTools.validateProfile(profile, mercenaryData)
+	if #errors > 0 then return nil, table.concat(errors, "; ") end
+	return profile
+end
+
 function MercenaryTools.validateProfile(profile, mercenaryData)
 	local errors = { }
 	local build = profile and mercenaryData and mercenaryData.builds[profile.buildId]
@@ -243,9 +402,13 @@ function MercenaryTools.validateProfile(profile, mercenaryData)
 			if support and support.familyId then seenFamilies[support.familyId] = true end
 		end
 	end
-	for poolIndex, pool in ipairs(build.skillPools or { }) do
-		if pool.countMax and (poolCounts[poolIndex] or 0) > pool.countMax then
-			table.insert(errors, "Skill pool "..poolIndex.." allows at most "..pool.countMax.." skills")
+	-- Warrant text contains the authoritative complete roster. The exported pool
+	-- maximums describe spawn selection, so they do not constrain an imported Warrant.
+	if not profile.importedWarrant then
+		for poolIndex, pool in ipairs(build.skillPools or { }) do
+			if pool.countMax and (poolCounts[poolIndex] or 0) > pool.countMax then
+				table.insert(errors, "Skill pool "..poolIndex.." allows at most "..pool.countMax.." skills")
+			end
 		end
 	end
 	if #(profile.skills or { }) == 0 then

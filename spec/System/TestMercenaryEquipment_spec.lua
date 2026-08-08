@@ -209,6 +209,47 @@ describe("Mercenary equipment validation", function()
 		assert.are.equal(1, #build.itemsTab.itemSetOrderList)
 	end)
 
+	it("imports copied Warrant text into the active loadout", function()
+		local mercenaryHelmet = MercenaryTools.itemSlotName("Helmet")
+		itemSet[mercenaryHelmet].selItemId = 9001
+		local warrantText = [[
+Item Class: Map Fragments
+Rarity: Normal
+Mercenary Warrant
+--------
+Thalia, the Exquisite
+--------
+Build: Kineticist
+Mercenary Level: 83
+--------
+Elemental Weakness
+Greater Curse Effect (Tier: 3)
+Faster Casting (Tier: 2)
+--------
+Right click this item to view Mercenary details.
+--------
+Note: ~b/o 1 mirror
+]]
+		tab.controls.importWarrant:Click()
+		local popup = main.popups[1]
+		assert.are.equal("Import Mercenary Warrant", popup.title)
+		popup.controls.edit:SetText(warrantText)
+		popup.controls.import:Click()
+		assert.are_not.equal(popup, main.popups[1])
+		assert.are.equal("Kineticist", tab.data.builds[tab.profile.buildId].name)
+		assert.are.equal(83, tab.profile.foundAreaLevel)
+		assert.are.equal("Elemental Weakness", tab.data.skills[tab.profile.mainSkillId].name)
+		assert.is_true(tab.profile.importedWarrant)
+		assert.are.equal(9001, itemSet[mercenaryHelmet].selItemId)
+		local xml = { }
+		tab:Save(xml)
+		assert.are.equal("true", xml[1].attrib.importedWarrant)
+		tab:Reset()
+		tab:Load(xml)
+		assert.is_true(tab.profile.importedWarrant)
+		assert.are.equal("Kineticist", tab.data.builds[tab.profile.buildId].name)
+	end)
+
 	it("preserves invalid equipped items for diagnostics", function()
 		selectBuild("MeleeAOEMarauderFireSlam")
 		local invalidHelmet = item({ id = 9015, name = "Invalid Mercenary Helmet", type = "Helmet", base = { type = "Helmet" }, requirements = { int = 1 } })

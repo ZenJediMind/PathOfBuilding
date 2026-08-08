@@ -1,7 +1,7 @@
 -- Path of Building
 --
 -- Class: Mercenary Tab
--- Permanent Mercenary configuration, persistence, and equipment validation.
+-- Permanent Mercenary configuration, persistence, import, and equipment validation.
 --
 local MercenaryTools = require("Modules/MercenaryTools")
 local skillOptions = require("Modules/SkillOptions")
@@ -146,6 +146,7 @@ local MercenaryTabClass = newClass("MercenaryTab", "ControlHost", "Control", fun
 	self.controls.classLabel = new("LabelControl", { "TOPLEFT", self, "TOPLEFT" }, { 12, 12, 0, 16 }, "^7Mercenary class:")
 	self.controls.class = new("DropDownControl", { "LEFT", self.controls.classLabel, "RIGHT" }, { 8, 0, 240, 20 }, { }, function(_, value)
 		local classGroup = value
+		self.profile.importedWarrant = nil
 		self.profile.classId = classGroup and classGroup.classIds[1]
 		self.profile.buildId = nil
 		self.profile.skills = { }
@@ -167,6 +168,7 @@ local MercenaryTabClass = newClass("MercenaryTab", "ControlHost", "Control", fun
 	end)
 	self.controls.buildLabel = new("LabelControl", { "TOPLEFT", self.controls.classLabel, "BOTTOMLEFT" }, { 0, 12, 0, 16 }, "^7Class and build:")
 	self.controls.build = new("DropDownControl", { "LEFT", self.controls.buildLabel, "RIGHT" }, { 8, 0, 300, 20 }, { }, function(_, value)
+		self.profile.importedWarrant = nil
 		self.profile.buildId = value and value.id
 		self.profile.classId = value and value.classId or self.profile.classId
 		self.profile.skills = { }
@@ -186,7 +188,10 @@ local MercenaryTabClass = newClass("MercenaryTab", "ControlHost", "Control", fun
 	self.controls.reset = new("ButtonControl", { "LEFT", self.controls.editEquipment, "RIGHT" }, { 8, 0, 80, 20 }, "Reset", function()
 		self:Reset()
 	end)
-	self.controls.lifeComparisonLabel = new("LabelControl", { "LEFT", self.controls.reset, "RIGHT" }, { 20, 0, 0, 16 }, "^7Loyal Bodyguard:")
+	self.controls.importWarrant = new("ButtonControl", { "LEFT", self.controls.reset, "RIGHT" }, { 8, 0, 120, 20 }, "Import Warrant...", function()
+		self:OpenWarrantImportPopup()
+	end)
+	self.controls.lifeComparisonLabel = new("LabelControl", { "LEFT", self.controls.importWarrant, "RIGHT" }, { 20, 0, 0, 16 }, "^7Loyal Bodyguard:")
 	self.controls.lifeComparison = new("DropDownControl", { "LEFT", self.controls.lifeComparisonLabel, "RIGHT" }, { 6, 0, 170, 20 }, {
 		{ label = "Automatic Life comparison", id = "AUTO" },
 		{ label = "Mercenary has higher Life", id = "MERCENARY" },
@@ -693,6 +698,7 @@ function MercenaryTabClass:OpenMercenarySetManagePopup()
 end
 
 function MercenaryTabClass:SetSkill(index, skillId)
+	self.profile.importedWarrant = nil
 	self.selectedSkillIndex = index
 	local existing = self.profile.skills[index]
 	local wasMainSkill = existing and self.profile.mainSkillId == existing.id
@@ -723,6 +729,43 @@ function MercenaryTabClass:SetSupport(index, supportId)
 		table.remove(skill.supports, index)
 	end
 	self:Changed()
+end
+
+function MercenaryTabClass:ImportWarrant(text)
+	local imported, err = MercenaryTools.importWarrant(text, self.data)
+	if not imported then return nil, err end
+	self.profile.classId = imported.classId
+	self.profile.buildId = imported.buildId
+	self.profile.foundAreaLevel = imported.foundAreaLevel
+	self.profile.importedWarrant = true
+	self.profile.mainSkillId = imported.mainSkillId
+	self.profile.skills = imported.skills
+	self.selectedSkillIndex = 1
+	self:Changed()
+	return true
+end
+
+function MercenaryTabClass:OpenWarrantImportPopup()
+	local controls = { }
+	local importError
+	controls.edit = new("EditControl", nil, { 0, 40, 600, 420 }, "", nil, "^%C\t\n", nil, nil, 14)
+	controls.edit.font = "FIXED"
+	controls.edit.pasteFilter = sanitiseText
+	controls.error = new("LabelControl", { "TOPLEFT", controls.edit, "BOTTOMLEFT" }, { 0, 8, 600, 16 }, function()
+		return importError and colorCodes.NEGATIVE..importError or ""
+	end)
+	controls.import = new("ButtonControl", nil, { -45, 510, 80, 20 }, "Import", function()
+		local ok, err = self:ImportWarrant(controls.edit.buf)
+		if not ok then
+			importError = err
+			return
+		end
+		main:ClosePopup()
+	end, nil, true)
+	controls.cancel = new("ButtonControl", nil, { 45, 510, 80, 20 }, "Cancel", function()
+		main:ClosePopup()
+	end)
+	main:OpenPopup(620, 550, "Import Mercenary Warrant", controls, "import", "edit", "cancel")
 end
 
 function MercenaryTabClass:Reset()
@@ -890,6 +933,7 @@ function MercenaryTabClass:Load(xml)
 	local function loadProfile(node, profile)
 		profile.buildId = node.attrib.buildId
 		profile.foundAreaLevel = tonumber(node.attrib.foundAreaLevel) or 68
+		profile.importedWarrant = node.attrib.importedWarrant == "true"
 		profile.mainSkillId = node.attrib.mainSkillId
 		profile.lifeComparison = node.attrib.lifeComparison or "AUTO"
 		local mercBuild = self.data.builds[profile.buildId]
@@ -948,6 +992,7 @@ function MercenaryTabClass:Save(xml)
 				title = profile.title,
 				buildId = profile.buildId,
 				foundAreaLevel = tostring(profile.foundAreaLevel or 68),
+				importedWarrant = tostring(profile.importedWarrant == true),
 				mainSkillId = profile.mainSkillId,
 				lifeComparison = profile.lifeComparison,
 			} }

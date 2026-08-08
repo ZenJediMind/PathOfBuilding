@@ -44,6 +44,75 @@ describe("Mercenary tools", function()
 		assert.are.equal(byClassId.scion, groups[3])
 	end)
 
+	it("accepts a complete Toxicologist Warrant roster", function()
+		local mercenaryData = LoadModule("Data/Mercenaries")
+		mercenaryData.supportCounts = _G.data.mercenaryStatData.supportCounts
+		local imported, err = tools.importWarrant([[
+Item Class: Map Fragments
+Rarity: Normal
+Mercenary Warrant
+--------
+Vreka, the Killer
+--------
+Build: Toxicologist
+Mercenary Level: 83
+--------
+Withering Step
+Increased Area of Effect (Tier: 2)
+Gilded Wither Stacks (Tier: 3)
+--------
+Chaotic Burst
+Wither on Hit (Tier: 2)
+Increased Area of Effect (Tier: 2)
+--------
+Chaotic Shot
+Physical as Extra Chaos (Tier: 2)
+Chance to Poison (Tier: 2)
+Chaos Penetration (Tier: 2)
+Faster Projectiles (Tier: 2)
+Greater Multiple Projectiles (Tier: 3)
+--------
+Scourge Arrow of Menace
+Greater Faster Attacks (Tier: 3)
+Greater DoT Multiplier (Tier: 3)
+Physical as Extra Chaos (Tier: 2)
+Chance to Poison (Tier: 2)
+--------
+Blink Arrow
+Faster Attacks (Tier: 2)
+Minion Life (Tier: 2)
+Greater Minion Damage (Tier: 3)
+--------
+Trarthan Agility
+Cooldown Recovery (Tier: 2)
+Greater Area of Effect (Tier: 3)
+--------
+Right click this item to view Mercenary details.
+Can be used in a personal Map Device alongside a Map to have this previously fought Mercenary reappear in the area for a rematch.
+]], mercenaryData)
+		assert.is_nil(err)
+		assert.is_table(mercenaryData.builds[imported.buildId])
+		assert.are.equal("Toxicologist", mercenaryData.builds[imported.buildId].name)
+		assert.are.equal(6, #imported.skills)
+		assert.same({
+			"Withering Step",
+			"Chaotic Burst",
+			"Chaotic Shot",
+			"Scourge Arrow of Menace",
+			"Blink Arrow",
+			"Trarthan Agility",
+		}, (function()
+			local names = { }
+			for _, skill in ipairs(imported.skills) do table.insert(names, mercenaryData.skills[skill.id].name) end
+			return names
+		end)())
+		local firstSupport = imported.skills[1].supports[1]
+		assert.are.equal("Increased Area of Effect", mercenaryData.supports[firstSupport.id].name)
+		assert.are.equal(2, firstSupport.tier)
+		assert.are.equal("Withering Step", mercenaryData.skills[imported.mainSkillId].name)
+		assert.is_true(imported.importedWarrant)
+	end)
+
 	it("calculates effective Mercenary levels and found-area requirements", function()
 		assert.are.equal(68, tools.effectiveLevel(50, 84))
 		assert.are.equal(100, tools.effectiveLevel(100, 85))

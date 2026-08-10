@@ -330,7 +330,7 @@ function buildMode:Init(dbFileName, buildName, buildXML, convertBuild, importLin
 				newSpec.title = loadout
 				t_insert(self.treeTab.specList, newSpec)
 
-				local itemSet = self.itemsTab:NewItemSet(#self.itemsTab.itemSets + 1)
+				local itemSet = self.itemsTab:NewItemSet()
 				t_insert(self.itemsTab.itemSetOrderList, itemSet.id)
 				itemSet.title = loadout
 
@@ -389,11 +389,12 @@ function buildMode:Init(dbFileName, buildName, buildXML, convertBuild, importLin
 		end
 
 		local oneSkill = self.skillsTab and #self.skillsTab.skillSetOrderList == 1
-		local oneItem = self.itemsTab and #self.itemsTab.itemSetOrderList == 1
+		local itemSetOrderList = self.itemsTab and self.itemsTab:GetPlayerItemSetOrderList() or { }
+		local oneItem = self.itemsTab and #itemSetOrderList == 1
 		local oneConfig = self.configTab and #self.configTab.configSetOrderList == 1
 
 		local newSpecId = findNamedSetId(self.treeTab:GetSpecList(), value, self.treeListSpecialLinks)
-		local newItemId = oneItem and 1 or findSetId(self.itemsTab.itemSetOrderList, value, self.itemsTab.itemSets, self.itemListSpecialLinks)
+		local newItemId = oneItem and itemSetOrderList[1] or findSetId(itemSetOrderList, value, self.itemsTab.itemSets, self.itemListSpecialLinks)
 		local newSkillId = oneSkill and 1 or findSetId(self.skillsTab.skillSetOrderList, value, self.skillsTab.skillSets, self.skillListSpecialLinks)
 		local newConfigId = oneConfig and 1 or findSetId(self.configTab.configSetOrderList, value, self.configTab.configSets, self.configListSpecialLinks)
 
@@ -787,7 +788,8 @@ function buildMode:SyncLoadouts()
 	self.treeListSpecialLinks, self.itemListSpecialLinks, self.skillListSpecialLinks, self.configListSpecialLinks = {}, {}, {}, {}
 
 	local oneSkill = self.skillsTab and #self.skillsTab.skillSetOrderList == 1
-	local oneItem = self.itemsTab and #self.itemsTab.itemSetOrderList == 1
+	local itemSetOrderList = self.itemsTab and self.itemsTab:GetPlayerItemSetOrderList() or { }
+	local oneItem = self.itemsTab and #itemSetOrderList == 1
 	local oneConfig = self.configTab and #self.configTab.configSetOrderList == 1
 
 	if self.treeTab ~= nil and self.itemsTab ~= nil and self.skillsTab ~= nil and self.configTab ~= nil then
@@ -845,7 +847,7 @@ function buildMode:SyncLoadouts()
 				end
 			end
 		end
-		identifyLinks(self.itemsTab.itemSetOrderList, self.itemsTab.itemSets, itemList, self.itemListSpecialLinks, self.treeListSpecialLinks)
+		identifyLinks(itemSetOrderList, self.itemsTab.itemSets, itemList, self.itemListSpecialLinks, self.treeListSpecialLinks)
 		identifyLinks(self.skillsTab.skillSetOrderList, self.skillsTab.skillSets, skillList, self.skillListSpecialLinks, self.treeListSpecialLinks)
 		identifyLinks(self.configTab.configSetOrderList, self.configTab.configSets, configList, self.configListSpecialLinks, self.treeListSpecialLinks)
 
@@ -1690,7 +1692,7 @@ function buildMode:RefreshSkillSelectControls(controls, mainGroup, suffix)
 				if not activeSkill.skillFlags.disable and (activeEffect.grantedEffect.minionList or activeSkill.minionList[1]) then
 					wipeTable(controls.mainSkillMinion.list)
 					if activeEffect.grantedEffect.minionHasItemSet then
-						for _, itemSetId in ipairs(self.itemsTab.itemSetOrderList) do
+						for _, itemSetId in ipairs(self.itemsTab:GetMinionItemSetOrderList()) do
 							local itemSet = self.itemsTab.itemSets[itemSetId]
 							t_insert(controls.mainSkillMinion.list, {
 								label = itemSet.title or "Default Item Set",

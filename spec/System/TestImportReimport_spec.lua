@@ -258,6 +258,10 @@ Blight 20/0  1
 	it("preserves Mercenary equipment and skills when importing a character", function()
 		local itemsTab = build.itemsTab
 		local mercenaryHelmetSlotName = MercenaryTools.itemSlotName("Helmet")
+		build.mercenaryTab.profile.buildId = "MeleeAOEMarauderFireSlam"
+		build.mercenaryTab:Changed()
+		local mercenaryItemSet = build.mercenaryTab:GetItemSet(true)
+		itemsTab:SetViewItemSet(mercenaryItemSet.id)
 		local equippedMercenaryHelmet = new("Item", "Rarity: Normal\nIron Hat")
 		itemsTab:AddItem(equippedMercenaryHelmet, true)
 		itemsTab.slots[mercenaryHelmetSlotName]:SetSelItemId(equippedMercenaryHelmet.id)
@@ -266,8 +270,7 @@ Blight 20/0  1
 		itemsTab:AddItem(sharedMercenaryHelmet, true)
 		local secondItemSet = itemsTab:NewItemSet()
 		table.insert(itemsTab.itemSetOrderList, secondItemSet.id)
-		secondItemSet[mercenaryHelmetSlotName].selItemId = sharedMercenaryHelmet.id
-		itemsTab.slots.Helmet:SetSelItemId(sharedMercenaryHelmet.id)
+		secondItemSet.Helmet.selItemId = sharedMercenaryHelmet.id
 
 		local mercenarySkills = { {
 			id = "InfernalBlowMercenary",
@@ -277,14 +280,38 @@ Blight 20/0  1
 		} }
 		build.mercenaryTab.profile.skills = mercenarySkills
 
-		build.importTab:ImportItemsAndSkills(buildImportPayload({ }), true, true, true)
+		build.importTab:ImportItemsAndSkills(buildImportPayload({
+			makeImportItem("Iron Hat", "Helm", { }, "test-import-player-helmet"),
+		}), true, true, true)
+		local importedPlayerHelmetId
+		for itemId, item in pairs(itemsTab.items) do
+			if item.uniqueID == "test-import-player-helmet" then importedPlayerHelmetId = itemId break end
+		end
 
-		assert.are.equal(equippedMercenaryHelmet.id, itemsTab.activeItemSet[mercenaryHelmetSlotName].selItemId)
+		assert.are.equal(equippedMercenaryHelmet.id, mercenaryItemSet[mercenaryHelmetSlotName].selItemId)
 		assert.are.equal(equippedMercenaryHelmet.id, itemsTab.slots[mercenaryHelmetSlotName].selItemId)
-		assert.are.equal(sharedMercenaryHelmet.id, secondItemSet[mercenaryHelmetSlotName].selItemId)
+		assert.are.equal(sharedMercenaryHelmet.id, secondItemSet.Helmet.selItemId)
 		assert.is_not_nil(itemsTab.items[equippedMercenaryHelmet.id])
 		assert.is_not_nil(itemsTab.items[sharedMercenaryHelmet.id])
-		assert.are.equal(0, itemsTab.activeItemSet.Helmet.selItemId)
+		assert.are.equal(importedPlayerHelmetId, itemsTab.activeItemSet.Helmet.selItemId)
+		assert.are_not.equal(equippedMercenaryHelmet.id, itemsTab.activeItemSet.Helmet.selItemId)
 		assert.same(mercenarySkills, build.mercenaryTab.profile.skills)
+	end)
+
+	it("preserves a dedicated Mercenary set before profile selection during import", function()
+		local itemsTab = build.itemsTab
+		local mercenaryItemSet = build.mercenaryTab:EnsureItemSet()
+		build.mercenaryTab.itemSetId = nil
+		local mercenaryHelmet = new("Item", "Rarity: Normal\nIron Hat")
+		itemsTab:AddItem(mercenaryHelmet, true)
+		mercenaryItemSet[MercenaryTools.itemSlotName("Helmet")].selItemId = mercenaryHelmet.id
+
+		build.importTab:ImportItemsAndSkills(buildImportPayload({
+			makeImportItem("Iron Hat", "Helm", { }, "test-import-player-helmet-before-mercenary-profile"),
+		}), true, true, true)
+
+		assert.is_not_nil(itemsTab.items[mercenaryHelmet.id])
+		assert.are.equal(mercenaryHelmet.id, mercenaryItemSet[MercenaryTools.itemSlotName("Helmet")].selItemId)
+		assert.is_nil(build.mercenaryTab.itemSetId)
 	end)
 end)

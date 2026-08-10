@@ -134,6 +134,7 @@ local MercenaryTabClass = newClass("MercenaryTab", "ControlHost", "Control", fun
 	self:NewMercenarySet(1)
 	self.activeMercenarySetId = 1
 	self.profile = self.mercenarySets[1]
+	self.itemSetId = nil
 	self.sortGemsByDPS = true
 	self.sortGemsByDPSField = "CombinedDPS"
 	self.supportSortRevision = 0
@@ -183,6 +184,8 @@ local MercenaryTabClass = newClass("MercenaryTab", "ControlHost", "Control", fun
 	end)
 
 	self.controls.editEquipment = new("ButtonControl", { "TOPLEFT", self.controls.buildLabel, "BOTTOMLEFT" }, { 0, 14, 150, 20 }, "Edit Equipment", function()
+		local itemSet = self:GetItemSet(true)
+		if itemSet then build.itemsTab:SetViewItemSet(itemSet.id) end
 		build.viewMode = "ITEMS"
 	end)
 	self.controls.reset = new("ButtonControl", { "LEFT", self.controls.editEquipment, "RIGHT" }, { 8, 0, 80, 20 }, "Reset", function()
@@ -200,8 +203,16 @@ local MercenaryTabClass = newClass("MercenaryTab", "ControlHost", "Control", fun
 		self.profile.lifeComparison = value.id
 		self:Changed()
 	end)
+	self.controls.itemSetLabel = new("LabelControl", { "TOPLEFT", self.controls.editEquipment, "BOTTOMLEFT" }, { 0, 12, 0, 16 }, "^7Equipment item set:")
+	self.controls.itemSetSelect = new("DropDownControl", { "LEFT", self.controls.itemSetLabel, "RIGHT" }, { 6, 0, 230, 20 }, { }, function(_, value)
+		if value and value.id then self:SetItemSet(value.id) end
+	end)
+	self.controls.itemSetSelect.enableDroppedWidth = true
+	self.controls.itemSetManage = new("ButtonControl", { "LEFT", self.controls.itemSetSelect, "RIGHT" }, { 4, 0, 90, 20 }, "Manage...", function()
+		self:OpenMercenaryItemSetManagePopup()
+	end)
 
-	self.controls.skillList = new("MercenarySkillListControl", { "TOPLEFT", self.controls.editEquipment, "BOTTOMLEFT" }, { 0, 38, 360, 300 }, self)
+	self.controls.skillList = new("MercenarySkillListControl", { "TOPLEFT", self.controls.itemSetLabel, "BOTTOMLEFT" }, { 0, 32, 360, 300 }, self)
 	self.controls.skillTip = new("LabelControl", { "TOPLEFT", self.controls.skillList, "BOTTOMLEFT" }, { 0, 8, 0, 14 }, [[
 ^7Usage Tips:
 - Ctrl + Click to enable/disable skill groups.
@@ -453,10 +464,72 @@ function MercenaryTabClass:AddSupportTooltip(tooltip, support, index, preview)
 end
 
 function MercenaryTabClass:Changed()
+	if self.profile and self.profile.buildId then self:GetItemSet(true) end
 	self.modFlag = true
 	self.build.buildFlag = true
 	self:InvalidateSupportSort()
 	self:RefreshControls()
+end
+
+function MercenaryTabClass:GetMercenaryItemSetList()
+	local itemSetList = { }
+	for _, itemSetId in ipairs(self:GetMercenaryItemSetOrderList()) do
+		local itemSet = self.build.itemsTab.itemSets[itemSetId]
+		t_insert(itemSetList, {
+			id = itemSetId,
+			label = itemSet.title or "Mercenary Equipment",
+		})
+	end
+	return itemSetList
+end
+
+function MercenaryTabClass:GetMercenaryItemSetOrderList()
+	local orderList = { }
+	local itemsTab = self.build.itemsTab
+	for _, itemSetId in ipairs(itemsTab.itemSetOrderList) do
+		if itemsTab:IsMercenaryItemSet(itemsTab.itemSets[itemSetId]) then
+			t_insert(orderList, itemSetId)
+		end
+	end
+	return orderList
+end
+
+function MercenaryTabClass:EnsureItemSet()
+	local itemsTab = self.build.itemsTab
+	local itemSet = self.itemSetId and itemsTab.itemSets[self.itemSetId]
+	if itemSet and itemsTab:IsMercenaryItemSet(itemSet) then
+		itemSet.owner = "Mercenary"
+		itemSet.title = itemSet.title or "Mercenary Equipment"
+		return itemSet
+	end
+	local itemSetList = self:GetMercenaryItemSetList()
+	if #itemSetList == 1 then
+		self.itemSetId = itemSetList[1].id
+		return itemsTab.itemSets[self.itemSetId]
+	elseif #itemSetList > 1 then
+		return
+	end
+	itemSet = itemsTab:NewItemSet(nil, "Mercenary")
+	itemSet.title = "Mercenary Equipment"
+	t_insert(itemsTab.itemSetOrderList, itemSet.id)
+	self.itemSetId = itemSet.id
+	return itemSet
+end
+
+function MercenaryTabClass:GetItemSet(create)
+	local itemSet = self.itemSetId and self.build.itemsTab.itemSets[self.itemSetId]
+	if itemSet and self.build.itemsTab:IsMercenaryItemSet(itemSet) then return itemSet end
+	if create == true then return self:EnsureItemSet() end
+end
+
+function MercenaryTabClass:SetItemSet(itemSetId)
+	local itemsTab = self.build.itemsTab
+	local itemSet = itemsTab.itemSets[itemSetId]
+	if not itemsTab:IsMercenaryItemSet(itemSet) then return false end
+	self.itemSetId = itemSetId
+	itemsTab:SetViewItemSet(itemSetId)
+	self:Changed()
+	return true
 end
 
 function MercenaryTabClass:InvalidateSupportSort()
@@ -574,6 +647,14 @@ function MercenaryTabClass:RefreshControls()
 	end
 	self.controls.setSelect:SetList(setList)
 	self.controls.setSelect:SelByValue(self.activeMercenarySetId, "id")
+	local itemSetList = self:GetMercenaryItemSetList()
+	local hasMercenaryItemSets = #itemSetList > 0
+	if #itemSetList == 0 then
+		itemSetList[1] = { label = "<No Mercenary item set>" }
+	end
+	self.controls.itemSetSelect:SetList(itemSetList)
+	self.controls.itemSetSelect:SelByValue(self.itemSetId, "id")
+	self.controls.itemSetSelect.enabled = hasMercenaryItemSets
 
 	local classGroup = self.classGroupsByClassId[self.profile.classId]
 	self.controls.class:SelByValue(classGroup and classGroup.id, "id")
@@ -697,6 +778,15 @@ function MercenaryTabClass:OpenMercenarySetManagePopup()
 	})
 end
 
+function MercenaryTabClass:OpenMercenaryItemSetManagePopup()
+	main:OpenPopup(370, 290, "Manage Mercenary Equipment Sets", {
+		new("MercenaryItemSetListControl", nil, {0, 50, 350, 200}, self),
+		new("ButtonControl", nil, {0, 260, 90, 20}, "Done", function()
+			main:ClosePopup()
+		end),
+	})
+end
+
 function MercenaryTabClass:SetSkill(index, skillId)
 	self.profile.importedWarrant = nil
 	self.selectedSkillIndex = index
@@ -769,8 +859,20 @@ function MercenaryTabClass:OpenWarrantImportPopup()
 end
 
 function MercenaryTabClass:Reset()
+	local itemSetId = self.itemSetId
 	self.profile = self:NewMercenarySet(self.activeMercenarySetId, self.profile.title)
 	self.selectedSkillIndex = 1
+	local hasConfiguredProfile = false
+	for _, setId in ipairs(self.mercenarySetOrderList) do
+		local profile = self.mercenarySets[setId]
+		if profile and profile.buildId then hasConfiguredProfile = true break end
+	end
+	if not hasConfiguredProfile then
+		self.itemSetId = nil
+		if self.build.itemsTab.viewItemSetId == itemSetId then
+			self.build.itemsTab:SetViewItemSet(self.build.itemsTab.activeItemSetId)
+		end
+	end
 	self:Changed()
 end
 
@@ -787,13 +889,13 @@ function MercenaryTabClass:PlayerFlag(flagName)
 	return mainEnv and mainEnv.modDB and mainEnv.modDB:Flag(nil, flagName) or false
 end
 
-function MercenaryTabClass:ValidateEquippedItem(item, slotName, itemSet)
+function MercenaryTabClass:ValidateEquippedItem(item, slotName, itemSet, playerItemSet)
 	if not self:IsSlotSupported(slotName) then
 		return false, "slot is not supported by Mercenaries"
 	end
 	local parentSlot, abyssalSocketIndex = slotName:match("^(.-) Abyssal Socket (%d+)$")
 	if parentSlot then
-		local parentSetSlot = itemSet[MercenaryTools.itemSlotName(parentSlot)]
+		local parentSetSlot = itemSet and itemSet[MercenaryTools.itemSlotName(parentSlot)]
 		local parentItem = self.build.itemsTab.items[parentSetSlot and parentSetSlot.selItemId]
 		if not parentItem or (parentItem.abyssalSocketCount or 0) < tonumber(abyssalSocketIndex) then
 			return false, "parent item does not have this Abyssal Socket"
@@ -847,8 +949,11 @@ function MercenaryTabClass:ValidateEquippedItem(item, slotName, itemSet)
 	if #(item.grantedSkills or { }) > 0 then
 		return false, "item-granted skills and triggers cannot be used"
 	end
-	if itemSet then
-		for playerSlotName, playerSlot in pairs(itemSet) do
+	if not playerItemSet and itemSet and not self.build.itemsTab:IsMercenaryItemSet(itemSet) then
+		playerItemSet = itemSet
+	end
+	if playerItemSet then
+		for playerSlotName, playerSlot in pairs(playerItemSet) do
 			if type(playerSlot) == "table" and not MercenaryTools.baseItemSlotName(playerSlotName) and playerSlot.selItemId == item.id then
 				return false, "the same physical item is equipped by the player"
 			end
@@ -870,9 +975,9 @@ function MercenaryTabClass:GetErrors()
 		t_insert(errors, "Selected build has no exported wieldable-type data")
 	end
 	local itemsTab = self.build.itemsTab
-	local itemSet = itemsTab.activeItemSet
+	local itemSet = self:GetItemSet(false)
 	if not itemSet then
-		t_insert(errors, "No active item set is available")
+		if self.profile.buildId then t_insert(errors, "No Mercenary item set is available") end
 	else
 		local offHandSlot = itemSet[MercenaryTools.itemSlotName("Weapon 2")]
 		if mercBuild and mercBuild.weaponConfiguration.offHandRequired and not itemsTab.items[offHandSlot and offHandSlot.selItemId] then
@@ -883,7 +988,7 @@ function MercenaryTabClass:GetErrors()
 			local item = itemsTab.items[setSlot and setSlot.selItemId]
 			if item then
 				local baseValid = itemsTab:IsItemValidForSlot(item, slot.slotName, itemSet)
-				local valid, reason = self:ValidateEquippedItem(item, slot.mercenarySlotName, itemSet)
+				local valid, reason = self:ValidateEquippedItem(item, slot.mercenarySlotName, itemSet, itemsTab.activeItemSet)
 				if not baseValid then
 					t_insert(errors, slot.mercenarySlotName..": invalid base slot or weapon configuration")
 				elseif not valid then
@@ -945,6 +1050,7 @@ function MercenaryTabClass:Load(xml)
 
 	self.activeMercenarySetId = nil
 	self.profile = nil
+	self.itemSetId = tonumber(xml.attrib.itemSetId)
 	self.mercenarySets = { }
 	self.mercenarySetOrderList = { }
 	if xml.attrib.sortGemsByDPS then
@@ -977,6 +1083,7 @@ end
 function MercenaryTabClass:Save(xml)
 	xml.attrib = {
 		activeMercenarySet = tostring(self.activeMercenarySetId),
+		itemSetId = self.itemSetId and tostring(self.itemSetId),
 		sortGemsByDPS = tostring(self.sortGemsByDPS),
 		sortGemsByDPSField = self.sortGemsByDPSField,
 	}

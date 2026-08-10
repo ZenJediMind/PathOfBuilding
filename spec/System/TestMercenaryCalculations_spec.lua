@@ -3,7 +3,7 @@ describe("Permanent Mercenary calculations", function()
 	local configOptions = LoadModule("Modules/ConfigOptions")
 	local configVisibility = LoadModule("Modules/ConfigVisibility")
 	local function equipmentSlot(slotName)
-		return build.itemsTab.activeItemSet[MercenaryTools.itemSlotName(slotName)]
+		return assert(build.mercenaryTab:GetItemSet(true))[MercenaryTools.itemSlotName(slotName)]
 	end
 
 	local function selectScionLuminary()
@@ -397,7 +397,7 @@ describe("Permanent Mercenary calculations", function()
 		assert.are.near(1694.5, mercenary.output.AverageHit, 10 ^ -9)
 	end)
 
-	it("uses the compared slot actor while sharing the active item set", function()
+	it("uses the compared slot actor with separate player and Mercenary equipment", function()
 		configure("TrapsMinesShadow", "TrapsMinesShadowLightning", "LightningTrapMercenary")
 		local env = calculate()
 		local compare, playerBase, actorBases = build.calcsTab.calcs.getMiscCalculator(build)
@@ -405,6 +405,154 @@ describe("Permanent Mercenary calculations", function()
 		assert.are.equal(env.mercenary.output.Life, actorBases.MERCENARY.Life)
 		assert.are.equal(env.player.output.Life, compare({ }).Life)
 		assert.are.equal(env.mercenary.output.Life, compare({ comparisonActor = "MERCENARY" }).Life)
+	end)
+
+	it("uses player, Animate Guardian, and Mercenary equipment simultaneously", function()
+		configure("TrapsMinesShadow", "TrapsMinesShadowLightning", "LightningTrapMercenary")
+		local itemsTab = build.itemsTab
+		local guardianSet = itemsTab:NewItemSet(nil, "Animate Guardian")
+		guardianSet.title = "Animate Guardian"
+		table.insert(itemsTab.itemSetOrderList, guardianSet.id)
+		local mercenarySet = assert(build.mercenaryTab:GetItemSet(true))
+
+		local playerHelmet = new("Item", "Rarity: Normal\nIron Hat")
+		local guardianHelmet = new("Item", "Rarity: Normal\nIron Hat")
+		local mercenaryHelmet = new("Item", "Rarity: Normal\nIron Hat")
+		itemsTab:AddItem(playerHelmet, true)
+		itemsTab:AddItem(guardianHelmet, true)
+		itemsTab:AddItem(mercenaryHelmet, true)
+		itemsTab.activeItemSet.Helmet.selItemId = playerHelmet.id
+		guardianSet.Helmet.selItemId = guardianHelmet.id
+		mercenarySet[MercenaryTools.itemSlotName("Helmet")].selItemId = mercenaryHelmet.id
+
+		build.skillsTab:PasteSocketGroup("Animate Guardian 20/0  1")
+		local guardianGroup = build.skillsTab.socketGroupList[#build.skillsTab.socketGroupList]
+		build.mainSocketGroup = #build.skillsTab.socketGroupList
+		local guardianGem
+		for _, gem in ipairs(guardianGroup.gemList) do
+			if gem.nameSpec == "Animate Guardian" or gem.gemData and gem.gemData.name == "Animate Guardian" or gem.grantedEffect and gem.grantedEffect.name == "Animate Guardian" then
+				guardianGem = gem
+				break
+			end
+		end
+		guardianGem = assert(guardianGem)
+		guardianGem.skillMinionItemSet = guardianSet.id
+		guardianGem.skillMinionItemSetCalcs = guardianSet.id
+
+		local env = calculate()
+		assert.are.equal(playerHelmet, env.player.itemList.Helmet)
+		assert.are.equal(guardianHelmet, env.minion.itemList.Helmet)
+		assert.are.equal(mercenaryHelmet, env.mercenary.itemList.Helmet)
+	end)
+
+	it("uses the active Mercenary equipment item set for calculations", function()
+		configure("TrapsMinesShadow", "TrapsMinesShadowLightning", "LightningTrapMercenary")
+		local itemsTab = build.itemsTab
+		local firstSet = assert(build.mercenaryTab:GetItemSet(true))
+		local secondSet = itemsTab:NewItemSet(nil, "Mercenary")
+		secondSet.title = "Alternate Equipment"
+		table.insert(itemsTab.itemSetOrderList, secondSet.id)
+		local firstHelmet = new("Item", "Rarity: Normal\nIron Hat")
+		local secondHelmet = new("Item", "Rarity: Normal\nIron Hat")
+		itemsTab:AddItem(firstHelmet, true)
+		itemsTab:AddItem(secondHelmet, true)
+		firstSet[MercenaryTools.itemSlotName("Helmet")].selItemId = firstHelmet.id
+		secondSet[MercenaryTools.itemSlotName("Helmet")].selItemId = secondHelmet.id
+
+		build.mercenaryTab:SetItemSet(secondSet.id)
+		local env = calculate()
+		assert.are.equal(secondSet.id, build.mercenaryTab.itemSetId)
+		assert.are.equal(secondHelmet, env.mercenary.itemList.Helmet)
+	end)
+
+	it("uses the dedicated Mercenary set for trade stat replacements", function()
+		configure("TrapsMinesShadow", "TrapsMinesShadowLightning", "LightningTrapMercenary")
+		local itemsTab = build.itemsTab
+		local mercenarySet = assert(build.mercenaryTab:GetItemSet(true))
+		local currentHelmet = new("Item", "Rarity: Normal\nIron Hat")
+		itemsTab:AddItem(currentHelmet, true)
+		mercenarySet[MercenaryTools.itemSlotName("Helmet")].selItemId = currentHelmet.id
+
+		local tradeQuery = itemsTab.tradeQuery
+		tradeQuery.tradeQueryGenerator = new("TradeQueryGenerator", itemsTab)
+		tradeQuery.slotTables[1] = { slotName = MercenaryTools.itemSlotName("Helmet"), itemSetId = mercenarySet.id }
+		tradeQuery.resultTbl[1] = { { item_string = [[Rarity: Rare
+Mercenary's Test
+Iron Hat
+--------
++100 to maximum Life]] } }
+		tradeQuery.statSortSelectionList = { { stat = "Life", weightMult = 1 } }
+
+		calculate()
+		local _, _, actorOutputs = build.calcsTab:GetMiscCalculator()
+		local evaluation = tradeQuery:GetResultEvaluation(1, 1)
+		assert.is_number(evaluation[1].output.Life)
+		assert.is_true(evaluation[1].output.Life > actorOutputs.MERCENARY.Life)
+		assert.is_true(evaluation[1].weight > 0)
+	end)
+
+	it("uses the selected Animate Guardian set for trade stat replacements", function()
+		configure("TrapsMinesShadow", "TrapsMinesShadowLightning", "LightningTrapMercenary")
+		local itemsTab = build.itemsTab
+		local configuredGuardianSet = itemsTab:NewItemSet(nil, "Animate Guardian")
+		configuredGuardianSet.title = "Configured Guardian"
+		table.insert(itemsTab.itemSetOrderList, configuredGuardianSet.id)
+		local selectedGuardianSet = itemsTab:NewItemSet(nil, "Animate Guardian")
+		selectedGuardianSet.title = "Trader Guardian"
+		table.insert(itemsTab.itemSetOrderList, selectedGuardianSet.id)
+
+		local configuredHelmet = new("Item", "Rarity: Normal\nIron Hat")
+		local selectedHelmet = new("Item", [[Rarity: Rare
+Selected Guardian Helmet
+Iron Hat
+--------
++10 to maximum Life]])
+		local replacementHelmet = new("Item", [[Rarity: Rare
+Replacement Guardian Helmet
+Iron Hat
+--------
++100 to maximum Life]])
+		itemsTab:AddItem(configuredHelmet, true)
+		itemsTab:AddItem(selectedHelmet, true)
+		itemsTab:AddItem(replacementHelmet, true)
+		configuredGuardianSet.Helmet.selItemId = configuredHelmet.id
+		selectedGuardianSet.Helmet.selItemId = selectedHelmet.id
+
+		build.skillsTab:PasteSocketGroup("Animate Guardian 20/0  1")
+		local guardianGroup = build.skillsTab.socketGroupList[#build.skillsTab.socketGroupList]
+		build.mainSocketGroup = #build.skillsTab.socketGroupList
+		local guardianGem
+		for _, gem in ipairs(guardianGroup.gemList) do
+			if gem.nameSpec == "Animate Guardian" or gem.gemData and gem.gemData.name == "Animate Guardian" or gem.grantedEffect and gem.grantedEffect.name == "Animate Guardian" then
+				guardianGem = gem
+				break
+			end
+		end
+		guardianGem = assert(guardianGem)
+		guardianGem.skillMinionItemSet = configuredGuardianSet.id
+		guardianGem.skillMinionItemSetCalcs = configuredGuardianSet.id
+
+		calculate()
+		itemsTab:SetViewItemSet(selectedGuardianSet.id)
+		local tradeQueryGenerator = new("TradeQueryGenerator", itemsTab.tradeQuery)
+		tradeQueryGenerator:StartQuery(itemsTab.slots.Helmet, {
+			itemSetId = selectedGuardianSet.id,
+			influence1 = 1,
+			influence2 = 1,
+			statWeights = { { stat = "Life", weightMult = 1 } },
+			requiredMods = { },
+		})
+		tradeQueryGenerator.calcContext.co = nil
+		local baseOutput = tradeQueryGenerator.calcContext.baseOutput
+		local replacementOutput = tradeQueryGenerator.calcContext.calcFunc({
+			itemSetId = selectedGuardianSet.id,
+			comparisonActor = "PLAYER",
+			repSlotName = "Helmet",
+			repItem = replacementHelmet,
+		})
+
+		assert.are.equal(baseOutput.Life, replacementOutput.Life)
+		assert.is_true(replacementOutput.Minion.Life > baseOutput.Minion.Life)
 	end)
 
 	it("calculates every selectable exported inherent skill and support without runtime errors", function()
@@ -455,6 +603,8 @@ describe("Permanent Mercenary calculations", function()
 
 		build.configTab.input.enemyLevel = 83
 		build.configTab:BuildModList()
+		build.mercenaryTab.profile.buildId = build.data.mercenaries.buildOrder[1]
+		build.mercenaryTab:Changed()
 		local skillIds = { }
 		for skillId in pairs(buildForSkill) do table.insert(skillIds, skillId) end
 		table.sort(skillIds)
@@ -901,7 +1051,8 @@ describe("Permanent Mercenary calculations", function()
 
 	it("displays configuration warnings without blocking calculations", function()
 		configure("TrapsMinesShadow", "TrapsMinesShadowLightning", "LightningTrapMercenary", { foundAreaLevel = 68 })
-		local forbiddenFlask = { id = 9020, type = "Life Flask", rarity = "NORMAL", requirements = { }, grantedSkills = { } }
+		local forbiddenFlask = new("Item", "Rarity: Normal\nSmall Life Flask")
+		forbiddenFlask.id = 9020
 		build.itemsTab.items[forbiddenFlask.id] = forbiddenFlask
 		build.itemsTab.activeItemSet["Flask 1"].selItemId = forbiddenFlask.id
 		assert.is_table(calculate(83).mercenary)
@@ -1058,6 +1209,27 @@ describe("Permanent Mercenary calculations", function()
 		local env = calculate()
 		assert.is_true(env.skillsUsed.Absolution)
 		assert.are.near(env.mercenary.output.TotalDPS + env.mercenaryMinion.output.TotalDPS * 3, env.mercenary.output.FullDPS, 10 ^ -6)
+	end)
+
+	it("calculates Full DPS from the persisted Mercenary equipment item set", function()
+		configure("EleBowRanger", "EleBowRangerFire", "BurningArrowMercenary", { includeInFullDPS = true })
+		local bow = new("Item", "Rarity: Normal\nCrude Bow")
+		local quiver = new("Item", "Rarity: Normal\nSerrated Arrow Quiver")
+		bow.id, quiver.id = 9040, 9041
+		build.itemsTab.items[bow.id], build.itemsTab.items[quiver.id] = bow, quiver
+		equipmentSlot("Weapon 1").selItemId, equipmentSlot("Weapon 2").selItemId = bow.id, quiver.id
+
+		local itemsXml, mercenaryXml = { }, { }
+		build.itemsTab:Save(itemsXml)
+		build.mercenaryTab:Save(mercenaryXml)
+		local savedItemSetId = build.mercenaryTab.itemSetId
+		build.itemsTab:Load(itemsXml)
+		build.mercenaryTab:Load(mercenaryXml)
+
+		local env = calculate()
+		assert.are.equal(savedItemSetId, build.mercenaryTab.itemSetId)
+		assert.are.equal(bow, env.mercenary.itemList["Weapon 1"])
+		assert.is_true(env.mercenary.output.FullDPS > 0)
 	end)
 
 	it("applies Mercenary on-hit curses as auxiliary skills", function()

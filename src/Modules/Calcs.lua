@@ -117,6 +117,8 @@ function calcs.getMiscCalculator(build)
 		PLAYER = comparisonOutput(env),
 		MERCENARY = comparisonOutput(env, { comparisonActor = "MERCENARY" }),
 	}
+	local activeBaseOutput = build.itemsTab and build.itemsTab.IsMercenaryView and build.itemsTab:IsMercenaryView()
+		and baseOutputs.MERCENARY or baseOutputs.PLAYER
 	return function(override, useFullDPS)
 		local env, cachedPlayerDB, cachedEnemyDB, cachedMinionDB = calcs.initEnv(build, "CALCULATOR", override)
 		calcs.perform(env)
@@ -128,7 +130,7 @@ function calcs.getMiscCalculator(build)
 			applyFullDPSOutput(env, fullDPS)
 		end
 		return comparisonOutput(env, override)
-	end, baseOutputs.PLAYER, baseOutputs
+	end, activeBaseOutput, baseOutputs
 end
 
 local function getActiveSkillCount(activeSkill)

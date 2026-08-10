@@ -29,6 +29,11 @@ local groupSlotDropList = {
 	{ label = "Belt", slotName = "Belt" },
 }
 
+local function getActiveItemForSlot(itemsTab, slotName)
+	local itemSlot = itemsTab:GetItemSetSlot(itemsTab.activeItemSet, slotName)
+	return itemSlot and itemsTab.items[itemSlot.selItemId]
+end
+
 local defaultGemLevelList = {
 	{
 		label = "Normal Maximum",
@@ -183,7 +188,7 @@ function SkillsTabClass:SkillsTab(build)
 			tooltip:AddLine(16, "This will allow the skill to benefit from modifiers on the item that affect socketed gems.")
 		else
 			local slot = self.build.itemsTab.slots[value.slotName]
-			local ttItem = self.build.itemsTab.items[slot.selItemId]
+			local ttItem = getActiveItemForSlot(self.build.itemsTab, value.slotName)
 			if ttItem then
 				self.build.itemsTab:AddItemTooltip(tooltip, ttItem, slot)
 			else
@@ -209,12 +214,9 @@ function SkillsTabClass:SkillsTab(build)
 		local item
 		local groupSlot = self.controls.groupSlot:GetSelValue()
 		if groupSlot and groupSlot.slotName then
-			local slot = self.build.itemsTab.slots[groupSlot.slotName]
-			if slot then
-				item = self.build.itemsTab.items[slot.selItemId]
-				if not item then
-					return
-				end
+			item = getActiveItemForSlot(self.build.itemsTab, groupSlot.slotName)
+			if not item then
+				return
 			end
 		end
 		return item, groupSlot
@@ -1244,7 +1246,7 @@ function SkillsTabClass:UpdateSocketGroups()
 					local colours = { "R", "G", "B" }
 					local gemIdx = gemOffset + i
 					if slot then
-						local item = self.build.itemsTab.items[slot.selItemId]
+						local item = getActiveItemForSlot(self.build.itemsTab, socketGroup.slot)
 						if item and item.sockets then
 							-- e.g. dialla's malefaction
 							if item.sockets.colourAlwaysMatches then

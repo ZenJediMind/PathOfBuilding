@@ -65,12 +65,6 @@ function SharedItemSetListClass:AddValueTooltip(tooltip, index, sharedItemSet)
 			end
 		end
 	end
-	for _, slot in ipairs(self.itemsTab.mercenarySlots) do
-		local item = sharedItemSet.slots[slot.slotName]
-		if item then
-			tooltip:AddLine(16, s_format("^7%s: %s%s", slot.label, colorCodes[item.rarity], item.name))
-		end
-	end
 end
 
 function SharedItemSetListClass:GetDragValue(index, value)
@@ -78,18 +72,19 @@ function SharedItemSetListClass:GetDragValue(index, value)
 end
 
 function SharedItemSetListClass:CanReceiveDrag(type, value)
-	return type == "ItemList"
+	return type == "ItemList" and not self.itemsTab:GetItemSetOwner(value)
 end
 
 function SharedItemSetListClass:ReceiveDrag(type, value, source)
-	if type == "ItemList" then
+	if type == "ItemList" and not self.itemsTab:GetItemSetOwner(value) then
 		local sharedItemList = { title = value.title, slots = { } }
-		for slotName, slot in pairs(self.itemsTab.slots) do
+		for _, slot in ipairs(self.itemsTab.orderedSlots) do
 			if not slot.nodeId then
-				if value ~= self.itemsTab.activeItemSet then
+				local slotName = slot.slotName
+				if value ~= self.itemsTab:GetVisibleItemSet() then
 					slot = value[slotName]
 				end
-				if slot.selItemId ~= 0 then
+				if slot and slot.selItemId ~= 0 then
 					local item = self.itemsTab.items[slot.selItemId]
 					local rawItem = { raw = item:BuildRaw() }
 					local newItem = new("Item"):Item(rawItem.raw)

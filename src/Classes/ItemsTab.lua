@@ -110,7 +110,7 @@ function ItemsTabClass:ItemsTab(build)
 
 	-- Set selector
 	self.controls.setSelect = new("DropDownControl"):DropDownControl({"TOPLEFT",self,"TOPLEFT"}, {96, 8, 216, 20}, nil, function(index, value)
-		self:SetActiveItemSet(self.itemSetOrderList[index])
+		self:SetViewItemSet(self.itemSetOrderList[index])
 		self:AddUndoState()
 	end)
 	self.controls.setSelect.enableDroppedWidth = true
@@ -158,13 +158,13 @@ function ItemsTabClass:ItemsTab(build)
 			-- Add alternate weapon slot
 			slot.weaponSet = 1
 			slot.shown = function()
-				return not self.activeItemSet.useSecondWeaponSet
+				return not self:GetVisibleItemSet().useSecondWeaponSet
 			end
 			local swapSlot = new("ItemSlotControl"):ItemSlotControl({"TOPLEFT",prevSlot,"BOTTOMLEFT"}, 0, 2, self, slotName.." Swap", slotName)
 			addSlot(swapSlot)
 			swapSlot.weaponSet = 2
 			swapSlot.shown = function()
-				return self.activeItemSet.useSecondWeaponSet
+				return self:GetVisibleItemSet().useSecondWeaponSet
 			end
 			for i = 1, 6 do
 				local abyssal = new("ItemSlotControl"):ItemSlotControl({"TOPLEFT",prevSlot,"BOTTOMLEFT"}, 0, 2, self, slotName.." Swap Abyssal Socket "..i, "Abyssal #"..i)
@@ -172,7 +172,7 @@ function ItemsTabClass:ItemsTab(build)
 				abyssal.parentSlot = swapSlot
 				abyssal.weaponSet = 2
 				abyssal.shown = function()
-					return not abyssal.inactive and self.activeItemSet.useSecondWeaponSet
+					return not abyssal.inactive and self:GetVisibleItemSet().useSecondWeaponSet
 				end
 				swapSlot.abyssalSocketList[i] = abyssal
 			end
@@ -194,21 +194,18 @@ function ItemsTabClass:ItemsTab(build)
 				if slotName:match("Weapon") then
 					abyssal.weaponSet = 1
 					abyssal.shown = function()
-						return not abyssal.inactive and not self.activeItemSet.useSecondWeaponSet
+						return not abyssal.inactive and not self:GetVisibleItemSet().useSecondWeaponSet
 					end
 				end
 				slot.abyssalSocketList[i] = abyssal
 			end
 		end
 	end
+	local playerLastSlot = prevSlot
 
 	local function showMercenaryEquipment()
-		return self.build.mercenaryTab and self.build.mercenaryTab.profile.buildId ~= nil
+		return self:IsMercenaryView()
 	end
-	self.controls.mercenarySlotHeader = new("LabelControl"):LabelControl({"TOPLEFT",prevSlot,"BOTTOMLEFT"}, {0, 12, 0, 16}, "^7Mercenary equipment:")
-	self.controls.mercenarySlotHeader.anchor.collapse = true
-	self.controls.mercenarySlotHeader.shown = showMercenaryEquipment
-	prevSlot = self.controls.mercenarySlotHeader
 	self.mercenarySlots = { }
 	local function addMercenarySlot(slot, baseSlotName)
 		prevSlot = slot
@@ -236,9 +233,15 @@ function ItemsTabClass:ItemsTab(build)
 			end
 		end
 	end
+	for _, slot in ipairs(self.orderedSlots) do
+		local originalShown = slot.shown
+		slot.shown = function()
+			return not self:IsMercenaryView() and originalShown()
+		end
+	end
 
 	-- Passive tree dropdown controls
-	self.controls.specSelect = new("DropDownControl"):DropDownControl({"TOPLEFT",prevSlot,"BOTTOMLEFT"}, {0, 8, 216, 20}, nil, function(index, value)
+	self.controls.specSelect = new("DropDownControl"):DropDownControl({"TOPLEFT",playerLastSlot,"BOTTOMLEFT"}, {0, 8, 216, 20}, nil, function(index, value)
 		if self.build.treeTab.specList[index] then
 			self.build.modFlag = true
 			self.build.treeTab:SetActiveSpec(index)
@@ -265,13 +268,18 @@ function ItemsTabClass:ItemsTab(build)
 	end)
 	for _, node in ipairs(socketOrder) do
 		local socketControl = new("ItemSlotControl"):ItemSlotControl({"TOPLEFT",prevSlot,"BOTTOMLEFT"}, 0, 2, self, "Jewel "..node.id, "Socket", node.id)
+		local originalShown = socketControl.shown
+		socketControl.shown = function()
+			return not self:IsMercenaryView() and originalShown()
+		end
 		self.sockets[node.id] = socketControl
 		addSlot(socketControl)
 	end
 	self.controls.slotHeader = new("LabelControl"):LabelControl({"BOTTOMLEFT",self.slotAnchor,"TOPLEFT"}, {0, -4, 0, 16}, "^7Equipped items:")
 	self.controls.weaponSwap1 = new("ButtonControl"):ButtonControl({"BOTTOMRIGHT",self.slotAnchor,"TOPRIGHT"}, {-20, -2, 18, 18}, "I", function()
-		if self.activeItemSet.useSecondWeaponSet then
-			self.activeItemSet.useSecondWeaponSet = false
+		local visibleItemSet = self:GetVisibleItemSet()
+		if visibleItemSet.useSecondWeaponSet then
+			visibleItemSet.useSecondWeaponSet = false
 			self:AddUndoState()
 			self.build.buildFlag = true
 			local mainSocketGroup = self.build.skillsTab.socketGroupList[self.build.mainSocketGroup]
@@ -287,11 +295,12 @@ function ItemsTabClass:ItemsTab(build)
 	end)
 	self.controls.weaponSwap1.overSizeText = 3
 	self.controls.weaponSwap1.locked = function()
-		return not self.activeItemSet.useSecondWeaponSet
+		return not self:GetVisibleItemSet().useSecondWeaponSet
 	end
 	self.controls.weaponSwap2 = new("ButtonControl"):ButtonControl({"BOTTOMRIGHT",self.slotAnchor,"TOPRIGHT"}, {0, -2, 18, 18}, "II", function()
-		if not self.activeItemSet.useSecondWeaponSet then
-			self.activeItemSet.useSecondWeaponSet = true
+		local visibleItemSet = self:GetVisibleItemSet()
+		if not visibleItemSet.useSecondWeaponSet then
+			visibleItemSet.useSecondWeaponSet = true
 			self:AddUndoState()
 			self.build.buildFlag = true
 			local mainSocketGroup = self.build.skillsTab.socketGroupList[self.build.mainSocketGroup]
@@ -307,9 +316,12 @@ function ItemsTabClass:ItemsTab(build)
 	end)
 	self.controls.weaponSwap2.overSizeText = 3
 	self.controls.weaponSwap2.locked = function()
-		return self.activeItemSet.useSecondWeaponSet
+		return self:GetVisibleItemSet().useSecondWeaponSet
 	end
 	self.controls.weaponSwapLabel = new("LabelControl"):LabelControl({"RIGHT",self.controls.weaponSwap1,"LEFT"}, {-4, 0, 0, 14}, "^7Weapon Set:")
+	self.controls.weaponSwap1.shown = function() return not self:IsMercenaryView() end
+	self.controls.weaponSwap2.shown = function() return not self:IsMercenaryView() end
+	self.controls.weaponSwapLabel.shown = function() return not self:IsMercenaryView() end
 	-- All items list
 	if main.portraitMode then
 		self.controls.itemList = new("ItemListControl"):ItemListControl({"TOPRIGHT",self.lastSlot,"BOTTOMRIGHT"}, {0, 0, 360, 308}, self, true)
@@ -1250,6 +1262,8 @@ end
 
 function ItemsTabClass:Load(xml, dbFileName)
 	self.activeItemSetId = 0
+	self.viewItemSetId = nil
+	self.viewItemSet = nil
 	self.itemSets = { }
 	self.itemSetOrderList = { }
 	self.tradeQuery.statSortSelectionList = { }
@@ -1313,16 +1327,25 @@ function ItemsTabClass:Load(xml, dbFileName)
 				end
 			end
 		elseif node.elem == "ItemSet" then
-			local itemSet = self:NewItemSet(tonumber(node.attrib.id))
+			local title = node.attrib.title
+			local owner = node.attrib.owner
+			if owner == "Player" then
+				owner = nil
+			elseif not owner and title == "Animate Guardian" then
+				-- Older saves used the title to identify the Animate Guardian set.
+				owner = "Animate Guardian"
+			end
+			local itemSet = self:NewItemSet(tonumber(node.attrib.id), owner)
 			itemSet.title = node.attrib.title
 			itemSet.useSecondWeaponSet = node.attrib.useSecondWeaponSet == "true"
 			for _, child in ipairs(node) do
 				if child.elem == "Slot" then
 					local slotName = child.attrib.name or ""
-					if itemSet[slotName] then
-						itemSet[slotName].selItemId = tonumber(child.attrib.itemId)
-						itemSet[slotName].active = child.attrib.active == "true"
-						itemSet[slotName].pbURL = child.attrib.itemPbURL or ""
+					local itemSlot = itemSet[slotName]
+					if itemSlot then
+						itemSlot.selItemId = tonumber(child.attrib.itemId) or 0
+						itemSlot.active = child.attrib.active == "true"
+						itemSlot.pbURL = child.attrib.itemPbURL or ""
 					end
 				elseif child.elem == "SocketIdURL" then
 					local id = tonumber(child.attrib.nodeId)
@@ -1350,11 +1373,31 @@ function ItemsTabClass:Load(xml, dbFileName)
 		end
 	end
 	if not self.itemSetOrderList[1] then
-		self.activeItemSet = self:NewItemSet(1)
-		self.activeItemSet.useSecondWeaponSet = xml.attrib.useSecondWeaponSet == "true"
-		self.itemSetOrderList[1] = 1
+		local itemSet = self:NewItemSet(1)
+		itemSet.useSecondWeaponSet = xml.attrib.useSecondWeaponSet == "true"
+		t_insert(self.itemSetOrderList, itemSet.id)
 	end
-	self:SetActiveItemSet(tonumber(xml.attrib.activeItemSet) or 1)
+	local savedActiveItemSetId = tonumber(xml.attrib.activeItemSet)
+	local activeItemSetId = savedActiveItemSetId
+	if not self:IsPlayerItemSet(self.itemSets[activeItemSetId]) then
+		for _, itemSetId in ipairs(self.itemSetOrderList) do
+			if self:IsPlayerItemSet(self.itemSets[itemSetId]) then
+				activeItemSetId = itemSetId
+				break
+			end
+		end
+	end
+	if not self:IsPlayerItemSet(self.itemSets[activeItemSetId]) then
+		local itemSet = self:NewItemSet(nil)
+		itemSet.useSecondWeaponSet = xml.attrib.useSecondWeaponSet == "true"
+		activeItemSetId = itemSet.id
+		t_insert(self.itemSetOrderList, 1, itemSet.id)
+	end
+	self:SetActiveItemSet(activeItemSetId)
+	local viewItemSetId = tonumber(xml.attrib.viewItemSet)
+	if viewItemSetId and self.itemSets[viewItemSetId] then
+		self:SetViewItemSet(viewItemSetId)
+	end
 	if xml.attrib.showStatDifferences then
 		self.showStatDifferences = xml.attrib.showStatDifferences == "true"
 	end
@@ -1364,6 +1407,7 @@ end
 function ItemsTabClass:Save(xml)
 	xml.attrib = {
 		activeItemSet = tostring(self.activeItemSetId),
+		viewItemSet = tostring(self.viewItemSetId or self.activeItemSetId),
 		useSecondWeaponSet = tostring(self.activeItemSet.useSecondWeaponSet),
 		showStatDifferences = tostring(self.showStatDifferences),
 	}
@@ -1418,13 +1462,21 @@ function ItemsTabClass:Save(xml)
 	end
 	for _, itemSetId in ipairs(self.itemSetOrderList) do
 		local itemSet = self.itemSets[itemSetId]
-		local child = { elem = "ItemSet", attrib = { id = tostring(itemSetId), title = itemSet.title, useSecondWeaponSet = tostring(itemSet.useSecondWeaponSet) } }
-		for slotName, slot in pairs(self.slots) do
+		local owner = self:GetItemSetOwner(itemSet)
+		local child = { elem = "ItemSet", attrib = { id = tostring(itemSetId), title = itemSet.title, owner = owner or "Player", useSecondWeaponSet = tostring(itemSet.useSecondWeaponSet) } }
+		local slots = owner == "Mercenary" and self.mercenarySlots or self.orderedSlots
+		for _, slot in ipairs(slots) do
 			if not slot.nodeId then
-				t_insert(child, { elem = "Slot", attrib = { name = slotName, itemId = tostring(itemSet[slotName].selItemId), itemPbURL = itemSet[slotName].pbURL or "", active = itemSet[slotName].active and "true" }})
-			else
-				if self.build.spec.allocNodes[slot.nodeId] then
-					t_insert(child, { elem = "SocketIdURL", attrib = { name = slotName, nodeId = tostring(slot.nodeId), itemPbURL = itemSet[slot.nodeId] and itemSet[slot.nodeId].pbURL or ""}})
+				local itemSlot = itemSet[slot.slotName]
+				if itemSlot then
+					t_insert(child, { elem = "Slot", attrib = { name = slot.slotName, itemId = tostring(itemSlot.selItemId), itemPbURL = itemSlot.pbURL or "", active = itemSlot.active and "true" }})
+				end
+			end
+		end
+		if owner ~= "Mercenary" then
+			for _, slot in ipairs(self.orderedSlots) do
+				if slot.nodeId and self.build.spec.allocNodes[slot.nodeId] then
+					t_insert(child, { elem = "SocketIdURL", attrib = { name = slot.slotName, nodeId = tostring(slot.nodeId), itemPbURL = itemSet[slot.nodeId] and itemSet[slot.nodeId].pbURL or ""}})
 				end
 			end
 		end
@@ -1550,8 +1602,10 @@ function ItemsTabClass:Draw(viewPort, inputEvents)
 	local newItemList = { }
 	for index, itemSetId in ipairs(self.itemSetOrderList) do
 		local itemSet = self.itemSets[itemSetId]
-		t_insert(newItemList, itemSet.title or "Default")
-		if itemSetId == self.activeItemSetId then
+		local owner = self:GetItemSetOwner(itemSet)
+		local title = itemSet.title or (owner == "Mercenary" and "Mercenary Equipment") or (owner == "Animate Guardian" and "Animate Guardian") or "Default"
+		t_insert(newItemList, title)
+		if itemSetId == self.viewItemSetId then
 			self.controls.setSelect.selIndex = index
 		end
 	end
@@ -1604,50 +1658,141 @@ function ItemsTabClass:Draw(viewPort, inputEvents)
 	self.controls.specSelect:SetList(self.build.treeTab:GetSpecList())
 end
 
+function ItemsTabClass:GetItemSetOwner(itemSet)
+	if not itemSet then return nil end
+	return itemSet.owner
+end
+
+function ItemsTabClass:IsMercenaryItemSet(itemSet)
+	return self:GetItemSetOwner(itemSet) == "Mercenary"
+end
+
+function ItemsTabClass:IsAnimateGuardianItemSet(itemSet)
+	return self:GetItemSetOwner(itemSet) == "Animate Guardian"
+end
+
+function ItemsTabClass:IsPlayerItemSet(itemSet)
+	return itemSet and not self:GetItemSetOwner(itemSet)
+end
+
+function ItemsTabClass:GetPlayerItemSetOrderList()
+	local orderList = { }
+	for _, itemSetId in ipairs(self.itemSetOrderList) do
+		if self:IsPlayerItemSet(self.itemSets[itemSetId]) then
+			t_insert(orderList, itemSetId)
+		end
+	end
+	return orderList
+end
+
+function ItemsTabClass:GetMinionItemSetOrderList()
+	local orderList = { }
+	for _, itemSetId in ipairs(self.itemSetOrderList) do
+		if not self:IsMercenaryItemSet(self.itemSets[itemSetId]) then
+			t_insert(orderList, itemSetId)
+		end
+	end
+	return orderList
+end
+
+function ItemsTabClass:GetVisibleItemSet()
+	return self.viewItemSet or self.activeItemSet
+end
+
+function ItemsTabClass:IsMercenaryView()
+	return self:IsMercenaryItemSet(self:GetVisibleItemSet())
+end
+
+function ItemsTabClass:GetVisibleItemSlots()
+	return self:IsMercenaryView() and self.mercenarySlots or self.orderedSlots
+end
+
+function ItemsTabClass:GetItemSetSlotName(slotName, itemSet)
+	if slotName and self:IsMercenaryItemSet(itemSet) and not MercenaryTools.baseItemSlotName(slotName) then
+		return MercenaryTools.itemSlotName(slotName)
+	end
+	return slotName
+end
+
+function ItemsTabClass:GetItemSetSlot(itemSet, slotName)
+	return itemSet and itemSet[self:GetItemSetSlotName(slotName, itemSet)]
+end
+
+function ItemsTabClass:GetVisibleSlotName(slotName)
+	return self:GetItemSetSlotName(slotName, self:GetVisibleItemSet())
+end
+
+function ItemsTabClass:IsItemSetReferenced(itemSetId)
+	local mercenaryTab = self.build.mercenaryTab
+	if mercenaryTab and mercenaryTab.itemSetId == itemSetId then
+		return true
+	end
+	for _, socketGroup in ipairs(self.build.skillsTab and self.build.skillsTab.socketGroupList or { }) do
+		for _, gem in ipairs(socketGroup.gemList or { }) do
+			if gem.skillMinionItemSet == itemSetId or gem.skillMinionItemSetCalcs == itemSetId then
+				return true
+			end
+		end
+	end
+	return false
+end
+
 -- Creates a new item set
-function ItemsTabClass:NewItemSet(itemSetId)
-	local itemSet = { id = itemSetId }
+function ItemsTabClass:NewItemSet(itemSetId, owner)
+	local itemSet = { id = itemSetId, owner = owner }
 	if not itemSetId then
 		itemSet.id = 1
 		while self.itemSets[itemSet.id] do
 			itemSet.id = itemSet.id + 1
 		end
 	end
-	for slotName, slot in pairs(self.slots) do
+	local slots = owner == "Mercenary" and self.mercenarySlots or self.orderedSlots
+	for _, slot in ipairs(slots) do
 		if not slot.nodeId then
-			itemSet[slotName] = { selItemId = 0 }
+			itemSet[slot.slotName] = { selItemId = 0 }
 		end
 	end
 	self.itemSets[itemSet.id] = itemSet
 	return itemSet
 end
 
--- Changes the active item set
+function ItemsTabClass:SetViewItemSet(itemSetId)
+	local itemSet = self.itemSets[itemSetId]
+	if not itemSet then
+		itemSetId = self.activeItemSetId or self.itemSetOrderList[1]
+		itemSet = self.itemSets[itemSetId]
+	end
+	if not itemSet then return end
+	if self:IsPlayerItemSet(itemSet) then
+		self:SetActiveItemSet(itemSet.id)
+		self.viewItemSetId = itemSet.id
+		self.viewItemSet = itemSet
+		self:PopulateSlots()
+		self:UpdateSockets()
+		return
+	end
+	self.viewItemSetId = itemSet.id
+	self.viewItemSet = itemSet
+	self.build.buildFlag = true
+	self:PopulateSlots()
+	self:UpdateSockets()
+end
+
+-- Changes the active player item set. Actor-owned sets are presentation-only.
 function ItemsTabClass:SetActiveItemSet(itemSetId)
-	local prevSet = self.activeItemSet
-	if not self.itemSets[itemSetId] then
-		itemSetId = self.itemSetOrderList[1]
+	local itemSet = self.itemSets[itemSetId]
+	if not self:IsPlayerItemSet(itemSet) then
+		return self:SetViewItemSet(itemSetId)
 	end
 	self.activeItemSetId = itemSetId
-	self.activeItemSet = self.itemSets[itemSetId]
-	local curSet = self.activeItemSet
-	for slotName, slot in pairs(self.slots) do
-		if not slot.nodeId then
-			if prevSet then
-				-- Update the previous set
-				prevSet[slotName].selItemId = slot.selItemId
-				prevSet[slotName].active = slot.active
-			end
-			-- Equip the incoming set's item
-			slot.selItemId = curSet[slotName].selItemId
-			slot.active = curSet[slotName].active
-			if slot.controls.activate then
-				slot.controls.activate.state = slot.active
-			end
-		end
+	self.activeItemSet = itemSet
+	if not self.viewItemSet or self:IsPlayerItemSet(self.viewItemSet) then
+		self.viewItemSetId = itemSetId
+		self.viewItemSet = itemSet
 	end
 	self.build.buildFlag = true
 	self:PopulateSlots()
+	self:UpdateSockets()
 	self.build:SyncLoadouts()
 end
 
@@ -1655,7 +1800,9 @@ end
 function ItemsTabClass:EquipItemInSet(item, itemSetId)
 	local itemSet = self.itemSets[itemSetId]
 	local slotName = item:GetPrimarySlot()
-	if self.slots[slotName].weaponSet == 1 and itemSet.useSecondWeaponSet then
+	slotName = self:GetItemSetSlotName(slotName, itemSet)
+	local slot = self.slots[slotName]
+	if slot and slot.weaponSet == 1 and itemSet.useSecondWeaponSet then
 		-- Redirect to second weapon set
 		slotName = slotName .. " Swap"
 	end
@@ -1670,12 +1817,14 @@ function ItemsTabClass:EquipItemInSet(item, itemSetId)
 			slotName = altSlot
 		end
 	end
-	if itemSet == self.activeItemSet then
+	if itemSet == self:GetVisibleItemSet() and self.slots[slotName] then
 		self.slots[slotName]:SetSelItemId(item.id)
 	else
-		itemSet[slotName].selItemId = item.id
-		if itemSet[altSlot].selItemId ~= 0 and not self:IsItemValidForSlot(self.items[itemSet[altSlot].selItemId], altSlot, itemSet) then
-			itemSet[altSlot].selItemId = 0
+		local itemSlot = itemSet[self:GetItemSetSlotName(slotName, itemSet)]
+		if itemSlot then itemSlot.selItemId = item.id end
+		local altItemSlot = itemSet[self:GetItemSetSlotName(altSlot, itemSet)]
+		if altItemSlot and altItemSlot.selItemId ~= 0 and not self:IsItemValidForSlot(self.items[altItemSlot.selItemId], altSlot, itemSet) then
+			altItemSlot.selItemId = 0
 		end
 	end
 	self:PopulateSlots()
@@ -1686,12 +1835,25 @@ end
 -- Update the item lists for all the slot controls
 function ItemsTabClass:PopulateSlots()
 	for _, slot in pairs(self.slots) do
-		slot:Populate()
+		if slot.nodeId or (self:IsMercenaryView() and slot.mercenarySlotName) or (not self:IsMercenaryView() and not slot.mercenarySlotName) then
+			slot:Populate()
+		end
+	end
+	if self:IsMercenaryView() then
+		local abyssalIndex = 0
+		for _, slot in ipairs(self.mercenarySlots) do
+			if slot.parentSlot and not slot.inactive then
+				abyssalIndex = abyssalIndex + 1
+				slot.label = "Abyssal #"..abyssalIndex
+			end
+		end
 	end
 end
 
 -- Updates the status and position of the socket controls
 function ItemsTabClass:UpdateSockets()
+	self.lastSlot = self:IsMercenaryView() and self.mercenarySlots[#self.mercenarySlots] or self.slots[baseSlots[#baseSlots]]
+	if not self.build.spec or self:IsMercenaryView() then return end
 	-- Build a list of active sockets
 	local activeSocketList = { }
 	for nodeId, slot in pairs(self.sockets) do
@@ -1705,7 +1867,6 @@ function ItemsTabClass:UpdateSockets()
 	table.sort(activeSocketList)
 
 	-- Update the state of the active socket controls
-	self.lastSlot = self.build.mercenaryTab and self.build.mercenaryTab.profile.buildId and self.mercenarySlots[#self.mercenarySlots] or self.slots[baseSlots[#baseSlots]]
 	for index, nodeId in ipairs(activeSocketList) do
 		self.sockets[nodeId].label = "Socket #"..index
 		self.lastSlot = self.sockets[nodeId]
@@ -1735,7 +1896,7 @@ function ItemsTabClass:AddItem(item, noAutoEquip, index)
 
 		if not noAutoEquip then
 			-- Autoequip it
-			for _, slot in ipairs(self.orderedSlots) do
+			for _, slot in ipairs(self:GetVisibleItemSlots()) do
 				if not slot.nodeId and slot.selItemId == 0 and slot:IsShown() and self:IsItemValidForSlot(item, slot.slotName) then
 					slot:SetSelItemId(item.id)
 					break
@@ -1892,13 +2053,14 @@ end
 function ItemsTabClass:DeleteItem(item, deferUndoState)
 	for slotName, slot in pairs(self.slots) do
 		if slot.selItemId == item.id then
-			slot:SetSelItemId(0)
+			slot.selItemId = 0
 			self.build.buildFlag = true
 		end
 		if not slot.nodeId then
 			for _, itemSet in pairs(self.itemSets) do
-				if itemSet[slotName].selItemId == item.id then
-					itemSet[slotName].selItemId = 0
+				local itemSlot = itemSet[slotName]
+				if itemSlot and itemSlot.selItemId == item.id then
+					itemSlot.selItemId = 0
 					self.build.buildFlag = true
 				end
 			end
@@ -1940,12 +2102,15 @@ end
 
 function ItemsTabClass:CopyAnointsAndEldritchImplicits(newItem, copyEldritchImplicits, overwrite, sourceSlotName)
 	local newItemType = sourceSlotName or (newItem.base.weapon and "Weapon 1" or newItem.base.type)
-	if self.activeItemSet[newItemType] then
-		local currentItem = self.activeItemSet[newItemType].selItemId and self.items[self.activeItemSet[newItemType].selItemId]
+	local itemSet = self:GetVisibleItemSet()
+	local itemSetSlotName = self:GetItemSetSlotName(newItemType, itemSet)
+	local itemSetSlot = itemSet and itemSet[itemSetSlotName]
+	if itemSetSlot then
+		local currentItem = itemSetSlot.selItemId and self.items[itemSetSlot.selItemId]
 		-- if you don't have an equipped item that matches the type of the newItem, no need to do anything
 		if currentItem then
 			-- if the new item is anointable and does not have an anoint and your current respective item does, apply that anoint to the new item
-			if isAnointable(newItem) and (#newItem.enchantModLines == 0 or overwrite) and self.activeItemSet[newItemType].selItemId > 0 then
+			if isAnointable(newItem) and (#newItem.enchantModLines == 0 or overwrite) and itemSetSlot.selItemId > 0 then
 				local currentAnoint = currentItem.enchantModLines
 				if currentAnoint and #currentAnoint == 1 then -- skip if amulet has more than one anoint e.g. Stranglegasp
 					newItem.enchantModLines = currentAnoint
@@ -1970,7 +2135,7 @@ function ItemsTabClass:CopyAnointsAndEldritchImplicits(newItem, copyEldritchImpl
 			end
 
 			-- harvest and heist enchantments on modifiable body armour or weapons
-			if (newItem.base.weapon or newItem.base.type == "Body Armour") and (#newItem.enchantModLines == 0 or overwrite)	and self.activeItemSet[newItemType].selItemId > 0 and modifiableItem and currentItem.enchantModLines then
+			if (newItem.base.weapon or newItem.base.type == "Body Armour") and (#newItem.enchantModLines == 0 or overwrite)	and itemSetSlot.selItemId > 0 and modifiableItem and currentItem.enchantModLines then
 				newItem.enchantModLines = currentItem.enchantModLines
 			end
 
@@ -2561,24 +2726,24 @@ end
 
 -- Returns the first slot in which the given item is equipped
 function ItemsTabClass:GetEquippedSlotForItem(item)
-	local function findEquippedSlot(slots)
+	local function findEquippedSlot(slots, isMercenary)
 		for _, slot in ipairs(slots or { }) do
-			if not slot.inactive then
-				if slot.selItemId == item.id then
-					return slot
-				end
+			if not slot.inactive and not slot.nodeId then
 				for _, itemSetId in ipairs(self.itemSetOrderList) do
 					local itemSet = self.itemSets[itemSetId]
-					if itemSetId ~= self.activeItemSetId and itemSet[slot.slotName] and itemSet[slot.slotName].selItemId == item.id then
-						return slot, itemSet
+					if itemSet and self:IsMercenaryItemSet(itemSet) == isMercenary then
+						local itemSlot = itemSet[self:GetItemSetSlotName(slot.slotName, itemSet)]
+						if itemSlot and itemSlot.selItemId == item.id then
+							return slot, itemSet
+						end
 					end
 				end
 			end
 		end
 	end
-	local slot, itemSet = findEquippedSlot(self.orderedSlots)
+	local slot, itemSet = findEquippedSlot(self.orderedSlots, false)
 	if slot then return slot, itemSet end
-	return findEquippedSlot(self.mercenarySlots)
+	return findEquippedSlot(self.mercenarySlots, true)
 end
 
 function ItemsTabClass:GetComparisonSlotNameForItem(item)
@@ -2593,12 +2758,12 @@ function ItemsTabClass:GetComparisonSlotNameForItem(item)
 			end
 		end
 	end
-	return item:GetPrimarySlot()
+	return self:GetVisibleSlotName(item:GetPrimarySlot())
 end
 -- Check if the given item could be equipped in the given slot, taking into account possible conflicts with currently equipped items
 -- For example, a shield is not valid for Weapon 2 if Weapon 1 is a staff, and a wand is not valid for Weapon 2 if Weapon 1 is a dagger
 function ItemsTabClass:IsItemValidForSlot(item, slotName, itemSet)
-	itemSet = itemSet or self.activeItemSet
+	itemSet = itemSet or self:GetVisibleItemSet()
 	local mercenarySlotName = MercenaryTools.baseItemSlotName(slotName)
 	slotName = mercenarySlotName or slotName
 	local slotType, slotId = slotName:match("^([%a ]+) (%d+)$")
@@ -2637,7 +2802,8 @@ function ItemsTabClass:IsItemValidForSlot(item, slotName, itemSet)
 	elseif slotName == "Weapon 2" or slotName == "Weapon 2 Swap" then
 		local weapon1SlotName = slotName == "Weapon 2" and "Weapon 1" or "Weapon 1 Swap"
 		if mercenarySlotName then weapon1SlotName = MercenaryTools.itemSlotName(weapon1SlotName) end
-		local weapon1Sel = itemSet[weapon1SlotName].selItemId or 0
+		local weapon1Slot = itemSet and itemSet[weapon1SlotName]
+		local weapon1Sel = weapon1Slot and weapon1Slot.selItemId or 0
 		local weapon1Type = self.items[weapon1Sel] and self.items[weapon1Sel].base.type or "None"
 		if weapon1Type == "None" then
 			return item.type == "Shield" or (self.build.data.weaponTypeInfo[item.type] and self.build.data.weaponTypeInfo[item.type].oneHand)
@@ -4024,18 +4190,14 @@ end
 
 
 function ItemsTabClass:AddItemSetTooltip(tooltip, itemSet)
-	for _, slot in ipairs(self.orderedSlots) do
+	local slots = self:IsMercenaryItemSet(itemSet) and self.mercenarySlots or self.orderedSlots
+	for _, slot in ipairs(slots) do
 		if not slot.nodeId then
-			local item = self.items[itemSet[slot.slotName].selItemId]
+			local itemSlot = itemSet[slot.slotName]
+			local item = itemSlot and self.items[itemSlot.selItemId]
 			if item then
 				tooltip:AddLine(16, s_format("^7%s: %s%s", slot.label, colorCodes[item.rarity], item.name))
 			end
-		end
-	end
-	for _, slot in ipairs(self.mercenarySlots) do
-		local item = self.items[itemSet[slot.slotName].selItemId]
-		if item then
-			tooltip:AddLine(16, s_format("^7%s: %s%s", slot.label, colorCodes[item.rarity], item.name))
 		end
 	end
 end
@@ -4960,9 +5122,10 @@ function ItemsTabClass:AddItemStatDifferences(tooltip, item, base, slot)
 	else
 		self:UpdateSockets()
 		-- Build sorted list of slots to compare with
-		local compareSlots = {}
+		local compareSlots = { }
+		local visibleItemSet = self:GetVisibleItemSet()
 		for slotName, slot in pairs(self.slots) do
-			if self:IsItemValidForSlot(item, slotName) and not slot.inactive and (not slot.weaponSet or slot.weaponSet == (self.activeItemSet.useSecondWeaponSet and 2 or 1)) and slot.shown() then
+			if self:IsItemValidForSlot(item, slotName, visibleItemSet) and not slot.inactive and (not slot.weaponSet or slot.weaponSet == (visibleItemSet.useSecondWeaponSet and 2 or 1)) and slot.shown() then
 				t_insert(compareSlots, slot)
 			end
 		end
@@ -4994,7 +5157,7 @@ function ItemsTabClass:AddItemStatDifferences(tooltip, item, base, slot)
 		-- tooltips only for affected slots" checked, we can just compare that
 		-- one slot
 		if main.slotOnlyTooltips and slot then
-			slot = type(slot) ~= "string" and slot or self.slots[slot]
+			slot = type(slot) ~= "string" and slot or self.slots[self:GetVisibleSlotName(slot)]
 			if slot then addCompareForSlot(slot) end
 			return
 		end
@@ -5072,6 +5235,7 @@ end
 function ItemsTabClass:CreateUndoState()
 	local state = { }
 	state.activeItemSetId = self.activeItemSetId
+	state.viewItemSetId = self.viewItemSetId
 	state.items = { }
 	for k, v in pairs(self.items) do
 		state.items[k] = copyTableSafe(self.items[k], true, true)
@@ -5092,9 +5256,6 @@ function ItemsTabClass:RestoreUndoState(state)
 	for k, v in pairs(state.itemOrderList) do
 		self.itemOrderList[k] = v
 	end
-	for slotName, selItemId in pairs(state.slotSelItemId) do
-		self.slots[slotName]:SetSelItemId(selItemId)
-	end
 	self.itemSets = state.itemSets
 	wipeTable(self.itemSetOrderList)
 	for k, v in pairs(state.itemSetOrderList) do
@@ -5102,5 +5263,11 @@ function ItemsTabClass:RestoreUndoState(state)
 	end
 	self.activeItemSetId = state.activeItemSetId
 	self.activeItemSet = self.itemSets[self.activeItemSetId]
+	self.viewItemSetId = state.viewItemSetId or self.activeItemSetId
+	self.viewItemSet = self.itemSets[self.viewItemSetId] or self.activeItemSet
+	for slotName, selItemId in pairs(state.slotSelItemId) do
+		local slot = self.slots[slotName]
+		if slot and slot.nodeId then slot:SetSelItemId(selItemId) end
+	end
 	self:PopulateSlots()
 end

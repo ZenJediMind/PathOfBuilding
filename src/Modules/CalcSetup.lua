@@ -213,7 +213,6 @@ function calcs.initMercenary(env)
 		env.mercenaryCalculationErrors = { "Selected Mercenary has no allied MonsterVariety data" }
 		return
 	end
-
 	local mercenary = {
 		type = "Mercenary",
 		isMercenary = true,
@@ -263,7 +262,11 @@ function calcs.initMercenary(env)
 		mercenary.modDB:AddMod(value.mod)
 	end
 
-	local itemSet = env.build.itemsTab.activeItemSet
+	local itemSet = tab:GetItemSet(false)
+	local selectedItemSet = env.override.itemSetId and env.build.itemsTab.itemSets[env.override.itemSetId]
+	if selectedItemSet and env.build.itemsTab:IsMercenaryItemSet(selectedItemSet) then
+		itemSet = selectedItemSet
+	end
 	for _, slotName in ipairs(MercenaryTools.equipmentSlots) do
 		local itemSlotName = MercenaryTools.itemSlotName(slotName)
 		local slot = env.build.itemsTab.slots[itemSlotName]
@@ -875,6 +878,14 @@ function calcs.initEnv(build, mode, override, specEnv)
 
 	-- environment variables
 	local override = override or { }
+	local overrideItemSet = override.itemSetId and build.itemsTab.itemSets[override.itemSetId]
+	local replacesPlayerItem = override.itemSetId == nil
+	if override.itemSetId then
+		replacesPlayerItem = false
+		if overrideItemSet then
+			replacesPlayerItem = build.itemsTab:IsPlayerItemSet(overrideItemSet)
+		end
+	end
 	local modDB = nil
 	local enemyDB = nil
 	local classStats = nil
@@ -1204,16 +1215,17 @@ function calcs.initEnv(build, mode, override, specEnv)
 				goto continue
 			end
 			local item
-			if slotName == override.repSlotName then
+			if replacesPlayerItem and slotName == override.repSlotName then
 				item = override.repItem
-			elseif override.repItem and override.repSlotName:match("^Weapon 1") and slotName:match("^Weapon 2") and
+			elseif replacesPlayerItem and override.repItem and override.repSlotName:match("^Weapon 1") and slotName:match("^Weapon 2") and
 			(override.repItem.base.type == "Staff" or override.repItem.base.type == "Two Handed Sword" or override.repItem.base.type == "Two Handed Axe" or override.repItem.base.type == "Two Handed Mace"
 			or (override.repItem.base.type == "Bow" and item and item.base.type ~= "Quiver")) then
 				goto continue
-			elseif slot.nodeId and override.spec then
+			elseif slot.nodeId then
 				item = build.itemsTab.items[env.spec.jewels[slot.nodeId]]
 			else
-				item = build.itemsTab.items[slot.selItemId]
+				local itemSlot = build.itemsTab:GetItemSetSlot(build.itemsTab.activeItemSet, slotName)
+				item = build.itemsTab.items[itemSlot and itemSlot.selItemId]
 			end
 			if item and item.grantedSkills then
 				-- Find skills granted by this item
@@ -1353,7 +1365,7 @@ function calcs.initEnv(build, mode, override, specEnv)
 			for _, slot in ipairs(build.itemsTab.orderedSlots) do
 				local slotName = slot.slotName
 				if items[slotName] then
-					local srcList = items[slotName].modList or items[slotName].slotModList[slot.slotNum]
+					local srcList = items[slotName].modList or items[slotName].slotModList and items[slotName].slotModList[slot.slotNum] or { }
 					for _, mod in ipairs(srcList) do
 						-- checks if it disables another slot
 						for _, tag in ipairs(mod) do

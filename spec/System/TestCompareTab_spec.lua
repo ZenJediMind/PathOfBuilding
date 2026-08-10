@@ -2,10 +2,6 @@ describe("CompareTab", function()
 	it("imports Mercenary builds and preserves their Calcs skill selection", function()
 		local MercenaryTools = require("Modules/MercenaryTools")
 		newBuild()
-		local item = new("Item", "Rarity: Normal\nCrude Bow")
-		item.id = 999903
-		build.itemsTab.items[item.id] = item
-		build.itemsTab.activeItemSet[MercenaryTools.itemSlotName("Weapon 1")].selItemId = item.id
 		build.mercenaryTab.profile = {
 			classId = "EleBowRanger",
 			buildId = "EleBowRangerClones",
@@ -18,6 +14,11 @@ describe("CompareTab", function()
 			},
 		}
 		build.mercenaryTab:Changed()
+		local mercenaryItemSet = build.mercenaryTab:GetItemSet(true)
+		local item = new("Item", "Rarity: Normal\nCrude Bow")
+		item.id = 999903
+		build.itemsTab.items[item.id] = item
+		mercenaryItemSet[MercenaryTools.itemSlotName("Weapon 1")].selItemId = item.id
 		build.calcsTab.input.actor = "MERCENARY"
 		build.configTab.input.enemyLevel = 83
 		build.configTab:BuildModList()
@@ -80,5 +81,45 @@ describe("CompareTab", function()
 		assert.is_true(entry.skillsTab.socketGroupList[1].gemList[1].matchesSocket)
 		assert.are.equals(build.calcsTab.mainOutput.GemQuality, entry.calcsTab.mainOutput.GemQuality)
 		assert.are.equals(build.calcsTab.mainOutput.CombinedDPS, entry.calcsTab.mainOutput.CombinedDPS)
+	end)
+
+	it("copies an item from the visible Mercenary set into the primary Mercenary set", function()
+		local MercenaryTools = require("Modules/MercenaryTools")
+		newBuild()
+		build.mercenaryTab.profile = {
+			classId = "EleBowRanger",
+			buildId = "EleBowRangerClones",
+			foundAreaLevel = 68,
+			mainSkillId = "MirrorArrowMercenary",
+			lifeComparison = "AUTO",
+			skills = { { id = "MirrorArrowMercenary", enabled = true, supports = { } } },
+		}
+		build.mercenaryTab:Changed()
+		local primaryMercenarySet = assert(build.mercenaryTab:GetItemSet(true))
+		local item = new("Item", "Rarity: Normal\nCrude Bow")
+		build.itemsTab:AddItem(item, true)
+		primaryMercenarySet[MercenaryTools.itemSlotName("Weapon 1")].selItemId = item.id
+
+		build.configTab.input.enemyLevel = 83
+		build.configTab:BuildModList()
+		build.calcsTab:BuildOutput()
+		local compareTab = build.compareTab
+		assert.is_true(compareTab:ImportBuild(assert(build:SaveDB("mercenary-copy")), "Mercenary"))
+		local entry = assert(compareTab:GetActiveCompare())
+		entry.itemsTab:SetViewItemSet(assert(entry.mercenaryTab.itemSetId))
+		build.itemsTab:SetViewItemSet(primaryMercenarySet.id)
+		build.calcsTab:BuildOutput()
+		local _, baseOutput, actorOutputs = build.calcsTab:GetMiscCalculator()
+		assert.are.equal(actorOutputs.MERCENARY, baseOutput)
+
+		local playerWeapon = build.itemsTab.activeItemSet["Weapon 1"]
+		playerWeapon.selItemId = 0
+		compareTab:CopyCompareItemToPrimary("Weapon 1", entry, true)
+
+		local copiedItemId = primaryMercenarySet[MercenaryTools.itemSlotName("Weapon 1")].selItemId
+		assert.is_true(copiedItemId > 0)
+		assert.are.equal("Crude Bow", build.itemsTab.items[copiedItemId].name)
+		assert.are.equal(0, playerWeapon.selItemId)
+	end)
 	end)
 end)

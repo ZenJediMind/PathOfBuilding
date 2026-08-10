@@ -1279,11 +1279,18 @@ local function initMinionModDB(env, activeSkill, output)
 		for slotName, slot in pairs(env.build.itemsTab.slots) do
 			if minion.uses[slotName] then
 				local item
+				local itemSetSlotName = slotName
 				if minion.itemSet then
 					if slot.weaponSet == 1 and minion.itemSet.useSecondWeaponSet then
-						slotName = slotName .. " Swap"
+						itemSetSlotName = slotName .. " Swap"
+						slotName = itemSetSlotName
 					end
-					item = env.build.itemsTab.items[minion.itemSet[slotName].selItemId]
+					local itemSlot = minion.itemSet[itemSetSlotName]
+					if env.override.itemSetId == minion.itemSet.id and env.override.repSlotName == itemSetSlotName then
+						item = env.override.repItem
+					elseif itemSlot then
+						item = env.build.itemsTab.items[itemSlot.selItemId]
+					end
 				else
 					item = parent.itemList[slotName]
 				end
@@ -1673,8 +1680,10 @@ function calcs.perform(env, skipEHP)
 	local maxRightActiveMagicUtilityCount = modDB:Sum("BASE", nil, "RightActiveMagicUtilityFlasks")
 	if maxLeftActiveMagicUtilityCount > 0 or maxRightActiveMagicUtilityCount > 0 then
 		local magicUtilityFlasks = {}
+		local activeItemSet = env.build.itemsTab.activeItemSet
 		for _, slot in ipairs(env.build.itemsTab.orderedSlots) do
-			local item = env.build.itemsTab.items[slot.selItemId]
+			local itemSlot = env.build.itemsTab:GetItemSetSlot(activeItemSet, slot.slotName)
+			local item = env.build.itemsTab.items[itemSlot and itemSlot.selItemId]
 			if item and item.type == "Flask" and item.rarity == "MAGIC"
 				and not (item.baseName:match("Life Flask") or item.baseName:match("Mana Flask") or item.baseName:match("Hybrid Flask")) then
 				t_insert(magicUtilityFlasks, item)

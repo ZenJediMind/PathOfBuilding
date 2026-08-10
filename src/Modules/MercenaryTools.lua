@@ -10,8 +10,12 @@ function MercenaryTools.baseItemSlotName(slotName)
 	return type(slotName) == "string" and slotName:match("^Mercenary (.+)$") or nil
 end
 
+function MercenaryTools.comparisonActor(slotName)
+	return MercenaryTools.baseItemSlotName(slotName) and "MERCENARY" or "PLAYER"
+end
+
 function MercenaryTools.comparisonBaseOutput(playerOutput, actorOutputs, slotName)
-	local actor = MercenaryTools.baseItemSlotName(slotName) and "MERCENARY" or "PLAYER"
+	local actor = MercenaryTools.comparisonActor(slotName)
 	return actorOutputs and actorOutputs[actor] or playerOutput
 end
 

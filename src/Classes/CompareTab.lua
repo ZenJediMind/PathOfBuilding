@@ -19,6 +19,65 @@ local configVisibility = require("Modules.ConfigVisibility")
 -- Node IDs below this value are normal passive tree nodes; IDs at or above are cluster jewel nodes
 local CLUSTER_NODE_OFFSET = 65536
 
+local function getComparisonItemSet(itemsTab)
+	if itemsTab and itemsTab.IsMercenaryView and itemsTab:IsMercenaryView() then
+		return itemsTab:GetVisibleItemSet()
+	end
+	return itemsTab and itemsTab.activeItemSet
+end
+
+local function isMercenaryComparisonSet(itemsTab)
+	local itemSet = getComparisonItemSet(itemsTab)
+	return itemSet and itemsTab and itemsTab.IsMercenaryItemSet and itemsTab:IsMercenaryItemSet(itemSet)
+end
+
+local function getComparisonSlotName(itemsTab, slotName)
+	local itemSet = getComparisonItemSet(itemsTab)
+	return itemsTab and itemsTab.GetItemSetSlotName and itemsTab:GetItemSetSlotName(slotName, itemSet) or slotName
+end
+
+local function getActiveItemSetSlot(itemsTab, slotName)
+	local itemSet = getComparisonItemSet(itemsTab)
+	return itemSet and itemsTab:GetItemSetSlot(itemSet, slotName)
+end
+
+local function getActiveItem(itemsTab, slotName)
+	local itemSlot = getActiveItemSetSlot(itemsTab, slotName)
+	return itemSlot and itemsTab.items and itemsTab.items[itemSlot.selItemId]
+end
+
+local function hasActiveAbyssalSocket(itemsTab, slotName, socketIndex)
+	local itemSet = getComparisonItemSet(itemsTab)
+	local visibleSlotName = getComparisonSlotName(itemsTab, slotName)
+	local slot = itemsTab and itemsTab.slots and (itemsTab.slots[visibleSlotName] or itemsTab.slots[slotName])
+	if slot and slot.weaponSet and itemSet and slot.weaponSet ~= (itemSet.useSecondWeaponSet and 2 or 1) then
+		return false
+	end
+	local item = getActiveItem(itemsTab, slotName)
+	return item and (item.abyssalSocketCount or 0) >= socketIndex
+end
+
+local function getComparisonItemSetOrderList(itemsTab)
+	if not itemsTab then return { } end
+	if itemsTab.IsMercenaryView and itemsTab:IsMercenaryView() then
+		local orderList = { }
+		for _, itemSetId in ipairs(itemsTab.itemSetOrderList or { }) do
+			if itemsTab:IsMercenaryItemSet(itemsTab.itemSets[itemSetId]) then
+				t_insert(orderList, itemSetId)
+			end
+		end
+		return orderList
+	end
+	return itemsTab.GetPlayerItemSetOrderList and itemsTab:GetPlayerItemSetOrderList() or itemsTab.itemSetOrderList or { }
+end
+
+local function getComparisonItemSetId(itemsTab)
+	if itemsTab and itemsTab.IsMercenaryView and itemsTab:IsMercenaryView() then
+		return itemsTab.viewItemSetId
+	end
+	return itemsTab and itemsTab.activeItemSetId
+end
+
 -- Wrap a string into lines for a given pixel width at font height 14 ("VAR").
 -- Breaks BEFORE a word that would exceed the width, so rendered lines never
 -- overshoot into the next column.
@@ -324,8 +383,9 @@ function CompareTabClass:InitControls()
 	self.controls.compareItemSetLabel.shown = setsEnabled
 	self.controls.compareItemSetSelect = new("DropDownControl"):DropDownControl({"LEFT", self.controls.compareItemSetLabel, "RIGHT"}, {2, 0, 150, 20}, {}, function(index, value)
 		local entry = self:GetActiveCompare()
-		if entry and entry.itemsTab and entry.itemsTab.itemSetOrderList[index] then
-			entry:SetActiveItemSet(entry.itemsTab.itemSetOrderList[index])
+		local itemSetOrderList = entry and getComparisonItemSetOrderList(entry.itemsTab)
+		if entry and itemSetOrderList and itemSetOrderList[index] then
+			entry:SetActiveItemSet(itemSetOrderList[index])
 		end
 	end)
 	self.controls.compareItemSetSelect.enabled = setsEnabled
@@ -862,8 +922,9 @@ function CompareTabClass:InitControls()
 	self.controls.primaryItemSetLabel = new("LabelControl"):LabelControl(nil, {0, 0, 0, 16}, "^7Item set:")
 	self.controls.primaryItemSetLabel.shown = itemsShown
 	self.controls.primaryItemSetSelect = new("DropDownControl"):DropDownControl(nil, {0, 0, 216, 20}, {}, function(index, value)
-		if self.primaryBuild.itemsTab and self.primaryBuild.itemsTab.itemSetOrderList[index] then
-			self.primaryBuild.itemsTab:SetActiveItemSet(self.primaryBuild.itemsTab.itemSetOrderList[index])
+		local itemSetOrderList = getComparisonItemSetOrderList(self.primaryBuild.itemsTab)
+		if itemSetOrderList and itemSetOrderList[index] then
+			self.primaryBuild.itemsTab:SetActiveItemSet(itemSetOrderList[index])
 			self.primaryBuild.itemsTab:AddUndoState()
 		end
 	end)
@@ -875,8 +936,9 @@ function CompareTabClass:InitControls()
 	self.controls.compareItemSetLabel2.shown = itemsShown
 	self.controls.compareItemSetSelect2 = new("DropDownControl"):DropDownControl(nil, {0, 0, 216, 20}, {}, function(index, value)
 		local entry = self:GetActiveCompare()
-		if entry and entry.itemsTab and entry.itemsTab.itemSetOrderList[index] then
-			entry:SetActiveItemSet(entry.itemsTab.itemSetOrderList[index])
+		local itemSetOrderList = entry and getComparisonItemSetOrderList(entry.itemsTab)
+		if entry and itemSetOrderList and itemSetOrderList[index] then
+			entry:SetActiveItemSet(itemSetOrderList[index])
 		end
 	end)
 	self.controls.compareItemSetSelect2.enabled = itemsShown
@@ -1167,6 +1229,10 @@ function CompareTabClass:PopulateSetDropdown(tab, orderListField, setsField, act
 	local orderList = tab[orderListField]
 	local sets = tab[setsField]
 	local activeId = tab[activeIdField]
+	if orderListField == "itemSetOrderList" then
+		orderList = getComparisonItemSetOrderList(tab)
+		activeId = getComparisonItemSetId(tab)
+	end
 	if orderList then
 		for index, setId in ipairs(orderList) do
 			local set = sets[setId]
@@ -1453,6 +1519,9 @@ end
 -- Build a list of jewel comparison entries between the primary and compare builds.
 -- Returns a sorted list of { label, nodeId, pItem, cItem, pSlotName, cSlotName } records.
 function CompareTabClass:GetJewelComparisonSlots(compareEntry)
+	if isMercenaryComparisonSet(self.primaryBuild.itemsTab) or isMercenaryComparisonSet(compareEntry.itemsTab) then
+		return { }
+	end
 	local pSpec = self.primaryBuild.spec
 	local cSpec = compareEntry.spec
 	if not pSpec or not cSpec then return {} end
@@ -1520,19 +1589,20 @@ end
 
 -- Copy a compared build's item into the primary build
 function CompareTabClass:CopyCompareItemToPrimary(slotName, compareEntry, andUse)
-	local cSlot = compareEntry.itemsTab and compareEntry.itemsTab.slots and compareEntry.itemsTab.slots[slotName]
-	local cItem = cSlot and compareEntry.itemsTab.items and compareEntry.itemsTab.items[cSlot.selItemId]
+	local cItem = getActiveItem(compareEntry.itemsTab, slotName)
 	if not cItem or not cItem.raw then return end
 
 	local newItem = new("Item"):Item(cItem.raw)
 	newItem:NormaliseQuality()
 	local pItemsTab = self.primaryBuild.itemsTab
+	local primaryItemSet = getComparisonItemSet(pItemsTab)
 	pItemsTab:AddItem(newItem, true) -- true = noAutoEquip
 
 	if andUse then
-		local pSlot = pItemsTab.slots[slotName]
+		local targetSlotName = getComparisonSlotName(pItemsTab, slotName)
+		local pSlot = pItemsTab.slots[targetSlotName] or pItemsTab.slots[slotName]
 		if pSlot then
-			pSlot:SetSelItemId(newItem.id)
+			pSlot:SetSelItemId(newItem.id, primaryItemSet)
 		end
 	end
 
@@ -2645,8 +2715,7 @@ function CompareTabClass:ComparePowerBuilder(compareEntry, powerStat, categories
 		self:AddAbyssSockets(compareEntry, baseSlots, true)
 		
 		for _, slotName in ipairs(baseSlots) do
-			local cSlot = compareEntry.itemsTab and compareEntry.itemsTab.slots[slotName]
-			local cItem = cSlot and compareEntry.itemsTab.items[cSlot.selItemId]
+			local cItem = getActiveItem(compareEntry.itemsTab, slotName)
 			if cItem then
 				total = total + 1
 			end
@@ -2801,6 +2870,10 @@ function CompareTabClass:ComparePowerBuilder(compareEntry, powerStat, categories
 	-- Items
 	-- ==========================================
 	if categories.items then
+		local primaryItemSet = getComparisonItemSet(self.primaryBuild.itemsTab)
+		local primaryItemSetSlotName = function(slotName)
+			return getComparisonSlotName(self.primaryBuild.itemsTab, slotName)
+		end
 		local baseSlots = { "Weapon 1", "Weapon 2", "Helmet", "Body Armour", "Gloves", "Boots", "Amulet", "Ring 1", "Ring 2", "Belt", "Flask 1", "Flask 2", "Flask 3", "Flask 4", "Flask 5" }
 		if self:ShouldShowRing3(compareEntry) then
 			t_insert(baseSlots, 10, "Ring 3")
@@ -2810,10 +2883,8 @@ function CompareTabClass:ComparePowerBuilder(compareEntry, powerStat, categories
 		self:AddAbyssSockets(compareEntry, baseSlots, true)
 		
 		for _, slotName in ipairs(baseSlots) do
-			local cSlot = compareEntry.itemsTab and compareEntry.itemsTab.slots[slotName]
-			local cItem = cSlot and compareEntry.itemsTab.items[cSlot.selItemId]
-			local pSlot = self.primaryBuild.itemsTab and self.primaryBuild.itemsTab.slots[slotName]
-			local pItem = pSlot and self.primaryBuild.itemsTab.items[pSlot.selItemId]
+			local cItem = getActiveItem(compareEntry.itemsTab, slotName)
+			local pItem = getActiveItem(self.primaryBuild.itemsTab, slotName)
 			if cItem and cItem.raw and not (pItem and pItem.name == cItem.name) then
 				local newItem = new("Item"):Item(cItem.raw)
 				newItem:NormaliseQuality()
@@ -2826,12 +2897,14 @@ function CompareTabClass:ComparePowerBuilder(compareEntry, powerStat, categories
 				if newItem.abyssalSocketCount > 0 then
 					for idx = 1, newItem.abyssalSocketCount do
 						local abyssSlotName = string.format("%s Abyssal Socket %d", slotName, idx)
-						local cmpJewelSlot = compareEntry.itemsTab.slots[abyssSlotName]
+						local cmpJewelSlot = getActiveItemSetSlot(compareEntry.itemsTab, abyssSlotName)
 						-- save old id and unequip existing
-						local primaryJewelSlot = self.primaryBuild.itemsTab.slots[abyssSlotName]
-						oldEquipped[abyssSlotName] = primaryJewelSlot.selItemId
-						primaryJewelSlot:SetSelItemId(0)
-						if cmpJewelSlot.selItemId > 0 then
+						local primaryJewelSlot = getActiveItemSetSlot(self.primaryBuild.itemsTab, abyssSlotName)
+						oldEquipped[abyssSlotName] = primaryJewelSlot and primaryJewelSlot.selItemId or 0
+						local primarySlotName = primaryItemSetSlotName(abyssSlotName)
+						local primarySlot = self.primaryBuild.itemsTab.slots[primarySlotName] or self.primaryBuild.itemsTab.slots[abyssSlotName]
+						if primarySlot then primarySlot:SetSelItemId(0, primaryItemSet) end
+						if cmpJewelSlot and cmpJewelSlot.selItemId > 0 then
 							local cmpJewel = compareEntry.itemsTab.items[cmpJewelSlot.selItemId]
 							-- due to a previous bug where jewel slots didn't
 							-- get cleared when becoming inactive, so the item
@@ -2843,21 +2916,23 @@ function CompareTabClass:ComparePowerBuilder(compareEntry, powerStat, categories
 								self.primaryBuild.itemsTab:AddItem(itemCopy, false)
 
 								-- equip copied
-								self.primaryBuild.itemsTab.slots[abyssSlotName]:SetSelItemId(itemCopy.id)
+								if primarySlot then primarySlot:SetSelItemId(itemCopy.id, primaryItemSet) end
 							end
 						end
 					end
 				end
 
 
-				local output = calcFunc({ repSlotName = slotName, repItem = newItem }, useFullDPS)
+				local output = calcFunc({ repSlotName = primaryItemSetSlotName(slotName), repItem = newItem }, useFullDPS)
 				local impact = self.primaryBuild.calcsTab:CalculatePowerStat(powerStat, output, calcBase)
 				local impactStr, impactVal, combinedImpactStr, impactPercent, impactIsZero = formatImpact(impact)
 
 				-- restore abyss jewel state
 				if newItem.abyssalSocketCount > 0 then
 					for k, v in pairs(oldEquipped) do
-						self.primaryBuild.itemsTab.slots[k]:SetSelItemId(v)
+						local primarySlotName = primaryItemSetSlotName(k)
+						local primarySlot = self.primaryBuild.itemsTab.slots[primarySlotName] or self.primaryBuild.itemsTab.slots[k]
+						if primarySlot then primarySlot:SetSelItemId(v, primaryItemSet) end
 					end
 					for _, item in ipairs(cmpJewels) do
 						self.primaryBuild.itemsTab:DeleteItem(item)
@@ -3768,8 +3843,8 @@ function CompareTabClass:AddAbyssSockets(comparison, destTable, requireBothSides
 	for _, slot in ipairs(equipmentSlots) do
 		for number = 1, 6 do
 			local abyssalSocketName = string.format("%s Abyssal Socket %d", slot, number)
-			local mainHas = self.primaryBuild.itemsTab.slots[abyssalSocketName].shown()
-			local comparisonHas = comparison.itemsTab.slots[abyssalSocketName].shown()
+			local mainHas = hasActiveAbyssalSocket(self.primaryBuild.itemsTab, slot, number)
+			local comparisonHas = hasActiveAbyssalSocket(comparison.itemsTab, slot, number)
 			if (requireBothSides and mainHas and comparisonHas)
 				or ((not requireBothSides) and (mainHas or comparisonHas)) then
 				table.insert(destTable, abyssalSocketName)
@@ -3811,11 +3886,8 @@ function CompareTabClass:DrawItems(vp, compareEntry, inputEvents)
 	if self.itemsExpandedMode then
 		-- Expanded mode: measure the widest rendered line of every primary item card
 		local widest = 0
-		local pItems = self.primaryBuild.itemsTab and self.primaryBuild.itemsTab.items
-		local pSlots = self.primaryBuild.itemsTab and self.primaryBuild.itemsTab.slots
 		for _, slotName in ipairs(baseSlots) do
-			local pSlot = pSlots and pSlots[slotName]
-			local pItem = pSlot and pItems and pItems[pSlot.selItemId]
+			local pItem = getActiveItem(self.primaryBuild.itemsTab, slotName)
 			if pItem then
 				local w = self:DrawItemExpanded(pItem, 0, 0, 0, nil, true) or 0
 				if w > widest then widest = w end
@@ -3834,10 +3906,6 @@ function CompareTabClass:DrawItems(vp, compareEntry, inputEvents)
 	else
 		-- Compact mode
 		local maxDiffW = 0
-		local pItems = self.primaryBuild.itemsTab and self.primaryBuild.itemsTab.items
-		local pSlots = self.primaryBuild.itemsTab and self.primaryBuild.itemsTab.slots
-		local cItems = compareEntry.itemsTab and compareEntry.itemsTab.items
-		local cSlots = compareEntry.itemsTab and compareEntry.itemsTab.slots
 		local function measureDiff(pItem, cItem)
 			local lbl = tradeHelpers.getSlotDiffLabel(pItem, cItem)
 			if lbl and lbl ~= "" then
@@ -3846,10 +3914,8 @@ function CompareTabClass:DrawItems(vp, compareEntry, inputEvents)
 			end
 		end
 		for _, slotName in ipairs(baseSlots) do
-			local pSlot = pSlots and pSlots[slotName]
-			local cSlot = cSlots and cSlots[slotName]
-			local pItem = pSlot and pItems and pItems[pSlot.selItemId]
-			local cItem = cSlot and cItems and cItems[cSlot.selItemId]
+			local pItem = getActiveItem(self.primaryBuild.itemsTab, slotName)
+			local cItem = getActiveItem(compareEntry.itemsTab, slotName)
 			measureDiff(pItem, cItem)
 		end
 		for _, jE in ipairs(jewelSlots) do
@@ -4000,13 +4066,11 @@ function CompareTabClass:DrawItems(vp, compareEntry, inputEvents)
 
 	for _, slotName in ipairs(baseSlots) do
 		-- Get items from both builds
-		local pSlot = self.primaryBuild.itemsTab and self.primaryBuild.itemsTab.slots and self.primaryBuild.itemsTab.slots[slotName]
-		local cSlot = compareEntry.itemsTab and compareEntry.itemsTab.slots and compareEntry.itemsTab.slots[slotName]
-		local pItem = pSlot and self.primaryBuild.itemsTab.items and self.primaryBuild.itemsTab.items[pSlot.selItemId]
-		local cItem = cSlot and compareEntry.itemsTab and compareEntry.itemsTab.items and compareEntry.itemsTab.items[cSlot.selItemId]
+		local pItem = getActiveItem(self.primaryBuild.itemsTab, slotName)
+		local cItem = getActiveItem(compareEntry.itemsTab, slotName)
 
 		local slotMissing = slotName == "Ring 3" and not primaryHasRing3
-		drawSlotEntry(slotName, pItem, cItem, slotName, slotName, maxLabelW, nil, nil, slotMissing)
+		drawSlotEntry(slotName, pItem, cItem, slotName, getComparisonSlotName(self.primaryBuild.itemsTab, slotName), maxLabelW, nil, nil, slotMissing)
 	end
 
 	-- === TREE SET DROPDOWNS ===
@@ -4050,7 +4114,7 @@ function CompareTabClass:DrawItems(vp, compareEntry, inputEvents)
 			local pWarn = (jEntry.pItem and not jEntry.pNodeAllocated) and colorCodes.WARNING .. "  (tree missing allocated node)" or ""
 			local cWarn = (jEntry.cItem and not jEntry.cNodeAllocated) and colorCodes.WARNING .. "  (tree missing allocated node)" or ""
 
-			drawSlotEntry(jEntry.label, jEntry.pItem, jEntry.cItem, jEntry.cSlotName, jEntry.pSlotName, maxLabelW, pWarn, cWarn, nil)
+			drawSlotEntry(jEntry.label, jEntry.pItem, jEntry.cItem, jEntry.cSlotName, getComparisonSlotName(self.primaryBuild.itemsTab, jEntry.pSlotName), maxLabelW, pWarn, cWarn, nil)
 		end
 	end
 
@@ -4089,10 +4153,10 @@ function CompareTabClass:DrawItems(vp, compareEntry, inputEvents)
 
 			-- Determine what's currently in the target slot
 			local pSlot = self.primaryBuild.itemsTab.slots[hoverEquipSlotName]
-			local selItem = pSlot and self.primaryBuild.itemsTab.items[pSlot.selItemId]
+			local selItem = getActiveItem(self.primaryBuild.itemsTab, hoverEquipSlotName)
 
 			-- For jewel sockets that aren't allocated, temporarily allocate the node
-			local override = { repSlotName = hoverEquipSlotName, repItem = newItem }
+			local override = { repSlotName = getComparisonSlotName(self.primaryBuild.itemsTab, hoverEquipSlotName), repItem = newItem }
 			if pSlot and pSlot.nodeId then
 				local pSpec = self.primaryBuild.spec
 				if pSpec and pSpec.allocNodes and not pSpec.allocNodes[pSlot.nodeId] then

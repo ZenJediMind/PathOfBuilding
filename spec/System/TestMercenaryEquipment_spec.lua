@@ -1,6 +1,6 @@
 describe("Mercenary equipment validation", function()
 	local MercenaryTools = require("Modules/MercenaryTools")
-	local tab, itemSet
+	local tab, itemSet, mercenaryItemSet
 	local function selectScionLuminary()
 		for classId, class in pairs(build.spec.tree.classes) do
 			if class.name == "Scion" then build.spec:SelectClass(classId) break end
@@ -25,6 +25,14 @@ describe("Mercenary equipment validation", function()
 	local function selectBuild(buildId, foundAreaLevel)
 		tab.profile.buildId = buildId
 		tab.profile.foundAreaLevel = foundAreaLevel or 68
+		tab:Changed()
+		mercenaryItemSet = tab:GetItemSet(true)
+	end
+
+	local function showMercenaryEquipment()
+		mercenaryItemSet = tab:GetItemSet(true)
+		build.itemsTab:SetViewItemSet(mercenaryItemSet.id)
+		return mercenaryItemSet
 	end
 
 	local function allocatePassive(name)
@@ -50,9 +58,10 @@ describe("Mercenary equipment validation", function()
 		selectScionLuminary()
 		tab = build.mercenaryTab
 		itemSet = build.itemsTab.activeItemSet
+		mercenaryItemSet = nil
 	end)
 
-	it("shows every standard player and Mercenary equipment row", function()
+	it("shows player and Mercenary equipment in separate views", function()
 		local itemsTab = build.itemsTab
 		local equipmentSlots = { "Weapon 1", "Weapon 2", "Helmet", "Body Armour", "Gloves", "Boots", "Amulet", "Ring 1", "Ring 2", "Belt" }
 		local flaskSlots = { "Flask 1", "Flask 2", "Flask 3", "Flask 4", "Flask 5" }
@@ -63,51 +72,215 @@ describe("Mercenary equipment validation", function()
 			assert.is_true(itemsTab.slots[slotName]:IsShown(), slotName)
 		end
 		selectBuild("MeleeAOEMarauderFireSlam")
+		assert.is_true(itemsTab.slots["Helmet"]:IsShown())
+		assert.is_false(itemsTab.slots[MercenaryTools.itemSlotName("Helmet")]:IsShown())
+		showMercenaryEquipment()
 		for _, slotName in ipairs(equipmentSlots) do
-			assert.is_true(itemsTab.slots[slotName]:IsShown(), slotName)
+			assert.is_false(itemsTab.slots[slotName]:IsShown(), slotName)
 			assert.is_true(itemsTab.slots[MercenaryTools.itemSlotName(slotName)]:IsShown(), "Mercenary "..slotName)
 		end
 		for _, slotName in ipairs(flaskSlots) do
-			assert.is_true(itemsTab.slots[slotName]:IsShown(), slotName)
+			assert.is_false(itemsTab.slots[slotName]:IsShown(), slotName)
 		end
 	end)
 
-	it("switches player and Mercenary equipment as one item set", function()
+	it("keeps player passive tree and socket controls anchored to player equipment", function()
+		selectBuild("MeleeAOEMarauderFireSlam")
 		local itemsTab = build.itemsTab
+		local specSelect = itemsTab.controls.specSelect
+		assert.are.equal(itemsTab.slots["Flask 5"], specSelect.anchor.other)
+		assert.is_true(specSelect:IsShown())
+		local firstSocket
+		for _, socket in pairs(itemsTab.sockets) do
+			if socket.anchor.other == specSelect then
+				firstSocket = socket
+				break
+			end
+		end
+		assert.is_not_nil(firstSocket)
+		assert.are.equal("^7Item set:", itemsTab.controls.setLabel.label)
+	end)
+
+	it("views dedicated Mercenary equipment without displacing player equipment", function()
+		local itemsTab = build.itemsTab
+		selectBuild("MeleeAOEMarauderFireSlam")
+		local mercSet = showMercenaryEquipment()
 		local secondSet = itemsTab:NewItemSet()
 		table.insert(itemsTab.itemSetOrderList, secondSet.id)
 		for id = 9001, 9004 do
 			itemsTab.items[id] = item({ id = id, name = "Helmet "..id, type = "Helmet", base = { type = "Helmet" } })
 		end
-		itemsTab.slots.Helmet:SetSelItemId(9001)
-		itemsTab.slots[MercenaryTools.itemSlotName("Helmet")]:SetSelItemId(9002)
+		itemSet.Helmet.selItemId = 9001
+		mercSet[MercenaryTools.itemSlotName("Helmet")].selItemId = 9002
 		secondSet.Helmet.selItemId = 9003
-		secondSet[MercenaryTools.itemSlotName("Helmet")].selItemId = 9004
 
 		itemsTab:SetActiveItemSet(secondSet.id)
+		itemsTab:SetViewItemSet(secondSet.id)
 		assert.are.equal(9003, itemsTab.slots.Helmet.selItemId)
-		assert.are.equal(9004, itemsTab.slots[MercenaryTools.itemSlotName("Helmet")].selItemId)
+		assert.are.equal(9002, mercSet[MercenaryTools.itemSlotName("Helmet")].selItemId)
 		itemsTab:SetActiveItemSet(itemSet.id)
 		assert.are.equal(9001, itemsTab.slots.Helmet.selItemId)
+		itemsTab:SetViewItemSet(mercSet.id)
 		assert.are.equal(9002, itemsTab.slots[MercenaryTools.itemSlotName("Helmet")].selItemId)
+		assert.are.equal(itemSet.id, itemsTab.activeItemSetId)
 	end)
 
-	it("persists Mercenary slots in Items instead of a Mercenary item-set reference", function()
-		itemSet[MercenaryTools.itemSlotName("Helmet")].selItemId = 9001
+	it("numbers active Mercenary Abyssal sockets sequentially", function()
+		selectBuild("MeleeAOEMarauderFireSlam")
+		local itemsTab = build.itemsTab
+		local helmet = item({ id = 9022, name = "Abyssal Helmet", type = "Helmet", base = { type = "Helmet" }, abyssalSocketCount = 1 })
+		local belt = item({ id = 9023, name = "Abyssal Belt", type = "Belt", base = { type = "Belt" }, abyssalSocketCount = 1 })
+		itemsTab.items[helmet.id] = helmet
+		itemsTab.items[belt.id] = belt
+		mercenaryItemSet[MercenaryTools.itemSlotName("Helmet")].selItemId = helmet.id
+		mercenaryItemSet[MercenaryTools.itemSlotName("Belt")].selItemId = belt.id
+		itemsTab:SetViewItemSet(mercenaryItemSet.id)
+		assert.are.equal("Abyssal #1", itemsTab.slots[MercenaryTools.itemSlotName("Helmet Abyssal Socket 1")].label)
+		assert.are.equal("Abyssal #2", itemsTab.slots[MercenaryTools.itemSlotName("Belt Abyssal Socket 1")].label)
+	end)
+
+	it("creates and activates multiple Mercenary equipment item sets", function()
+		selectBuild("MeleeAOEMarauderFireSlam")
+		local itemsTab = build.itemsTab
+		local manager = new("MercenaryItemSetListControl", nil, {0, 0, 350, 200}, tab)
+		assert.is_table(tab.controls.itemSetManage)
+		assert.is_table(manager.controls.copy)
+		assert.is_table(manager.controls.delete)
+		assert.is_table(manager.controls.new)
+
+		local originalOpenPopup = main.OpenPopup
+		local originalClosePopup = main.ClosePopup
+		local popup
+		main.OpenPopup = function(_, _, _, _, controls) popup = controls end
+		main.ClosePopup = function() end
+		local ok, err = pcall(function()
+			manager.controls.new.onClick()
+			popup.edit.buf = "Alternate Equipment"
+			popup.save.onClick()
+		end)
+		main.OpenPopup = originalOpenPopup
+		main.ClosePopup = originalClosePopup
+		assert.is_true(ok, err)
+
+		local activeItemSetId = tab.itemSetId
+		assert.are_not.equal(mercenaryItemSet.id, activeItemSetId)
+		assert.are.equal(2, #tab:GetMercenaryItemSetOrderList())
+		assert.are.equal("Alternate Equipment", itemsTab.itemSets[activeItemSetId].title)
+		assert.matches("%(Active%)", manager:GetRowValue(1, 2, activeItemSetId))
+	end)
+
+	it("views Animate Guardian and Mercenary gear alongside the active player set", function()
+		selectBuild("MeleeAOEMarauderFireSlam")
+		local itemsTab = build.itemsTab
+		local guardianSet = itemsTab:NewItemSet(nil, "Animate Guardian")
+		guardianSet.title = "Animate Guardian"
+		table.insert(itemsTab.itemSetOrderList, guardianSet.id)
+		local mercSet = showMercenaryEquipment()
+		local playerHelmet = new("Item", "Rarity: Normal\nIron Hat")
+		local guardianHelmet = new("Item", "Rarity: Normal\nIron Hat")
+		local mercHelmet = new("Item", "Rarity: Normal\nIron Hat")
+		itemsTab:AddItem(playerHelmet, true)
+		itemsTab:AddItem(guardianHelmet, true)
+		itemsTab:AddItem(mercHelmet, true)
+		itemSet.Helmet.selItemId = playerHelmet.id
+		guardianSet.Helmet.selItemId = guardianHelmet.id
+		mercSet[MercenaryTools.itemSlotName("Helmet")].selItemId = mercHelmet.id
+
+		itemsTab:SetViewItemSet(guardianSet.id)
+		assert.are.equal(guardianHelmet.id, itemsTab.slots.Helmet.selItemId)
+		assert.are.equal(itemSet.id, itemsTab.activeItemSetId)
+		itemsTab:SetViewItemSet(mercSet.id)
+		assert.are.equal(mercHelmet.id, itemsTab.slots[MercenaryTools.itemSlotName("Helmet")].selItemId)
+		assert.are.equal(itemSet.id, itemsTab.activeItemSetId)
+		itemsTab:SetViewItemSet(itemSet.id)
+		assert.are.equal(playerHelmet.id, itemsTab.slots.Helmet.selItemId)
+	end)
+
+	it("persists Mercenary equipment in an owned item set", function()
+		selectBuild("MeleeAOEMarauderFireSlam")
+		local mercSet = showMercenaryEquipment()
+		build.itemsTab.items[9001] = item({ id = 9001, name = "Mercenary Helmet", type = "Helmet", base = { type = "Helmet" } })
+		mercSet[MercenaryTools.itemSlotName("Helmet")].selItemId = 9001
 		local itemsXml = { }
 		build.itemsTab:Save(itemsXml)
 		local savedItemId
+		local savedOwner
 		for _, node in ipairs(itemsXml) do
-			if node.elem == "ItemSet" and tonumber(node.attrib.id) == itemSet.id then
+			if node.elem == "ItemSet" and tonumber(node.attrib.id) == mercSet.id then
+				savedOwner = node.attrib.owner
 				for _, slot in ipairs(node) do
 					if slot.attrib and slot.attrib.name == MercenaryTools.itemSlotName("Helmet") then savedItemId = slot.attrib.itemId end
 				end
 			end
 		end
 		assert.are.equal("9001", savedItemId)
+		assert.are.equal("Mercenary", savedOwner)
 		local mercenaryXml = { }
 		tab:Save(mercenaryXml)
-		assert.is_nil(mercenaryXml.attrib.itemSetId)
+		assert.are.equal(tostring(mercSet.id), mercenaryXml.attrib.itemSetId)
+	end)
+
+	it("selects the Mercenary equipment item set from the Mercenary tab", function()
+		selectBuild("MeleeAOEMarauderFireSlam")
+		local itemsTab = build.itemsTab
+		local activePlayerSetId = itemsTab.activeItemSetId
+		tab:GetItemSet(true)
+		local secondSet = itemsTab:NewItemSet(nil, "Mercenary")
+		secondSet.title = "Alternate Mercenary Equipment"
+		table.insert(itemsTab.itemSetOrderList, secondSet.id)
+		tab:RefreshControls()
+
+		local secondSetIndex
+		for index, value in ipairs(tab.controls.itemSetSelect.list) do
+			if value.id == secondSet.id then secondSetIndex = index break end
+		end
+		assert.is_not_nil(secondSetIndex)
+		tab.controls.itemSetSelect:SetSel(secondSetIndex)
+		assert.are.equal(secondSet.id, tab.itemSetId)
+		assert.are.equal(secondSet.id, itemsTab.viewItemSetId)
+		assert.are.equal(activePlayerSetId, itemsTab.activeItemSetId)
+
+		local saved = { }
+		tab:Save(saved)
+		assert.are.equal(tostring(secondSet.id), saved.attrib.itemSetId)
+	end)
+
+	it("finds a dedicated Mercenary set before profile selection", function()
+		local mercSet = tab:EnsureItemSet()
+		assert.are.equal(mercSet, tab:GetItemSet(true))
+	end)
+
+	it("keeps a player set named Animate Guardian as a player set", function()
+		local playerSet = build.itemsTab:NewItemSet()
+		playerSet.title = "Animate Guardian"
+		table.insert(build.itemsTab.itemSetOrderList, playerSet.id)
+		assert.is_true(build.itemsTab:IsPlayerItemSet(playerSet))
+		local itemsXml = { }
+		build.itemsTab:Save(itemsXml)
+		build.itemsTab:Load(itemsXml)
+		assert.is_true(build.itemsTab:IsPlayerItemSet(build.itemsTab.itemSets[playerSet.id]))
+	end)
+
+	it("round-trips the visible actor set without changing the active player set", function()
+		selectBuild("MeleeAOEMarauderFireSlam")
+		local itemsTab = build.itemsTab
+		local mercSet = showMercenaryEquipment()
+		local playerHelmet = new("Item", "Rarity: Normal\nIron Hat")
+		local mercHelmet = new("Item", "Rarity: Normal\nIron Hat")
+		itemsTab:AddItem(playerHelmet, true)
+		itemsTab:AddItem(mercHelmet, true)
+		itemsTab.activeItemSet.Helmet.selItemId = playerHelmet.id
+		mercSet[MercenaryTools.itemSlotName("Helmet")].selItemId = mercHelmet.id
+		local activePlayerSetId = itemsTab.activeItemSetId
+		local itemsXml, mercenaryXml = { }, { }
+		itemsTab:Save(itemsXml)
+		tab:Save(mercenaryXml)
+		itemsTab:Load(itemsXml)
+		tab:Load(mercenaryXml)
+		assert.are.equal(activePlayerSetId, itemsTab.activeItemSetId)
+		assert.are.equal(mercSet.id, itemsTab.viewItemSetId)
+		assert.are.equal(playerHelmet.id, itemsTab.itemSets[activePlayerSetId].Helmet.selItemId)
+		assert.are.equal(mercHelmet.id, tab:GetItemSet(true)[MercenaryTools.itemSlotName("Helmet")].selItemId)
 	end)
 
 	it("formats validity rows for TextListControl", function()
@@ -201,17 +374,89 @@ describe("Mercenary equipment validation", function()
 		assert.is_false(tab:ValidateEquippedItem(grantedAura, "Helmet", itemSet))
 	end)
 
-	it("preserves current-set Mercenary equipment on reset", function()
-		itemSet[MercenaryTools.itemSlotName("Helmet")].selItemId = 9001
+	it("detaches Mercenary equipment on reset without deleting the item set", function()
+		selectBuild("MeleeAOEMarauderFireSlam")
+		local mercSet = showMercenaryEquipment()
+		build.itemsTab.items[9001] = item({ id = 9001, name = "Mercenary Helmet", type = "Helmet", base = { type = "Helmet" } })
+		mercSet[MercenaryTools.itemSlotName("Helmet")].selItemId = 9001
 		tab:Reset()
-		assert.are.equal(itemSet, build.itemsTab.activeItemSet)
-		assert.are.equal(9001, itemSet[MercenaryTools.itemSlotName("Helmet")].selItemId)
-		assert.are.equal(1, #build.itemsTab.itemSetOrderList)
+		assert.is_nil(tab.itemSetId)
+		assert.are.equal(build.itemsTab.activeItemSetId, build.itemsTab.viewItemSetId)
+		assert.are.equal(mercSet, build.itemsTab.itemSets[mercSet.id])
+		assert.are.equal(9001, mercSet[MercenaryTools.itemSlotName("Helmet")].selItemId)
+	end)
+
+	it("protects the referenced Mercenary set in the item-set manager", function()
+		selectBuild("MeleeAOEMarauderFireSlam")
+		local mercSet = showMercenaryEquipment()
+		local manager = new("ItemSetListControl", nil, { 0, 0, 300, 200 }, build.itemsTab)
+		manager.selValue = mercSet.id
+		manager.selIndex = isValueInArray(manager.list, mercSet.id)
+		assert.is_false(manager.controls.copy.enabled())
+		assert.is_false(manager.controls.delete.enabled())
+		assert.is_nil(manager:GetDragValue(manager.selIndex, mercSet.id))
+	end)
+
+	it("keeps a player set active when deleting the adjacent actor set", function()
+		selectBuild("MeleeAOEMarauderFireSlam")
+		local itemsTab = build.itemsTab
+		local activePlayerSetId = itemsTab.activeItemSetId
+		local actorSet = itemsTab:NewItemSet(nil, "Animate Guardian")
+		actorSet.title = "Animate Guardian"
+		local secondPlayerSet = itemsTab:NewItemSet()
+		itemsTab.itemSetOrderList = { actorSet.id, activePlayerSetId, secondPlayerSet.id }
+		local manager = new("ItemSetListControl", nil, { 0, 0, 300, 200 }, itemsTab)
+		local originalOpenConfirmPopup = main.OpenConfirmPopup
+		main.OpenConfirmPopup = function(_, _, _, _, onConfirm)
+			onConfirm()
+		end
+		local ok, errorMessage = pcall(function()
+			manager:OnSelDelete(isValueInArray(manager.list, activePlayerSetId), activePlayerSetId)
+		end)
+		main.OpenConfirmPopup = originalOpenConfirmPopup
+		assert.is_true(ok, errorMessage)
+		assert.are.equal(secondPlayerSet.id, itemsTab.activeItemSetId)
+		assert.are.equal(secondPlayerSet, itemsTab.activeItemSet)
+	end)
+
+	it("does not delete the only player item set because actor sets exist", function()
+		selectBuild("MeleeAOEMarauderFireSlam")
+		local itemsTab = build.itemsTab
+		local actorSet = itemsTab:NewItemSet(nil, "Animate Guardian")
+		itemsTab.itemSetOrderList = { itemsTab.activeItemSetId, actorSet.id }
+		local manager = new("ItemSetListControl", nil, { 0, 0, 300, 200 }, itemsTab)
+		manager.selValue = itemsTab.activeItemSetId
+
+		assert.is_false(manager.controls.delete.enabled())
+	end)
+
+	it("keeps actor-only slots out of shared player item sets", function()
+		selectBuild("MeleeAOEMarauderFireSlam")
+		local itemsTab = build.itemsTab
+		local playerSet = itemsTab.activeItemSet
+		local playerItem = new("Item", "Rarity: Normal\nIron Hat")
+		local actorOnlyItem = new("Item", "Rarity: Normal\nIron Hat")
+		itemsTab:AddItem(playerItem, true)
+		itemsTab:AddItem(actorOnlyItem, true)
+		playerSet.Helmet.selItemId = playerItem.id
+		itemsTab:PopulateSlots()
+		itemsTab.slots[MercenaryTools.itemSlotName("Helmet")].selItemId = actorOnlyItem.id
+
+		local sharedList = new("SharedItemSetListControl", nil, { 0, 0, 300, 200 }, itemsTab)
+		local sharedSetCount = #sharedList.list
+		sharedList:ReceiveDrag("ItemList", playerSet)
+
+		assert.are.equal(sharedSetCount + 1, #sharedList.list)
+		local sharedSet = sharedList.list[#sharedList.list]
+		assert.is_nil(sharedSet.slots[MercenaryTools.itemSlotName("Helmet")])
+		assert.are.equal(playerItem.name, sharedSet.slots.Helmet.name)
 	end)
 
 	it("imports copied Warrant text into the active loadout", function()
+		selectBuild("MeleeAOEMarauderFireSlam")
+		local mercSet = showMercenaryEquipment()
 		local mercenaryHelmet = MercenaryTools.itemSlotName("Helmet")
-		itemSet[mercenaryHelmet].selItemId = 9001
+		mercSet[mercenaryHelmet].selItemId = 9001
 		local warrantText = [[
 Item Class: Map Fragments
 Rarity: Normal
@@ -240,7 +485,7 @@ Note: ~b/o 1 mirror
 		assert.are.equal(83, tab.profile.foundAreaLevel)
 		assert.are.equal("Elemental Weakness", tab.data.skills[tab.profile.mainSkillId].name)
 		assert.is_true(tab.profile.importedWarrant)
-		assert.are.equal(9001, itemSet[mercenaryHelmet].selItemId)
+		assert.are.equal(9001, mercSet[mercenaryHelmet].selItemId)
 		local xml = { }
 		tab:Save(xml)
 		assert.are.equal("true", xml[1].attrib.importedWarrant)
@@ -252,16 +497,18 @@ Note: ~b/o 1 mirror
 
 	it("preserves invalid equipped items for diagnostics", function()
 		selectBuild("MeleeAOEMarauderFireSlam")
+		local mercSet = showMercenaryEquipment()
 		local invalidHelmet = item({ id = 9015, name = "Invalid Mercenary Helmet", type = "Helmet", base = { type = "Helmet" }, requirements = { int = 1 } })
 		build.itemsTab.items[invalidHelmet.id] = invalidHelmet
 		build.itemsTab.slots[MercenaryTools.itemSlotName("Helmet")]:SetSelItemId(invalidHelmet.id)
 		build.itemsTab:PopulateSlots()
-		assert.are.equal(invalidHelmet.id, itemSet[MercenaryTools.itemSlotName("Helmet")].selItemId)
+		assert.are.equal(invalidHelmet.id, mercSet[MercenaryTools.itemSlotName("Helmet")].selItemId)
 		assert.matches("Helmet: armour attribute alignment", table.concat(tab:GetErrors(), "\n"))
 	end)
 
 	it("offers base-compatible warning items with normal item colors", function()
 		selectBuild("MeleeAOEMarauderFireSlam")
+		showMercenaryEquipment()
 		local invalidHelmet = item({ id = 9018, name = "Selectable Invalid Helmet", type = "Helmet", base = { type = "Helmet" }, requirements = { int = 1 } })
 		build.itemsTab.items[invalidHelmet.id] = invalidHelmet
 		build.itemsTab:PopulateSlots()
@@ -280,12 +527,13 @@ Note: ~b/o 1 mirror
 
 	it("allows Abyss jewels only in sockets on supported equipment", function()
 		selectBuild("MeleeAOEMarauderFireSlam")
+		local mercSet = showMercenaryEquipment()
 		local jewel = item({ id = 9016, name = "Mercenary Abyss Jewel", type = "Jewel", base = { type = "Jewel", subType = "Abyss" }, requirements = { level = 1 } })
 		assert.is_false(tab:ValidateEquippedItem(jewel, "Helmet Abyssal Socket 1", itemSet))
 		local helmet = item({ id = 9017, name = "Mercenary Abyss Helmet", type = "Helmet", base = { type = "Helmet" }, requirements = { str = 1 }, abyssalSocketCount = 1 })
 		build.itemsTab.items[helmet.id] = helmet
-		itemSet[MercenaryTools.itemSlotName("Helmet")].selItemId = helmet.id
-		assert.is_true(tab:ValidateEquippedItem(jewel, "Helmet Abyssal Socket 1", itemSet))
+		mercSet[MercenaryTools.itemSlotName("Helmet")].selItemId = helmet.id
+		assert.is_true(tab:ValidateEquippedItem(jewel, "Helmet Abyssal Socket 1", mercSet))
 		assert.is_false(tab:IsSlotSupported("Jewel 12345"))
 	end)
 
@@ -309,8 +557,10 @@ Note: ~b/o 1 mirror
 	end)
 
 	it("keeps unlimited Mercenary loadouts independent while sharing equipment", function()
+		selectBuild("MeleeAOEMarauderFireSlam")
+		local mercSet = showMercenaryEquipment()
 		local sharedHelmet = MercenaryTools.itemSlotName("Helmet")
-		itemSet[sharedHelmet].selItemId = 9019
+		mercSet[sharedHelmet].selItemId = 9019
 		tab.profile.buildId = "MeleeAOEMarauderFireSlam"
 		tab.profile.skills = { { id = "InfernalBlowMercenary", enabled = true, supports = { } } }
 		tab.profile.mainSkillId = "InfernalBlowMercenary"
@@ -337,12 +587,12 @@ Note: ~b/o 1 mirror
 		tab.profile.skills = { { id = "LightningTrapMercenary", enabled = true, supports = { } } }
 		tab.profile.mainSkillId = "LightningTrapMercenary"
 		tab:RefreshControls()
-		assert.are.equal(9019, build.itemsTab.activeItemSet[sharedHelmet].selItemId)
+		assert.are.equal(9019, mercSet[sharedHelmet].selItemId)
 
 		tab.controls.setSelect:SetSel(1)
 		assert.are.equal("MeleeAOEMarauderFireSlam", tab.profile.buildId)
 		assert.are.equal("InfernalBlowMercenary", tab.profile.mainSkillId)
-		assert.are.equal(9019, build.itemsTab.activeItemSet[sharedHelmet].selItemId)
+		assert.are.equal(9019, mercSet[sharedHelmet].selItemId)
 
 		local xml = { }
 		tab:Save(xml)
@@ -357,7 +607,7 @@ Note: ~b/o 1 mirror
 		assert.are.equal(17, #tab.mercenarySetOrderList)
 		assert.are.equal(firstId, tab.activeMercenarySetId)
 		assert.are.equal("InfernalBlowMercenary", tab.profile.mainSkillId)
-		assert.are.equal(9019, build.itemsTab.activeItemSet[sharedHelmet].selItemId)
+		assert.are.equal(9019, mercSet[sharedHelmet].selItemId)
 	end)
 
 	it("loads the previous single-profile Mercenary XML format", function()

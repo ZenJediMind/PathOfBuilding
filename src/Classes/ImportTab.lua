@@ -1344,11 +1344,12 @@ function ImportTabClass:GetOrCreateGuardianItemSet()
 	local itemsTab = self.build.itemsTab
 	for _, itemSetId in ipairs(itemsTab.itemSetOrderList) do
 		local itemSet = itemsTab.itemSets[itemSetId]
-		if itemSet.title == GUARD_ITEM_SET then
+		if itemsTab:GetItemSetOwner(itemSet) == GUARD_ITEM_SET then
+			itemSet.owner = GUARD_ITEM_SET
 			return itemSet
 		end
 	end
-	local itemSet = itemsTab:NewItemSet()
+	local itemSet = itemsTab:NewItemSet(nil, GUARD_ITEM_SET)
 	itemSet.title = GUARD_ITEM_SET
 	t_insert(itemsTab.itemSetOrderList, itemSet.id)
 	return itemSet
@@ -1363,7 +1364,7 @@ function ImportTabClass:AssignGuardianItemSet(itemSetId)
 				for _, suffix in ipairs({ "", "Calcs" }) do
 					local current = gem["skillMinionItemSet"..suffix]
 					local currentSet = current and itemsTab.itemSets[current]
-					if not current or (currentSet and currentSet.title == GUARD_ITEM_SET) then
+					if not current or (currentSet and itemsTab:GetItemSetOwner(currentSet) == GUARD_ITEM_SET) then
 						gem["skillMinionItemSet"..suffix] = itemSetId
 					end
 				end
@@ -1384,19 +1385,26 @@ function ImportTabClass:ImportItemsAndSkills(charData, clearItems, clearSkills, 
 	if clearItems then
 		local itemsTab = self.build.itemsTab
 		local mercenaryItemIds = { }
-		for _, itemSet in pairs(itemsTab.itemSets) do
-			for slotName, slot in pairs(itemSet) do
-				if MercenaryTools.baseItemSlotName(slotName) and slot.selItemId ~= 0 then
-					mercenaryItemIds[slot.selItemId] = true
+		for _, itemSetId in ipairs(itemsTab.itemSetOrderList) do
+			local itemSet = itemsTab.itemSets[itemSetId]
+			if itemsTab:IsMercenaryItemSet(itemSet) then
+				for slotName, slot in pairs(itemSet) do
+					if MercenaryTools.baseItemSlotName(slotName) and slot.selItemId ~= 0 then
+						mercenaryItemIds[slot.selItemId] = true
+					end
 				end
 			end
 		end
-		for slotName, slot in pairs(itemsTab.slots) do
-			if slot.selItemId ~= 0 and not slot.nodeId and not MercenaryTools.baseItemSlotName(slotName) then
-				if mercenaryItemIds[slot.selItemId] then
-					slot:SetSelItemId(0)
-				else
-					itemsTab:DeleteItem(itemsTab.items[slot.selItemId])
+		for _, slot in ipairs(itemsTab.orderedSlots) do
+			if not slot.nodeId then
+				local itemSlot = itemsTab.activeItemSet[slot.slotName]
+				local itemId = itemSlot and itemSlot.selItemId or 0
+				if itemId ~= 0 then
+					if mercenaryItemIds[itemId] then
+						itemSlot.selItemId = 0
+					else
+						itemsTab:DeleteItem(itemsTab.items[itemId])
+					end
 				end
 			end
 		end
@@ -1826,10 +1834,13 @@ function ImportTabClass:ImportItem(itemData, slotName, ignoreWeaponSwap, itemSet
 		else
 			self.build.itemsTab:AddItem(item, true)
 		end
-		if itemSetId and itemSetId ~= self.build.itemsTab.activeItemSetId then
-			self.build.itemsTab.itemSets[itemSetId][slotName].selItemId = item.id
+		if itemSetId then
+			local itemSet = assert(self.build.itemsTab.itemSets[itemSetId], "Missing imported item set: "..tostring(itemSetId))
+			local targetSlotName = self.build.itemsTab:GetItemSetSlotName(slotName, itemSet)
+			local targetSlot = assert(itemSet[targetSlotName], "Missing imported item slot: "..targetSlotName)
+			targetSlot.selItemId = item.id
 		else
-			self.build.itemsTab.slots[slotName]:SetSelItemId(item.id)
+			self.build.itemsTab.slots[slotName]:SetSelItemId(item.id, self.build.itemsTab.activeItemSet)
 		end
 	end
 end

@@ -42,7 +42,9 @@ function ItemSlotClass:ItemSlotControl(anchor, x, y, itemsTab, slotName, slotLab
 	if slotName:match("Flask") then
 		self.controls.activate = new("CheckBoxControl"):CheckBoxControl({"RIGHT",self,"LEFT"}, {-2, 0, 20}, nil, function(state)
 			self.active = state
-			itemsTab.activeItemSet[self.slotName].active = state
+			local itemSet = itemsTab:GetVisibleItemSet()
+			local itemSlot = itemSet and itemSet[itemsTab:GetItemSetSlotName(self.slotName, itemSet)]
+			if itemSlot then itemSlot.active = state end
 			itemsTab:AddUndoState()
 			itemsTab.build.buildFlag = true
 		end)
@@ -69,7 +71,7 @@ function ItemSlotClass:ItemSlotControl(anchor, x, y, itemsTab, slotName, slotLab
 	return self
 end
 
-function ItemSlotClass:SetSelItemId(selItemId)
+function ItemSlotClass:SetSelItemId(selItemId, targetItemSet)
 	if self.nodeId then
 		if self.itemsTab.build.spec then
 			self.itemsTab.build.spec.jewels[self.nodeId] = selItemId
@@ -78,7 +80,9 @@ function ItemSlotClass:SetSelItemId(selItemId)
 			end
 		end
 	else
-		self.itemsTab.activeItemSet[self.slotName].selItemId = selItemId
+		local itemSet = targetItemSet or self.itemsTab:GetVisibleItemSet()
+		local itemSlot = itemSet and itemSet[self.itemsTab:GetItemSetSlotName(self.slotName, itemSet)]
+		if itemSlot then itemSlot.selItemId = selItemId end
 	end
 	self.selItemId = selItemId
 end
@@ -86,6 +90,12 @@ end
 function ItemSlotClass:Populate()
 	if self.nodeId and self.itemsTab.build.spec then
 		self.selItemId = self.itemsTab.build.spec.jewels[self.nodeId] or 0
+	elseif not self.nodeId then
+		local itemSet = self.itemsTab:GetVisibleItemSet()
+		local itemSlot = itemSet and itemSet[self.itemsTab:GetItemSetSlotName(self.slotName, itemSet)]
+		self.selItemId = itemSlot and itemSlot.selItemId or 0
+		self.active = itemSlot and itemSlot.active or false
+		if self.controls.activate then self.controls.activate.state = self.active end
 	end
 
 	wipeTable(self.items)
@@ -94,7 +104,7 @@ function ItemSlotClass:Populate()
 	self.list[1] = "None"
 	self.selIndex = 1
 	for _, item in pairs(self.itemsTab.items) do
-		if self.itemsTab:IsItemValidForSlot(item, self.slotName) then
+		if self.itemsTab:IsItemValidForSlot(item, self.slotName, self.itemsTab:GetVisibleItemSet()) then
 			t_insert(self.items, item.id)
 			t_insert(self.list, colorCodes[item.rarity]..item.name)
 			if item.id == self.selItemId then
@@ -109,7 +119,7 @@ function ItemSlotClass:Populate()
 		t_insert(self.list, colorCodes.NEGATIVE..selectedItem.name)
 		self.selIndex = #self.list
 	end
-	if not preserveInvalid and (not self.selItemId or not selectedItem or not self.itemsTab:IsItemValidForSlot(selectedItem, self.slotName)) then
+	if not preserveInvalid and (not self.selItemId or not selectedItem or not self.itemsTab:IsItemValidForSlot(selectedItem, self.slotName, self.itemsTab:GetVisibleItemSet())) then
 		self:SetSelItemId(0)
 	end
 
@@ -130,7 +140,7 @@ function ItemSlotClass:Populate()
 end
 
 function ItemSlotClass:CanReceiveDrag(type, value)
-	return type == "Item" and self.itemsTab:IsItemValidForSlot(value, self.slotName)
+	return type == "Item" and self.itemsTab:IsItemValidForSlot(value, self.slotName, self.itemsTab:GetVisibleItemSet())
 end
 
 function ItemSlotClass:ReceiveDrag(type, value, source)

@@ -5,8 +5,8 @@
 --
 local t_insert = table.insert
 local t_remove = table.remove
+local ipairs = ipairs
 local m_max = math.max
-local s_format = string.format
 
 ---@class ItemSetListControl: ListControl
 local ItemSetListClass = newClass("ItemSetListControl", "ListControl")
@@ -24,25 +24,42 @@ function ItemSetListClass:ItemSetListControl(anchor, rect, itemsTab)
 		self:RenameSet(newSet, true)
 	end)
 	self.controls.copy.enabled = function()
-		return self.selValue ~= nil
+		return self.selValue ~= nil and not itemsTab:GetItemSetOwner(itemsTab.itemSets[self.selValue])
 	end
 	self.controls.delete = new("ButtonControl"):ButtonControl({"LEFT",self.controls.copy,"RIGHT"}, {4, 0, 60, 18}, "Delete", function()
 		self:OnSelDelete(self.selIndex, self.selValue)
 	end)
 	self.controls.delete.enabled = function()
-		return self.selValue ~= nil and #self.list > 1
+		return self:CanDeleteItemSet(self.selValue)
 	end
 	self.controls.rename = new("ButtonControl"):ButtonControl({"BOTTOMRIGHT",self,"TOP"}, {-2, -4, 60, 18}, "Rename", function()
 		self:RenameSet(itemsTab.itemSets[self.selValue])
 	end)
 	self.controls.rename.enabled = function()
-		return self.selValue ~= nil
+		return self.selValue ~= nil and not itemsTab:GetItemSetOwner(itemsTab.itemSets[self.selValue])
 	end
 	self.controls.new = new("ButtonControl"):ButtonControl({"RIGHT",self.controls.rename,"LEFT"}, {-4, 0, 60, 18}, "New", function()
 		local newSet = itemsTab:NewItemSet()
 		self:RenameSet(newSet, true)
 	end)
 	return self
+end
+
+function ItemSetListClass:CanDeleteItemSet(itemSetId)
+	local itemSet = self.itemsTab.itemSets[itemSetId]
+	if not itemSet or self.itemsTab:IsItemSetReferenced(itemSetId) then
+		return false
+	end
+	if not self.itemsTab:IsPlayerItemSet(itemSet) then
+		return #self.list > 1
+	end
+	local playerItemSetCount = 0
+	for _, candidateId in ipairs(self.list) do
+		if self.itemsTab:IsPlayerItemSet(self.itemsTab.itemSets[candidateId]) then
+			playerItemSetCount = playerItemSetCount + 1
+		end
+	end
+	return playerItemSetCount > 1
 end
 
 function ItemSetListClass:RenameSet(itemSet, addOnName)
@@ -76,7 +93,9 @@ end
 function ItemSetListClass:GetRowValue(column, index, itemSetId)
 	local itemSet = self.itemsTab.itemSets[itemSetId]
 	if column == 1 then
-		return (itemSet.title or "Default") .. (itemSetId == self.itemsTab.activeItemSetId and "  ^9(Current)" or "")
+		local owner = self.itemsTab:GetItemSetOwner(itemSet)
+		local title = itemSet.title or (owner == "Mercenary" and "Mercenary Equipment") or (owner == "Animate Guardian" and "Animate Guardian") or "Default"
+		return title .. (itemSetId == self.itemsTab.viewItemSetId and "  ^9(Visible)" or "") .. (itemSetId == self.itemsTab.activeItemSetId and "  ^9(Current player)" or "")
 	end
 end
 
@@ -87,6 +106,7 @@ function ItemSetListClass:AddValueTooltip(tooltip, index, itemSetId)
 end
 
 function ItemSetListClass:GetDragValue(index, itemSetId)
+	if self.itemsTab:GetItemSetOwner(self.itemsTab.itemSets[itemSetId]) then return nil end
 	return "ItemList", self.itemsTab.itemSets[itemSetId]
 end
 
@@ -98,11 +118,15 @@ function ItemSetListClass:ReceiveDrag(type, value, source)
 	if type == "SharedItemList" then
 		local itemSet = self.itemsTab:NewItemSet()
 		itemSet.title = value.title
-		for slotName, item in pairs(value.slots) do
-			local newItem = new("Item"):Item(item.raw)
-			newItem:NormaliseQuality()
-			self.itemsTab:AddItem(newItem, true)
-			itemSet[slotName].selItemId = newItem.id
+		for _, slot in ipairs(self.itemsTab.orderedSlots) do
+			local slotName = slot.slotName
+			local item = value.slots[slotName]
+			if item then
+				local newItem = new("Item"):Item(item.raw)
+				newItem:NormaliseQuality()
+				self.itemsTab:AddItem(newItem, true)
+				itemSet[slotName].selItemId = newItem.id
+			end
 		end
 		t_insert(self.list, self.selDragIndex or #self.list + 1, itemSet.id)
 		self.itemsTab:AddUndoState()
@@ -114,22 +138,41 @@ function ItemSetListClass:OnOrderChange()
 end
 
 function ItemSetListClass:OnSelClick(index, itemSetId, doubleClick)
-	if doubleClick and itemSetId ~= self.itemsTab.activeItemSetId then
-		self.itemsTab:SetActiveItemSet(itemSetId)
+	if doubleClick and itemSetId ~= self.itemsTab.viewItemSetId then
+		self.itemsTab:SetViewItemSet(itemSetId)
 		self.itemsTab:AddUndoState()
 	end
 end
 
 function ItemSetListClass:OnSelDelete(index, itemSetId)
 	local itemSet = self.itemsTab.itemSets[itemSetId]
-	if #self.list > 1 then
+	if self:CanDeleteItemSet(itemSetId) then
 		main:OpenConfirmPopup("Delete Item Set", "Are you sure you want to delete '"..(itemSet.title or "Default").."'?\nThis will not delete any items used by the set.", "Delete", function()
 			t_remove(self.list, index)
 			self.itemsTab.itemSets[itemSetId] = nil
 			self.selIndex = nil
 			self.selValue = nil
-			if itemSetId == self.itemsTab.activeItemSetId then 
-				self.itemsTab:SetActiveItemSet(self.list[m_max(1, index - 1)])
+			if itemSetId == self.itemsTab.activeItemSetId then
+				local replacementItemSetId
+				for candidateIndex = index, #self.list do
+					local candidateItemSetId = self.list[candidateIndex]
+					if self.itemsTab:IsPlayerItemSet(self.itemsTab.itemSets[candidateItemSetId]) then
+						replacementItemSetId = candidateItemSetId
+						break
+					end
+				end
+				if not replacementItemSetId then
+					for candidateIndex = index - 1, 1, -1 do
+						local candidateItemSetId = self.list[candidateIndex]
+						if self.itemsTab:IsPlayerItemSet(self.itemsTab.itemSets[candidateItemSetId]) then
+							replacementItemSetId = candidateItemSetId
+							break
+						end
+					end
+				end
+				self.itemsTab:SetActiveItemSet(replacementItemSetId)
+			elseif itemSetId == self.itemsTab.viewItemSetId then
+				self.itemsTab:SetViewItemSet(self.list[m_max(1, index - 1)])
 			end
 			self.itemsTab:AddUndoState()
 			self.itemsTab.build:SyncLoadouts()
@@ -139,7 +182,7 @@ end
 
 function ItemSetListClass:OnSelKeyDown(index, itemSetId, key)
 	local itemSet = self.itemsTab.itemSets[itemSetId]
-	if key == "F2" then
+	if key == "F2" and not self.itemsTab:GetItemSetOwner(itemSet) then
 		self:RenameSet(itemSet)
 	end
 end

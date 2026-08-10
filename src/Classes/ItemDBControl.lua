@@ -256,14 +256,23 @@ function ItemDBClass:ListBuilder()
 		local useFullDPS = self.sortDetail.stat == "FullDPS"
 		local start = GetTime()
 		local calcFunc, calcBase = self.itemsTab.build.calcsTab:GetMiscCalculator(self.build)
+		local visibleItemSet = self.itemsTab:GetVisibleItemSet()
+		local visibleSlots = self.itemsTab:GetVisibleItemSlots()
+		local function isSlotShown(slot)
+			if slot.shown == nil then return true end
+			return type(slot.shown) == "function" and slot.shown() or slot.shown
+		end
 		for itemIndex, item in ipairs(list) do
 			item.measuredPower = -math.huge
-			for slotName, slot in pairs(self.itemsTab.slots) do
-				if self.itemsTab:IsItemValidForSlot(item, slotName) and not slot.inactive and (not slot.weaponSet or slot.weaponSet == (self.itemsTab.activeItemSet.useSecondWeaponSet and 2 or 1)) then
+			local function measureSlot(slotName, slot)
+				if self.itemsTab:IsItemValidForSlot(item, slotName, visibleItemSet) and not slot.inactive and isSlotShown(slot) and (not slot.weaponSet or slot.weaponSet == (visibleItemSet.useSecondWeaponSet and 2 or 1)) then
 					local output = calcFunc(item.base.flask and { toggleFlask = item } or item.base.tincture and { toggleTincture = item } or { repSlotName = slotName, repItem = item }, useFullDPS)
 					local measuredPower = data.powerStatList.GetFromOutput(output, self.sortDetail)
 					item.measuredPower = m_max(item.measuredPower, measuredPower)
 				end
+			end
+			for _, slot in ipairs(visibleSlots) do
+				measureSlot(slot.slotName, slot)
 			end
 			local now = GetTime()
 			if now - start > 50 then
@@ -355,16 +364,17 @@ function ItemDBClass:OnSelClick(index, item, doubleClick)
 		self.itemsTab:AddItem(newItem, true)
 
 		-- Equip item if able
-		local slotName = newItem:GetPrimarySlot()
+		local slotName = self.itemsTab:GetVisibleSlotName(newItem:GetPrimarySlot())
+		local visibleItemSet = self.itemsTab:GetVisibleItemSet()
 		if slotName and self.itemsTab.slots[slotName] then
-			if self.itemsTab.slots[slotName].weaponSet == 1 and self.itemsTab.activeItemSet.useSecondWeaponSet then
+			if self.itemsTab.slots[slotName].weaponSet == 1 and visibleItemSet.useSecondWeaponSet then
 				-- Redirect to second weapon set
 				slotName = slotName .. " Swap"
 			end
 			if IsKeyDown("SHIFT") then
 				-- Redirect to second slot if possible
 				local altSlot = slotName:gsub("1","2")
-				if self.itemsTab:IsItemValidForSlot(newItem, altSlot) then
+				if self.itemsTab:IsItemValidForSlot(newItem, altSlot, visibleItemSet) then
 					slotName = altSlot
 				end
 			end

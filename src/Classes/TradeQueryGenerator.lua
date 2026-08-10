@@ -13,6 +13,15 @@ local tradeHelpers = require("Classes.TradeHelpers")
 local utils = require("Modules.Utils")
 local MercenaryTools = require("Modules.MercenaryTools")
 
+local function itemCalculationOverride(itemSetId, slotName, item)
+	return {
+		itemSetId = itemSetId,
+		comparisonActor = MercenaryTools.comparisonActor(slotName),
+		repSlotName = slotName,
+		repItem = item,
+	}
+end
+
 -- a table which tells us what subtypes each category we can search for
 -- contains. the commented out lines are type-subtype combinations which don't
 -- exist yet, but might exist in the future
@@ -593,7 +602,11 @@ function TradeQueryGeneratorClass:GenerateModWeights(modsToTest)
 				logToFile("Failed to test %s mod: %s", self.calcContext.itemCategory, modLine)
 			end
 
-			local output = self.calcContext.calcFunc({ repSlotName = self.calcContext.slot.slotName, repItem = self.calcContext.testItem })
+			local output = self.calcContext.calcFunc(itemCalculationOverride(
+				self.calcContext.itemSetId,
+				self.calcContext.slot.slotName,
+				self.calcContext.testItem
+			))
 			local meanStatDiff = TradeQueryGeneratorClass.WeightedRatioOutputs(self.calcContext.baseOutput, output, self.calcContext.options.statWeights) * 1000 - (self.calcContext.baseStatValue or 0)
 			if meanStatDiff > 0.01 then
 				t_insert(self.modWeights, { tradeModId = entry.tradeMod.id, weight = meanStatDiff / modValue, meanStatDiff = meanStatDiff, invert = entry.sign == "-" and true or false })
@@ -766,8 +779,15 @@ function TradeQueryGeneratorClass:StartQuery(slot, options)
 
 	-- Calculate base output with a blank item
 	local calcFunc, baseOutput, actorOutputs = self.itemsTab.build.calcsTab:GetMiscCalculator()
-	baseOutput = MercenaryTools.comparisonBaseOutput(baseOutput, actorOutputs, slot and slot.slotName)
-	local baseItemOutput = slot and calcFunc({ repSlotName = slot.slotName, repItem = testItem }) or baseOutput
+	local itemSetId = options.itemSetId
+	local slotName = slot and slot.slotName
+	local comparisonActor = MercenaryTools.comparisonActor(slotName)
+	if itemSetId then
+		baseOutput = calcFunc({ itemSetId = itemSetId, comparisonActor = comparisonActor })
+	else
+		baseOutput = MercenaryTools.comparisonBaseOutput(baseOutput, actorOutputs, slotName)
+	end
+	local baseItemOutput = slot and calcFunc(itemCalculationOverride(itemSetId, slotName, testItem)) or baseOutput
 	-- make weights more human readable
 	local compStatValue = TradeQueryGeneratorClass.WeightedRatioOutputs(baseOutput, baseItemOutput, options.statWeights) * 1000
 
@@ -783,6 +803,7 @@ function TradeQueryGeneratorClass:StartQuery(slot, options)
 		baseOutput = baseOutput,
 		baseStatValue = compStatValue,
 		calcFunc = calcFunc,
+		itemSetId = itemSetId,
 		options = options,
 		slot = slot,
 		requiredMods = options.requiredMods,
@@ -929,7 +950,11 @@ function TradeQueryGeneratorClass:FinishQuery()
 	end
 	self.calcContext.testItem:BuildAndParseRaw()
 
-	local originalOutput = originalItem and self.calcContext.calcFunc({ repSlotName = self.calcContext.slot.slotName, repItem = self.calcContext.testItem }) or self.calcContext.baseOutput
+	local originalOutput = originalItem and self.calcContext.calcFunc(itemCalculationOverride(
+		self.calcContext.itemSetId,
+		self.calcContext.slot.slotName,
+		self.calcContext.testItem
+	)) or self.calcContext.baseOutput
 	local currentStatDiff = TradeQueryGeneratorClass.WeightedRatioOutputs(self.calcContext.baseOutput, originalOutput, self.calcContext.options.statWeights) * 1000 - (self.calcContext.baseStatValue or 0)
 	
 	if self.calcContext.options.includeAllWEMods then
@@ -1427,6 +1452,7 @@ Remove: %s will be removed from the search results.]], term, term, term)
 			options.blockedMods = copyTable(notMods)
 		end
 		options.statWeights = statWeights
+		options.itemSetId = context.slotTbl.itemSetId
 		if controls.jewelSlot then
 			slot = controls.jewelSlot:GetSelValue()
 			-- pass node id back to table so evaluation can use the correct socket instead of the unique pseudo slot

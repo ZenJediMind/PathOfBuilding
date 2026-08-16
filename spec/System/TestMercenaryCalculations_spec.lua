@@ -54,6 +54,9 @@ describe("Permanent Mercenary calculations", function()
 			supports = fields.supports or { },
 		} }
 		build.mercenaryTab:Changed()
+		if buildId then
+			build.mercenaryTab:GetItemSet(true)
+		end
 	end
 
 	local function calculate(enemyLevel)
@@ -284,6 +287,20 @@ describe("Permanent Mercenary calculations", function()
 		local env = calculate()
 		assert.is_nil(env.mercenary)
 		assert.is_nil(env.mercenaryCalculationErrors)
+	end)
+
+	it("does not calculate a configured Mercenary without its item set", function()
+		configure("TrapsMinesShadow", "TrapsMinesShadowLightning", "LightningTrapMercenary")
+		assert.is_table(build.mercenaryTab:GetItemSet(false))
+		build.mercenaryTab.itemSetId = 99999
+		local env = calculate()
+		assert.is_nil(env.mercenary)
+		assert.is_nil(env.mercenaryMinion)
+		assert.is_not_nil(env.mercenaryCalculationErrors)
+		assert.matches("No Mercenary item set is available", table.concat(env.mercenaryCalculationErrors, "\n"))
+		assert.is_nil(build.calcsTab.calcsEnv.mercenary)
+		local _, _, actorOutputs = build.calcsTab:GetMiscCalculator()
+		assert.is_nil(actorOutputs.MERCENARY)
 	end)
 
 	it("shows and applies Configuration settings required by the Mercenary", function()
@@ -1437,13 +1454,29 @@ Iron Hat
 	end)
 
 	it("shows actor unavailable status without a synthetic mainSkill", function()
+		configure("TrapsMinesShadow", "TrapsMinesShadowLightning", "LightningTrapMercenary")
+		build.mercenaryTab.itemSetId = 99999
 		build.calcsTab.input.actor = "MERCENARY"
 		local env = calculate()
 		assert.is_nil(env.mercenary)
+		assert.is_not_nil(env.mercenaryCalculationErrors)
 		assert.is_nil(build.calcsTab:GetDisplayActor(build.calcsTab.calcsEnv))
 		assert.is_truthy(build.calcsTab.calcsOutput.ActorUnavailableMessage)
 		assert.is_true(build.calcsTab:CheckFlag({ haveOutput = "ActorUnavailableMessage" }))
 		assert.is_true(not build.calcsTab:CheckFlag({ flag = "attack" }))
+		assert.is_true(not build.calcsTab:CheckFlag({ flag = "minion" }))
+		assert.is_true(not build.calcsTab:CheckFlag({ playerFlag = "multiPart" }))
+		assert.is_true(not build.calcsTab:CheckFlag({ haveOutput = "Life" }))
+		assert.is_true(not build.calcsTab:CheckFlag({ haveOutput = "CombinedDPS" }))
+		assert.is_true(env.player.output.Life > 0)
+		assert.is_nil(build.calcsTab.calcsOutput.Life)
+		assert.is_nil(build.calcsTab.calcsOutput.CombinedDPS)
+		for _, section in ipairs(build.calcsTab.sectionList) do
+			section:UpdateSize()
+			if section.flag == "attack" then
+				assert.is_true(not section.enabled, section.id)
+			end
+		end
 		local statusOnly = { output = build.calcsTab.calcsOutput }
 		assert.is_nil(statusOnly.mainSkill)
 		assert.matches("unavailable", formatCalcStr("{output:ActorUnavailableMessage}", statusOnly))

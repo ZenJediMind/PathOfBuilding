@@ -846,7 +846,6 @@ function TradeQueryClass:GetResultEvaluation(row_idx, result_index, calcFunc, ba
 		end
 		if comparisonActor == "MERCENARY" and not MercenaryTools.mercenaryOutputAvailable(baseOutput) then
 			result.evaluation = { }
-			result.unavailableMessage = "Mercenary actor unavailable"
 			return result.evaluation
 		end
 		local onlyWeightedBaseOutput = self:ReduceOutput(baseOutput)

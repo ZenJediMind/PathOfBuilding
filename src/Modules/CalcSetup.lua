@@ -223,23 +223,25 @@ function calcs.initMercenary(env)
 	if selectedItemSet and itemsTab:IsMercenaryItemSet(selectedItemSet) then
 		itemSet = selectedItemSet
 	end
-	if itemSet then
-		local equipmentErrors = MercenaryTools.equipmentErrors({
-			profile = profile,
-			mercenaryData = env.data.mercenaries,
-			itemSet = itemSet,
-			playerItemSet = itemsTab.activeItemSet,
-			items = itemsTab.items,
-			playerHasFlag = function(flagName) return env.modDB:Flag(nil, flagName) end,
-			mercenarySlots = itemsTab.mercenarySlots,
-			isItemValidForSlot = function(item, slotName, set)
-				return itemsTab:IsItemValidForSlot(item, slotName, set)
-			end,
-		})
-		if #equipmentErrors > 0 then
-			env.mercenaryCalculationErrors = equipmentErrors
-			return
-		end
+	if not itemSet then
+		env.mercenaryCalculationErrors = { "No Mercenary item set is available" }
+		return
+	end
+	local equipmentErrors = MercenaryTools.equipmentErrors({
+		profile = profile,
+		mercenaryData = env.data.mercenaries,
+		itemSet = itemSet,
+		playerItemSet = itemsTab.activeItemSet,
+		items = itemsTab.items,
+		playerHasFlag = function(flagName) return env.modDB:Flag(nil, flagName) end,
+		mercenarySlots = itemsTab.mercenarySlots,
+		isItemValidForSlot = function(item, slotName, set)
+			return itemsTab:IsItemValidForSlot(item, slotName, set)
+		end,
+	})
+	if #equipmentErrors > 0 then
+		env.mercenaryCalculationErrors = equipmentErrors
+		return
 	end
 	local mercenary = {
 		type = "Mercenary",

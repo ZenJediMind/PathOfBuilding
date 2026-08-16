@@ -476,11 +476,14 @@ end
 
 function MercenaryTabClass:EnsureItemSet()
 	local itemsTab = self.build.itemsTab
-	local itemSet = self.itemSetId and itemsTab.itemSets[self.itemSetId]
-	if itemSet and itemsTab:IsMercenaryItemSet(itemSet) then
-		itemSet.owner = "Mercenary"
-		itemSet.title = itemSet.title or "Mercenary Equipment"
-		return itemSet
+	if self.itemSetId then
+		local itemSet = itemsTab.itemSets[self.itemSetId]
+		if itemSet and itemsTab:IsMercenaryItemSet(itemSet) then
+			itemSet.owner = "Mercenary"
+			itemSet.title = itemSet.title or "Mercenary Equipment"
+			return itemSet
+		end
+		return
 	end
 	local itemSetList = self:GetMercenaryItemSetList()
 	if #itemSetList == 1 then
@@ -489,7 +492,7 @@ function MercenaryTabClass:EnsureItemSet()
 	elseif #itemSetList > 1 then
 		return
 	end
-	itemSet = itemsTab:NewItemSet(nil, "Mercenary")
+	local itemSet = itemsTab:NewItemSet(nil, "Mercenary")
 	itemSet.title = "Mercenary Equipment"
 	t_insert(itemsTab.itemSetOrderList, itemSet.id)
 	self.itemSetId = itemSet.id
@@ -499,6 +502,7 @@ end
 function MercenaryTabClass:GetItemSet(create)
 	local itemSet = self.itemSetId and self.build.itemsTab.itemSets[self.itemSetId]
 	if itemSet and self.build.itemsTab:IsMercenaryItemSet(itemSet) then return itemSet end
+	if self.itemSetId then return end
 	if create == true then return self:EnsureItemSet() end
 end
 
@@ -761,9 +765,6 @@ function MercenaryTabClass:SetActiveMercenarySet(setId)
 	self.selectedSkillIndex = 1
 	self.modFlag = true
 	self.build.buildFlag = true
-	if self.profile and self.profile.buildId then
-		self:GetItemSet(true)
-	end
 	if self.controls.skillList then
 		self:RefreshControls()
 	end
@@ -903,20 +904,6 @@ function MercenaryTabClass:PlayerFlag(flagName)
 	return mainEnv and mainEnv.modDB and mainEnv.modDB:Flag(nil, flagName) or false
 end
 
-function MercenaryTabClass:ValidateEquippedItem(item, slotName, itemSet, playerItemSet)
-	if not playerItemSet and itemSet and not self.build.itemsTab:IsMercenaryItemSet(itemSet) then
-		playerItemSet = itemSet
-	end
-	return MercenaryTools.validateEquippedItem(item, slotName, {
-		profile = self.profile,
-		mercenaryData = self.data,
-		itemSet = itemSet,
-		playerItemSet = playerItemSet,
-		items = self.build.itemsTab.items,
-		playerHasFlag = function(flagName) return self:PlayerFlag(flagName) end,
-	})
-end
-
 function MercenaryTabClass:GetErrors()
 	local errors = MercenaryTools.validateProfile(self.profile, self.data)
 	if not self:PlayerFlag("CanHirePermanentMercenary") then
@@ -1019,7 +1006,6 @@ function MercenaryTabClass:Load(xml)
 	self.controls.sortGemsByDPS.state = self.sortGemsByDPS
 	self.controls.sortGemsByDPSFieldControl:SelByValue(xml.attrib.sortGemsByDPSField or "CombinedDPS", "type")
 	self.sortGemsByDPSField = self.controls.sortGemsByDPSFieldControl:GetSelValueByKey("type")
-	local loadedSets = false
 	for _, child in ipairs(xml) do
 		if child.elem == "MercenarySet" then
 			local setId = tonumber(child.attrib.id) or 1
@@ -1027,13 +1013,7 @@ function MercenaryTabClass:Load(xml)
 			local profile = self:NewMercenarySet(setId, child.attrib.title)
 			loadProfile(child, profile)
 			t_insert(self.mercenarySetOrderList, setId)
-			loadedSets = true
 		end
-	end
-	if not loadedSets then
-		local profile = self:NewMercenarySet(1)
-		loadProfile(xml, profile)
-		t_insert(self.mercenarySetOrderList, 1)
 	end
 	self:SetActiveMercenarySet(tonumber(xml.attrib.activeMercenarySet) or 1)
 	self.modFlag = false
@@ -1041,9 +1021,6 @@ function MercenaryTabClass:Load(xml)
 end
 
 function MercenaryTabClass:PostLoad()
-	if self.profile and self.profile.buildId then
-		self:GetItemSet(true)
-	end
 	self:RefreshControls()
 	self.modFlag = false
 end

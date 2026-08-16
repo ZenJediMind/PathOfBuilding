@@ -200,7 +200,6 @@ describe("TradeQuery", function()
 
 			assert.same({ }, evaluation)
 			assert.are.equal(0, weightedCalls)
-			assert.are.equal("Mercenary actor unavailable", mock_tradeQuery.resultTbl[1][1].unavailableMessage)
 		end)
 	end)
 	describe("PriceItem slot rows", function()

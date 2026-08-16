@@ -35,6 +35,17 @@ describe("Mercenary equipment validation", function()
 		return mercenaryItemSet
 	end
 
+	local function validateEquippedItem(equippedItem, slotName, mercenarySet)
+		return MercenaryTools.validateEquippedItem(equippedItem, slotName, {
+			profile = tab.profile,
+			mercenaryData = tab.data,
+			itemSet = mercenarySet or mercenaryItemSet,
+			playerItemSet = itemSet,
+			items = build.itemsTab.items,
+			playerHasFlag = function(flagName) return tab:PlayerFlag(flagName) end,
+		})
+	end
+
 	local function allocatePassive(name)
 		local node = build.spec.tree.ascendancyMap[name]
 		if not node then
@@ -330,6 +341,21 @@ describe("Mercenary equipment validation", function()
 		assert.are.equal(mercSet, tab:GetItemSet(true))
 	end)
 
+	it("does not replace an invalid explicit Mercenary item set", function()
+		selectBuild("MeleeAOEMarauderFireSlam")
+		local validSet = tab:GetItemSet(false)
+		assert.is_table(validSet)
+		tab.itemSetId = 99999
+		assert.is_nil(tab:GetItemSet(false))
+		assert.is_nil(tab:GetItemSet(true))
+		assert.is_nil(tab:EnsureItemSet())
+		assert.are.equal(99999, tab.itemSetId)
+		tab:PostLoad()
+		assert.are.equal(99999, tab.itemSetId)
+		assert.is_nil(tab:GetItemSet(false))
+		assert.are.equal(validSet, build.itemsTab.itemSets[validSet.id])
+	end)
+
 	it("keeps a player set named Animate Guardian as a player set", function()
 		local playerSet = build.itemsTab:NewItemSet()
 		playerSet.title = "Animate Guardian"
@@ -410,32 +436,32 @@ describe("Mercenary equipment validation", function()
 
 	it("applies single, dual, and triple attribute armour rules", function()
 		selectBuild("MeleeAOEMarauderFireSlam")
-		assert.is_true(tab:ValidateEquippedItem(item({ requirements = { str = 100, dex = 100 } }), "Body Armour", itemSet))
-		assert.is_false(tab:ValidateEquippedItem(item({ requirements = { dex = 100 } }), "Body Armour", itemSet))
-		assert.is_false(tab:ValidateEquippedItem(item({ requirements = { str = 1, dex = 1, int = 1 } }), "Body Armour", itemSet))
+		assert.is_true(validateEquippedItem(item({ requirements = { str = 100, dex = 100 } }), "Body Armour"))
+		assert.is_false(validateEquippedItem(item({ requirements = { dex = 100 } }), "Body Armour"))
+		assert.is_false(validateEquippedItem(item({ requirements = { str = 1, dex = 1, int = 1 } }), "Body Armour"))
 
 		selectBuild("AurasMinionsTemplarStaff")
-		assert.is_true(tab:ValidateEquippedItem(item({ requirements = { str = 100, int = 100 } }), "Body Armour", itemSet))
-		assert.is_false(tab:ValidateEquippedItem(item({ requirements = { str = 100, dex = 1 } }), "Body Armour", itemSet))
+		assert.is_true(validateEquippedItem(item({ requirements = { str = 100, int = 100 } }), "Body Armour"))
+		assert.is_false(validateEquippedItem(item({ requirements = { str = 100, dex = 1 } }), "Body Armour"))
 
 		selectBuild("MiscScionPhysDot")
-		assert.is_true(tab:ValidateEquippedItem(item({ requirements = { str = 1, dex = 1, int = 1 } }), "Body Armour", itemSet))
+		assert.is_true(validateEquippedItem(item({ requirements = { str = 1, dex = 1, int = 1 } }), "Body Armour"))
 	end)
 
 	it("enforces the exact 70 percent found-area level boundary", function()
 		selectBuild("MeleeAOEMarauderFireSlam", 47)
-		assert.is_false(tab:ValidateEquippedItem(item({ requirements = { level = 68, str = 1 } }), "Body Armour", itemSet))
+		assert.is_false(validateEquippedItem(item({ requirements = { level = 68, str = 1 } }), "Body Armour"))
 		tab.profile.foundAreaLevel = 48
-		assert.is_true(tab:ValidateEquippedItem(item({ requirements = { level = 68, str = 1 } }), "Body Armour", itemSet))
+		assert.is_true(validateEquippedItem(item({ requirements = { level = 68, str = 1 } }), "Body Armour"))
 	end)
 
 	it("requires Legendary slot passives and always rejects unique body armour", function()
 		selectBuild("MeleeAOEMarauderFireSlam")
-		assert.is_false(tab:ValidateEquippedItem(item({ rarity = "UNIQUE" }), "Body Armour", itemSet))
+		assert.is_false(validateEquippedItem(item({ rarity = "UNIQUE" }), "Body Armour"))
 		local helmet = item({ type = "Helmet", rarity = "UNIQUE", requirements = { str = 1 } })
-		assert.is_false(tab:ValidateEquippedItem(helmet, "Helmet", itemSet))
+		assert.is_false(validateEquippedItem(helmet, "Helmet"))
 		allocatePassive("Legendary Helmets")
-		assert.is_true(tab:ValidateEquippedItem(helmet, "Helmet", itemSet))
+		assert.is_true(validateEquippedItem(helmet, "Helmet"))
 	end)
 
 	it("applies every Legendary slot permission", function()
@@ -455,40 +481,40 @@ describe("Mercenary equipment validation", function()
 		for index, case in ipairs(cases) do
 			local unique = item({ id = 9100 + index, type = case[2], rarity = "UNIQUE", requirements = case[4] or { } })
 			if not allocated[case[3]] then
-				assert.is_false(tab:ValidateEquippedItem(unique, case[1], itemSet))
+				assert.is_false(validateEquippedItem(unique, case[1]))
 				allocatePassive(case[3])
 				allocated[case[3]] = true
 			end
-			assert.is_true(tab:ValidateEquippedItem(unique, case[1], itemSet))
+			assert.is_true(validateEquippedItem(unique, case[1]))
 		end
 	end)
 
 	it("uses exported main-hand, optional off-hand, shield, and quiver rules", function()
 		selectBuild("TrapsMinesShadowLightning")
-		assert.is_true(tab:ValidateEquippedItem(item({ type = "Dagger" }), "Weapon 1", itemSet))
-		assert.is_false(tab:ValidateEquippedItem(item({ type = "Shield" }), "Weapon 2", itemSet))
+		assert.is_true(validateEquippedItem(item({ type = "Dagger" }), "Weapon 1"))
+		assert.is_false(validateEquippedItem(item({ type = "Shield" }), "Weapon 2"))
 
 		selectBuild("MeleeStrikesMarauderFire")
-		assert.is_true(tab:ValidateEquippedItem(item({ type = "Shield" }), "Weapon 2", itemSet))
-		assert.is_true(tab:ValidateEquippedItem(item({ type = "One Handed Sword" }), "Weapon 2", itemSet))
+		assert.is_true(validateEquippedItem(item({ type = "Shield" }), "Weapon 2"))
+		assert.is_true(validateEquippedItem(item({ type = "One Handed Sword" }), "Weapon 2"))
 
 		selectBuild("AurasMinionsTemplarSmite")
-		assert.is_true(tab:ValidateEquippedItem(item({ type = "Shield" }), "Weapon 2", itemSet))
-		assert.is_false(tab:ValidateEquippedItem(item({ type = "Sceptre" }), "Weapon 2", itemSet))
+		assert.is_true(validateEquippedItem(item({ type = "Shield" }), "Weapon 2"))
+		assert.is_false(validateEquippedItem(item({ type = "Sceptre" }), "Weapon 2"))
 
 		selectBuild("NonEleBowRangerPhys")
-		assert.is_true(tab:ValidateEquippedItem(item({ type = "Bow" }), "Weapon 1", itemSet))
-		assert.is_true(tab:ValidateEquippedItem(item({ type = "Quiver" }), "Weapon 2", itemSet))
+		assert.is_true(validateEquippedItem(item({ type = "Bow" }), "Weapon 1"))
+		assert.is_true(validateEquippedItem(item({ type = "Quiver" }), "Weapon 2"))
 	end)
 
 	it("rejects shared physical item ids and all item-granted skills", function()
 		selectBuild("MeleeAOEMarauderFireSlam")
 		local shared = item({ type = "Helmet", requirements = { str = 1 } })
 		itemSet["Helmet"].selItemId = shared.id
-		assert.is_false(tab:ValidateEquippedItem(shared, "Helmet", itemSet))
+		assert.is_false(validateEquippedItem(shared, "Helmet"))
 
 		local grantedAura = item({ type = "Helmet", id = 9002, requirements = { str = 1 }, grantedSkills = { { skillId = "Anger" } } })
-		assert.is_false(tab:ValidateEquippedItem(grantedAura, "Helmet", itemSet))
+		assert.is_false(validateEquippedItem(grantedAura, "Helmet"))
 	end)
 
 	it("detaches Mercenary equipment on reset without deleting the item set", function()
@@ -646,11 +672,11 @@ Note: ~b/o 1 mirror
 		selectBuild("MeleeAOEMarauderFireSlam")
 		local mercSet = showMercenaryEquipment()
 		local jewel = item({ id = 9016, name = "Mercenary Abyss Jewel", type = "Jewel", base = { type = "Jewel", subType = "Abyss" }, requirements = { level = 1 } })
-		assert.is_false(tab:ValidateEquippedItem(jewel, "Helmet Abyssal Socket 1", itemSet))
+		assert.is_false(validateEquippedItem(jewel, "Helmet Abyssal Socket 1"))
 		local helmet = item({ id = 9017, name = "Mercenary Abyss Helmet", type = "Helmet", base = { type = "Helmet" }, requirements = { str = 1 }, abyssalSocketCount = 1 })
 		build.itemsTab.items[helmet.id] = helmet
 		mercSet[MercenaryTools.itemSlotName("Helmet")].selItemId = helmet.id
-		assert.is_true(tab:ValidateEquippedItem(jewel, "Helmet Abyssal Socket 1", mercSet))
+		assert.is_true(validateEquippedItem(jewel, "Helmet Abyssal Socket 1", mercSet))
 		assert.is_false(tab:IsSlotSupported("Jewel 12345"))
 	end)
 
@@ -667,7 +693,7 @@ Note: ~b/o 1 mirror
 			local parent = item({ id = 9024 + index, name = "Mercenary Abyss "..case.type, type = case.type, base = { type = case.type }, requirements = { str = 1 }, abyssalSocketCount = 1 })
 			build.itemsTab.items[parent.id] = parent
 			mercSet[MercenaryTools.itemSlotName(case.slotName)].selItemId = parent.id
-			assert.is_true(tab:ValidateEquippedItem(uniqueJewel, case.slotName.." Abyssal Socket 1", mercSet))
+			assert.is_true(validateEquippedItem(uniqueJewel, case.slotName.." Abyssal Socket 1", mercSet))
 		end
 	end)
 
@@ -742,27 +768,6 @@ Note: ~b/o 1 mirror
 		assert.are.equal(firstId, tab.activeMercenarySetId)
 		assert.are.equal("InfernalBlowMercenary", tab.profile.mainSkillId)
 		assert.are.equal(9019, mercSet[sharedHelmet].selItemId)
-	end)
-
-	it("loads the previous single-profile Mercenary XML format", function()
-		tab:Load({
-			attrib = {
-				buildId = "TrapsMinesShadowLightning",
-				foundAreaLevel = "80",
-				mainSkillId = "LightningTrapMercenary",
-				lifeComparison = "PLAYER",
-			},
-			{ elem = "Skill", attrib = {
-				id = "LightningTrapMercenary",
-				enabled = "true",
-				includeInFullDPS = "false",
-				count = "1",
-			} },
-		})
-		assert.are.equal(1, #tab.mercenarySetOrderList)
-		assert.are.equal("TrapsMinesShadowLightning", tab.profile.buildId)
-		assert.are.equal("PLAYER", tab.profile.lifeComparison)
-		assert.are.equal("LightningTrapMercenary", tab.profile.skills[1].id)
 	end)
 
 	it("matches the player skill tip sizing without exposing Calcs state in row text", function()
@@ -942,16 +947,19 @@ Note: ~b/o 1 mirror
 			table.insert(skillIds, skillId)
 			if #skillIds == 7 then break end
 		end
-		local mercenaryXml = {
+		local setNode = {
+			elem = "MercenarySet",
 			attrib = {
+				id = "1",
 				buildId = "MeleeAOEMarauderFireSlam",
 				foundAreaLevel = "68",
 				mainSkillId = skillIds[1],
 			},
 		}
 		for _, skillId in ipairs(skillIds) do
-			table.insert(mercenaryXml, { elem = "Skill", attrib = { id = skillId, enabled = "true" } })
+			table.insert(setNode, { elem = "Skill", attrib = { id = skillId, enabled = "true" } })
 		end
+		local mercenaryXml = { attrib = { }, setNode }
 		tab:Load(mercenaryXml)
 		assert.are.equal(7, #tab.profile.skills)
 		for index, skillId in ipairs(skillIds) do

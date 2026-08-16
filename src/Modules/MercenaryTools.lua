@@ -27,7 +27,6 @@ end
 
 local MAX_WARRANT_BYTES = 256 * 1024
 local MAX_SKILLS = 6
-MercenaryTools.MAX_SKILLS = MAX_SKILLS
 
 function MercenaryTools.contains(values, wanted)
 	for _, value in ipairs(values or { }) do
@@ -584,21 +583,20 @@ function MercenaryTools.isSlotSupported(slotName)
 end
 
 function MercenaryTools.validateEquippedItem(item, slotName, context)
-	context = context or { }
 	if not MercenaryTools.isSlotSupported(slotName) then
 		return false, "slot is not supported by Mercenaries"
 	end
 	local parentSlot, abyssalSocketIndex = slotName:match("^(.-) Abyssal Socket (%d+)$")
 	if parentSlot then
-		local parentSetSlot = context.itemSet and context.itemSet[MercenaryTools.itemSlotName(parentSlot)]
-		local parentItem = context.items and context.items[parentSetSlot and parentSetSlot.selItemId]
+		local parentSetSlot = context.itemSet[MercenaryTools.itemSlotName(parentSlot)]
+		local parentItem = context.items[parentSetSlot and parentSetSlot.selItemId]
 		if not parentItem or (parentItem.abyssalSocketCount or 0) < tonumber(abyssalSocketIndex) then
 			return false, "parent item does not have this Abyssal Socket"
 		end
 	end
 	local mercenaryData = context.mercenaryData
 	local profile = context.profile
-	local mercBuild = mercenaryData and mercenaryData.builds[profile and profile.buildId]
+	local mercBuild = mercenaryData.builds[profile.buildId]
 	local class = mercBuild and mercenaryData.classes[mercBuild.classId]
 	if not mercBuild or not class then
 		return false, "select a Mercenary build first"
@@ -631,10 +629,9 @@ function MercenaryTools.validateEquippedItem(item, slotName, context)
 	end
 	if (item.rarity == "UNIQUE" or item.rarity == "RELIC") and not (item.type == "Jewel" and item.base and item.base.subType == "Abyss") then
 		local requiredFlag = UNIQUE_FLAG_BY_SLOT[slotName]
-		local playerHasFlag = context.playerHasFlag or function() return false end
 		if not requiredFlag then
 			return false, "Unique items are never permitted in this slot"
-		elseif not playerHasFlag(requiredFlag) then
+		elseif not context.playerHasFlag(requiredFlag) then
 			return false, "requires a modifier allowing your Mercenary to equip "..UNIQUE_SLOT_DESCRIPTION[requiredFlag]
 		end
 	end
@@ -647,12 +644,9 @@ function MercenaryTools.validateEquippedItem(item, slotName, context)
 	if #(item.grantedSkills or { }) > 0 then
 		return false, "item-granted skills and triggers cannot be used"
 	end
-	local playerItemSet = context.playerItemSet
-	if playerItemSet then
-		for playerSlotName, playerSlot in pairs(playerItemSet) do
-			if type(playerSlot) == "table" and not MercenaryTools.baseItemSlotName(playerSlotName) and playerSlot.selItemId == item.id then
-				return false, "the same physical item is equipped by the player"
-			end
+	for playerSlotName, playerSlot in pairs(context.playerItemSet) do
+		if type(playerSlot) == "table" and not MercenaryTools.baseItemSlotName(playerSlotName) and playerSlot.selItemId == item.id then
+			return false, "the same physical item is equipped by the player"
 		end
 	end
 	return true
@@ -660,18 +654,18 @@ end
 
 function MercenaryTools.equipmentErrors(context)
 	local errors = { }
-	local mercBuild = context.mercenaryData and context.mercenaryData.builds[context.profile and context.profile.buildId]
+	local mercBuild = context.mercenaryData.builds[context.profile.buildId]
 	if mercBuild and mercBuild.weaponConfiguration.offHandRequired then
-		local offHandSlot = context.itemSet and context.itemSet[MercenaryTools.itemSlotName("Weapon 2")]
+		local offHandSlot = context.itemSet[MercenaryTools.itemSlotName("Weapon 2")]
 		if not context.items[offHandSlot and offHandSlot.selItemId] then
 			table.insert(errors, "Weapon 2: selected build requires a "..table.concat(mercBuild.weaponConfiguration.offHandTypes, " or "))
 		end
 	end
-	for _, slot in ipairs(context.mercenarySlots or { }) do
-		local setSlot = context.itemSet and context.itemSet[slot.slotName]
-		local item = context.items and context.items[setSlot and setSlot.selItemId]
+	for _, slot in ipairs(context.mercenarySlots) do
+		local setSlot = context.itemSet[slot.slotName]
+		local item = context.items[setSlot and setSlot.selItemId]
 		if item then
-			if context.isItemValidForSlot and not context.isItemValidForSlot(item, slot.slotName, context.itemSet) then
+			if not context.isItemValidForSlot(item, slot.slotName, context.itemSet) then
 				table.insert(errors, slot.mercenarySlotName..": invalid base slot or weapon configuration")
 			else
 				local valid, reason = MercenaryTools.validateEquippedItem(item, slot.mercenarySlotName, context)

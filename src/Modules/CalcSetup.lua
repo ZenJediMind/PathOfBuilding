@@ -204,14 +204,42 @@ function calcs.initMercenary(env)
 	if not tab or not tab.profile.buildId then return end
 
 	local profile = tab.profile
+	local profileErrors = MercenaryTools.validateProfile(profile, env.data.mercenaries)
+	if #profileErrors > 0 then
+		env.mercenaryCalculationErrors = profileErrors
+		return
+	end
 	local mercenaryBuild = env.data.mercenaries.builds[profile.buildId]
-	if not mercenaryBuild then return end
 	local mercenaryClass = mercenaryBuild and env.data.mercenaries.classes[mercenaryBuild.classId]
 	local monster = mercenaryClass and mercenaryClass.monster
 	local calculationErrors = { }
 	if not monster then
 		env.mercenaryCalculationErrors = { "Selected Mercenary has no allied MonsterVariety data" }
 		return
+	end
+	local itemsTab = env.build.itemsTab
+	local itemSet = tab:GetItemSet(false)
+	local selectedItemSet = env.override.itemSetId and itemsTab.itemSets[env.override.itemSetId]
+	if selectedItemSet and itemsTab:IsMercenaryItemSet(selectedItemSet) then
+		itemSet = selectedItemSet
+	end
+	if itemSet then
+		local equipmentErrors = MercenaryTools.equipmentErrors({
+			profile = profile,
+			mercenaryData = env.data.mercenaries,
+			itemSet = itemSet,
+			playerItemSet = itemsTab.activeItemSet,
+			items = itemsTab.items,
+			playerHasFlag = function(flagName) return env.modDB:Flag(nil, flagName) end,
+			mercenarySlots = itemsTab.mercenarySlots,
+			isItemValidForSlot = function(item, slotName, set)
+				return itemsTab:IsItemValidForSlot(item, slotName, set)
+			end,
+		})
+		if #equipmentErrors > 0 then
+			env.mercenaryCalculationErrors = equipmentErrors
+			return
+		end
 	end
 	local mercenary = {
 		type = "Mercenary",
@@ -262,11 +290,6 @@ function calcs.initMercenary(env)
 		mercenary.modDB:AddMod(value.mod)
 	end
 
-	local itemSet = tab:GetItemSet(false)
-	local selectedItemSet = env.override.itemSetId and env.build.itemsTab.itemSets[env.override.itemSetId]
-	if selectedItemSet and env.build.itemsTab:IsMercenaryItemSet(selectedItemSet) then
-		itemSet = selectedItemSet
-	end
 	for _, slotName in ipairs(MercenaryTools.equipmentSlots) do
 		local itemSlotName = MercenaryTools.itemSlotName(slotName)
 		local slot = env.build.itemsTab.slots[itemSlotName]
@@ -399,9 +422,8 @@ function calcs.initMercenary(env)
 			t_insert(calculationErrors, "Missing Mercenary auxiliary skill: "..auxiliarySkillId)
 		end
 	end
-	mercenary.mainSkill = mercenary.mainSkill or mercenary.activeSkillList[1]
 	if not mercenary.mainSkill then
-		t_insert(calculationErrors, "No usable enabled Mercenary skill is configured")
+		t_insert(calculationErrors, "Configured Mercenary main skill could not be constructed: "..tostring(profile.mainSkillId))
 	end
 	if #calculationErrors > 0 then
 		env.mercenaryCalculationErrors = calculationErrors
@@ -878,6 +900,9 @@ function calcs.initEnv(build, mode, override, specEnv)
 
 	-- environment variables
 	local override = override or { }
+	if override.itemSetId ~= nil and not build.itemsTab.itemSets[override.itemSetId] then
+		error("Unknown item set id: "..tostring(override.itemSetId))
+	end
 	local overrideItemSet = override.itemSetId and build.itemsTab.itemSets[override.itemSetId]
 	local replacesPlayerItem = override.itemSetId == nil
 	if override.itemSetId then

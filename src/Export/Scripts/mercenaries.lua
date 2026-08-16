@@ -190,6 +190,11 @@ local function stubMod() return { } end
 local mercenaryStatData = LoadModule("../Data/MercenaryStatMap.lua")(stubMod, stubMod, stubMod)
 local optionalShieldBuilds = mercenaryStatData.optionalShieldBuilds
 local supportCounts = mercenaryStatData.supportCounts
+for _, row in ipairs(sortedRows("MercenarySupportCounts", function(value) return value.Id end)) do
+	if not supportCounts[row.Id] then
+		error("Missing support-count policy for: "..tostring(row.Id))
+	end
+end
 
 -- Every stat a permanent Mercenary gains from its object template is either
 -- exported or listed here with the reason it is not, so that a stat GGG adds later

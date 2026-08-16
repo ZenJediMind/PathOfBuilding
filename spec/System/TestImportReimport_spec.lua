@@ -264,7 +264,7 @@ Blight 20/0  1
 		itemsTab:SetViewItemSet(mercenaryItemSet.id)
 		local equippedMercenaryHelmet = new("Item"):Item("Rarity: Normal\nIron Hat")
 		itemsTab:AddItem(equippedMercenaryHelmet, true)
-		itemsTab.slots[mercenaryHelmetSlotName]:SetSelItemId(equippedMercenaryHelmet.id)
+		itemsTab.slots[mercenaryHelmetSlotName]:SetSelItemId(equippedMercenaryHelmet.id, itemsTab:GetVisibleItemSet())
 
 		local sharedMercenaryHelmet = new("Item"):Item("Rarity: Normal\nCone Helmet")
 		itemsTab:AddItem(sharedMercenaryHelmet, true)

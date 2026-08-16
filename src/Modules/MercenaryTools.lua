@@ -15,12 +15,19 @@ function MercenaryTools.comparisonActor(slotName)
 end
 
 function MercenaryTools.comparisonBaseOutput(playerOutput, actorOutputs, slotName)
-	local actor = MercenaryTools.comparisonActor(slotName)
-	return actorOutputs and actorOutputs[actor] or playerOutput
+	if MercenaryTools.comparisonActor(slotName) == "PLAYER" then
+		return playerOutput
+	end
+	return actorOutputs and actorOutputs.MERCENARY
+end
+
+function MercenaryTools.mercenaryOutputAvailable(output)
+	return output ~= nil and not output.ActorUnavailableMessage
 end
 
 local MAX_WARRANT_BYTES = 256 * 1024
 local MAX_SKILLS = 6
+MercenaryTools.MAX_SKILLS = MAX_SKILLS
 
 function MercenaryTools.contains(values, wanted)
 	for _, value in ipairs(values or { }) do
@@ -58,12 +65,120 @@ end
 
 -- How many supports a skill accepts, and the largest limit any skill accepts. Both
 -- come from the hand-authored `supportCounts` policy attached to the Mercenary data.
+-- A missing policy record is nil, not 0: 0 is a valid gameplay capacity.
 function MercenaryTools.supportLimit(mercenaryData, skill)
-	local count = skill and mercenaryData.supportCounts[skill.supportCountId]
+	if not skill then
+		return nil
+	end
+	local count = mercenaryData.supportCounts[skill.supportCountId]
 	if not count then
-		return 0
+		return nil
 	end
 	return count.maximum
+end
+
+function MercenaryTools.missingSupportPolicyError(skill)
+	if not skill then
+		return nil
+	end
+	return "Missing support-count policy for "..tostring(skill.supportCountId).." on skill "..tostring(skill.id)
+end
+
+function MercenaryTools.skillCandidateError(profile, mercenaryData, index, skillId)
+	if not skillId then
+		return nil
+	end
+	local build = profile and mercenaryData and mercenaryData.builds[profile.buildId]
+	if not build then
+		return "Select a Mercenary class and build"
+	end
+	local skill = mercenaryData.skills[skillId]
+	if not skill or not contains(build.skillIds, skillId) then
+		return "Invalid skill for selected build: "..tostring(skillId)
+	end
+	local skills = profile.skills or { }
+	local replacing = skills[index] ~= nil
+	if not replacing and #skills >= MAX_SKILLS then
+		return "A Mercenary cannot have more than 6 inherent skills"
+	end
+	for skillIndex, selected in ipairs(skills) do
+		if skillIndex ~= index and selected.id == skillId then
+			return "Duplicate skill: "..skillId
+		end
+	end
+	local poolCounts = { }
+	for skillIndex, selected in ipairs(skills) do
+		local id = skillIndex == index and skillId or selected.id
+		for poolIndex, pool in ipairs(build.skillPools or { }) do
+			if contains(pool.skillIds, id) then
+				poolCounts[poolIndex] = (poolCounts[poolIndex] or 0) + 1
+				break
+			end
+		end
+	end
+	if not replacing then
+		for poolIndex, pool in ipairs(build.skillPools or { }) do
+			if contains(pool.skillIds, skillId) then
+				poolCounts[poolIndex] = (poolCounts[poolIndex] or 0) + 1
+				break
+			end
+		end
+	end
+	for poolIndex, pool in ipairs(build.skillPools or { }) do
+		if pool.countMax and (poolCounts[poolIndex] or 0) > pool.countMax then
+			return "Skill pool "..poolIndex.." allows at most "..pool.countMax.." skills"
+		end
+	end
+end
+
+function MercenaryTools.firstLegalSkillId(profile, mercenaryData)
+	local build = profile and mercenaryData and mercenaryData.builds[profile.buildId]
+	if not build then
+		return nil
+	end
+	local index = #(profile.skills or { }) + 1
+	for _, skillId in ipairs(build.skillIds) do
+		if not MercenaryTools.skillCandidateError(profile, mercenaryData, index, skillId) then
+			return skillId
+		end
+	end
+end
+
+function MercenaryTools.supportCandidateError(profile, mercenaryData, skillIndex, supportIndex, supportId)
+	if not supportId then
+		return nil
+	end
+	local selected = profile and profile.skills and profile.skills[skillIndex]
+	if not selected then
+		return "No selected Mercenary skill"
+	end
+	local skill = mercenaryData.skills[selected.id]
+	local maxSupports = MercenaryTools.supportLimit(mercenaryData, skill)
+	if maxSupports == nil then
+		return MercenaryTools.missingSupportPolicyError(skill) or "Missing support-count policy"
+	end
+	if supportIndex > maxSupports then
+		return "Skill "..tostring(selected.id).." allows at most "..maxSupports.." supports"
+	end
+	local supports = selected.supports or { }
+	if not supports[supportIndex] and #supports >= maxSupports then
+		return "Skill "..tostring(selected.id).." has more than "..maxSupports.." supports"
+	end
+	local support = mercenaryData.supports[supportId]
+	if not support or not skill or not contains(skill.possibleSupportIds, supportId) then
+		return "Invalid support for skill "..tostring(selected.id)..": "..tostring(supportId)
+	end
+	for index, selectedSupport in ipairs(supports) do
+		if index ~= supportIndex then
+			if selectedSupport.id == supportId then
+				return "Duplicate support "..supportId.." on skill "..tostring(selected.id)
+			end
+			local existing = mercenaryData.supports[selectedSupport.id]
+			if support.familyId and existing and existing.familyId == support.familyId then
+				return "Duplicate support family "..support.familyId.." on skill "..tostring(selected.id)
+			end
+		end
+	end
 end
 
 function MercenaryTools.maxSupportLimit(mercenaryData)
@@ -385,9 +500,13 @@ function MercenaryTools.validateProfile(profile, mercenaryData)
 				break
 			end
 		end
-		local maxSupports = skill and supportLimit(mercenaryData, skill)
-		if maxSupports and #(selected.supports or { }) > maxSupports then
-			table.insert(errors, "Skill "..tostring(selected.id).." has more than "..maxSupports.." supports")
+		if skill then
+			local maxSupports = supportLimit(mercenaryData, skill)
+			if maxSupports == nil then
+				table.insert(errors, MercenaryTools.missingSupportPolicyError(skill))
+			elseif #(selected.supports or { }) > maxSupports then
+				table.insert(errors, "Skill "..tostring(selected.id).." has more than "..maxSupports.." supports")
+			end
 		end
 		local seenSupports, seenFamilies = { }, { }
 		for _, selectedSupport in ipairs(selected.supports or { }) do
@@ -425,6 +544,142 @@ function MercenaryTools.validateProfile(profile, mercenaryData)
 		table.insert(errors, "Selected Calcs skill is not configured")
 	elseif not enabledSkillsById[profile.mainSkillId] then
 		table.insert(errors, "Selected Calcs skill is disabled")
+	end
+	return errors
+end
+
+local ARMOUR_SLOTS = {
+	Helmet = true,
+	["Body Armour"] = true,
+	Gloves = true,
+	Boots = true,
+}
+-- Unique equipment is only permitted where something has granted the matching
+-- "Your Mercenary can equip Unique ..." flag. Body Armour has no such flag.
+-- Re-evaluate when GGG adds a Unique Body Armour permission modifier.
+local UNIQUE_FLAG_BY_SLOT = {
+	["Weapon 1"] = "MercenaryCanEquipUniqueArms",
+	["Weapon 2"] = "MercenaryCanEquipUniqueArms",
+	Helmet = "MercenaryCanEquipUniqueHelmets",
+	Gloves = "MercenaryCanEquipUniqueGloves",
+	Boots = "MercenaryCanEquipUniqueBoots",
+	Amulet = "MercenaryCanEquipUniqueAmulets",
+	["Ring 1"] = "MercenaryCanEquipUniqueRings",
+	["Ring 2"] = "MercenaryCanEquipUniqueRings",
+	Belt = "MercenaryCanEquipUniqueBelts",
+}
+local UNIQUE_SLOT_DESCRIPTION = {
+	MercenaryCanEquipUniqueArms = "Unique Weapons, Shields and Quivers",
+	MercenaryCanEquipUniqueHelmets = "Unique Helmets",
+	MercenaryCanEquipUniqueGloves = "Unique Gloves",
+	MercenaryCanEquipUniqueBoots = "Unique Boots",
+	MercenaryCanEquipUniqueAmulets = "Unique Amulets",
+	MercenaryCanEquipUniqueRings = "Unique Rings",
+	MercenaryCanEquipUniqueBelts = "Unique Belts",
+}
+
+function MercenaryTools.isSlotSupported(slotName)
+	local parentSlot = slotName:match("^(.-) Abyssal Socket %d+$")
+	return contains(MercenaryTools.equipmentSlots, parentSlot or slotName)
+end
+
+function MercenaryTools.validateEquippedItem(item, slotName, context)
+	context = context or { }
+	if not MercenaryTools.isSlotSupported(slotName) then
+		return false, "slot is not supported by Mercenaries"
+	end
+	local parentSlot, abyssalSocketIndex = slotName:match("^(.-) Abyssal Socket (%d+)$")
+	if parentSlot then
+		local parentSetSlot = context.itemSet and context.itemSet[MercenaryTools.itemSlotName(parentSlot)]
+		local parentItem = context.items and context.items[parentSetSlot and parentSetSlot.selItemId]
+		if not parentItem or (parentItem.abyssalSocketCount or 0) < tonumber(abyssalSocketIndex) then
+			return false, "parent item does not have this Abyssal Socket"
+		end
+	end
+	local mercenaryData = context.mercenaryData
+	local profile = context.profile
+	local mercBuild = mercenaryData and mercenaryData.builds[profile and profile.buildId]
+	local class = mercBuild and mercenaryData.classes[mercBuild.classId]
+	if not mercBuild or not class then
+		return false, "select a Mercenary build first"
+	end
+	if ARMOUR_SLOTS[slotName] then
+		local itemRequirements = item.requirements or { }
+		local attributes = class.attributeId or ""
+		local attributeCount, requiredAttributeCount, hasAssociatedRequirement = 0, 0, false
+		for _, attribute in ipairs({ "Str", "Dex", "Int" }) do
+			if attributes:find(attribute, 1, true) then attributeCount = attributeCount + 1 end
+		end
+		for _, requirement in ipairs({ { "Str", "str" }, { "Dex", "dex" }, { "Int", "int" } }) do
+			local required = (itemRequirements[requirement[2]] or 0) > 0
+			local associated = attributes:find(requirement[1], 1, true) ~= nil
+			if required then
+				requiredAttributeCount = requiredAttributeCount + 1
+				hasAssociatedRequirement = hasAssociatedRequirement or associated
+			end
+			if attributeCount > 1 and required and not associated then
+				return false, "armour attribute alignment does not match "..class.attributeName
+			end
+		end
+		if attributeCount == 1 and (not hasAssociatedRequirement or requiredAttributeCount > 2) then
+			return false, "armour attribute alignment does not match "..class.attributeName
+		end
+	end
+	local requiredFoundLevel = MercenaryTools.requiredFoundAreaLevel(item.requirements and item.requirements.level)
+	if (profile.foundAreaLevel or 0) < requiredFoundLevel then
+		return false, "requires found-area level "..requiredFoundLevel
+	end
+	if (item.rarity == "UNIQUE" or item.rarity == "RELIC") and not (item.type == "Jewel" and item.base and item.base.subType == "Abyss") then
+		local requiredFlag = UNIQUE_FLAG_BY_SLOT[slotName]
+		local playerHasFlag = context.playerHasFlag or function() return false end
+		if not requiredFlag then
+			return false, "Unique items are never permitted in this slot"
+		elseif not playerHasFlag(requiredFlag) then
+			return false, "requires a modifier allowing your Mercenary to equip "..UNIQUE_SLOT_DESCRIPTION[requiredFlag]
+		end
+	end
+	if slotName == "Weapon 1" or slotName == "Weapon 2" then
+		local allowedTypes = slotName == "Weapon 1" and mercBuild.weaponConfiguration.mainHandTypes or mercBuild.weaponConfiguration.offHandTypes
+		if not contains(allowedTypes, item.type) then
+			return false, item.type.." is not valid in this weapon slot for the selected build"
+		end
+	end
+	if #(item.grantedSkills or { }) > 0 then
+		return false, "item-granted skills and triggers cannot be used"
+	end
+	local playerItemSet = context.playerItemSet
+	if playerItemSet then
+		for playerSlotName, playerSlot in pairs(playerItemSet) do
+			if type(playerSlot) == "table" and not MercenaryTools.baseItemSlotName(playerSlotName) and playerSlot.selItemId == item.id then
+				return false, "the same physical item is equipped by the player"
+			end
+		end
+	end
+	return true
+end
+
+function MercenaryTools.equipmentErrors(context)
+	local errors = { }
+	local mercBuild = context.mercenaryData and context.mercenaryData.builds[context.profile and context.profile.buildId]
+	if mercBuild and mercBuild.weaponConfiguration.offHandRequired then
+		local offHandSlot = context.itemSet and context.itemSet[MercenaryTools.itemSlotName("Weapon 2")]
+		if not context.items[offHandSlot and offHandSlot.selItemId] then
+			table.insert(errors, "Weapon 2: selected build requires a "..table.concat(mercBuild.weaponConfiguration.offHandTypes, " or "))
+		end
+	end
+	for _, slot in ipairs(context.mercenarySlots or { }) do
+		local setSlot = context.itemSet and context.itemSet[slot.slotName]
+		local item = context.items and context.items[setSlot and setSlot.selItemId]
+		if item then
+			if context.isItemValidForSlot and not context.isItemValidForSlot(item, slot.slotName, context.itemSet) then
+				table.insert(errors, slot.mercenarySlotName..": invalid base slot or weapon configuration")
+			else
+				local valid, reason = MercenaryTools.validateEquippedItem(item, slot.mercenarySlotName, context)
+				if not valid then
+					table.insert(errors, slot.mercenarySlotName..": "..reason)
+				end
+			end
+		end
 	end
 	return errors
 end

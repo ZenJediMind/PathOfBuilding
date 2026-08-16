@@ -72,7 +72,7 @@ function CalcsTabClass:CalcsTab(build)
 				self.build.buildFlag = true
 			end)
 		}, },
-		{ label = "Skill Part", flag = "multiPart", { controlName = "mainSkillPart",
+		{ label = "Skill Part", playerFlag = "multiPart", { controlName = "mainSkillPart",
 			control = new("DropDownControl"):DropDownControl(nil, {0, 0, 250, 16}, nil, function(index, value)
 				if self:IsMercenaryActor() then
 					local skill = self:GetMercenaryCalcsSkill()
@@ -88,7 +88,7 @@ function CalcsTabClass:CalcsTab(build)
 				self:AddUndoState()
 				self.build.buildFlag = true
 			end)
-		}, },{ label = "Skill Stages", flag = "multiStage", { controlName = "mainSkillStageCount",
+		}, },{ label = "Skill Stages", playerFlag = "multiStage", { controlName = "mainSkillStageCount",
 			control = new("EditControl"):EditControl(nil, {0, 0, 52, 16}, nil, nil, "%D", nil, function(buf)
 				if self:IsMercenaryActor() then
 					local skill = self:GetMercenaryCalcsSkill()
@@ -105,7 +105,7 @@ function CalcsTabClass:CalcsTab(build)
 				self.build.buildFlag = true
 			end)
 		}, },
-		{ label = "Active Mines", flag = "mine", { controlName = "mainSkillMineCount",
+		{ label = "Active Mines", playerFlag = "mine", { controlName = "mainSkillMineCount",
 			control = new("EditControl"):EditControl(nil, {0, 0, 52, 16}, nil, nil, "%D", nil, function(buf)
 				if self:IsMercenaryActor() then
 					local skill = self:GetMercenaryCalcsSkill()
@@ -243,28 +243,10 @@ function CalcsTabClass:RefreshMercenarySkillSelectControls(controls, suffix)
 	local selectedSkill = self:GetMercenaryCalcsSkill()
 	local mercenary = self.calcsEnv and self.calcsEnv.mercenary
 	local mercenaryMinion = self.calcsEnv and self.calcsEnv.mercenaryMinion
-	if self.input.actor == "MERCENARY_MINION" then
-		local activeSkill = mercenary and mercenary.mainSkill
-		mercenaryMinion = mercenaryMinion or activeSkill and activeSkill.minion
-		if not mercenaryMinion then return end
-		local selectedIndex = selectedSkill and (selectedSkill[minionSkillField] or (suffix == "Calcs" and selectedSkill.skillMinionSkill)) or 1
-		local minionSkillList = { }
-		for index, minionSkill in ipairs(mercenaryMinion.activeSkillList or { }) do
-			minionSkillList[#minionSkillList + 1] = { index = index, label = minionSkill.activeEffect.grantedEffect.name }
-		end
-		if #minionSkillList > 0 then
-			controls.mainSkillMinionSkill:SetList(minionSkillList)
-			controls.mainSkillMinionSkill:SelByValue(selectedIndex, "index")
-			controls.mainSkillMinionSkill.enabled = #minionSkillList > 1
-			controls.mainSkillMinionSkill.shown = true
-		end
-		return
-	end
-	if self.input.actor ~= "MERCENARY" then return end
 	local grantedEffect = selectedSkill and self.build.data.skills[selectedSkill.id]
-	local activeSkill = self.calcsEnv and self.calcsEnv.mercenary and self.calcsEnv.mercenary.mainSkill
+	local activeSkill = mercenary and mercenary.mainSkill
 	mercenaryMinion = mercenaryMinion or activeSkill and activeSkill.minion
-	if mercenaryMinion and #mercenaryMinion.activeSkillList > 0 then
+	if mercenaryMinion and #(mercenaryMinion.activeSkillList or { }) > 0 then
 		local minionSkillList = { }
 		local selectedIndex = selectedSkill and (selectedSkill[minionSkillField] or (suffix == "Calcs" and selectedSkill.skillMinionSkill)) or 1
 		for index, minionSkill in ipairs(mercenaryMinion.activeSkillList) do
@@ -547,7 +529,7 @@ function CalcsTabClass:CheckFlag(obj, actor, player)
 		end
 	end
 	if obj.playerFlag then
-		local sourceActor = player or self.calcsEnv.player
+		local sourceActor = self:IsMercenaryActor() and self.calcsEnv.mercenary or (player or self.calcsEnv.player)
 		if not sourceActor or not sourceActor.mainSkill or not sourceActor.mainSkill.skillFlags[obj.playerFlag] then
 			return
 		end
@@ -563,12 +545,13 @@ function CalcsTabClass:CheckFlag(obj, actor, player)
 		end
 	end
 	if obj.haveOutput then
+		local output = actor and actor.output or self.calcsOutput
 		local ns, var = obj.haveOutput:match("^(%a+)%.(%a+)$")
 		if ns then
-			if not actor or not actor.output[ns] or not actor.output[ns][var] or actor.output[ns][var] == 0 then
+			if not output or not output[ns] or not output[ns][var] or output[ns][var] == 0 then
 				return
 			end
-		elseif not actor or not actor.output[obj.haveOutput] or actor.output[obj.haveOutput] == 0 then
+		elseif not output or not output[obj.haveOutput] or output[obj.haveOutput] == 0 then
 			return
 		end
 	end

@@ -2996,9 +2996,19 @@ function calcs.offence(env, actor, activeSkill)
 			output.RuthlessBlowAilmentEffect = 1 - output.RuthlessBlowChance / 100 + output.RuthlessBlowChance / 100 * output.RuthlessBlowAilmentMultiplier
 
 			globalOutput.FistOfWarCooldown = skillModList:Sum("BASE", cfg, "FistOfWarCooldown") or 0
-			-- Fist of War eligibility is enforced by the active skill's support data;
-			-- retain the universal Vaal and skill-reuse exclusions here.
-			if globalOutput.FistOfWarCooldown ~= 0 and not activeSkill.skillTypes[SkillType.Vaal] and not activeSkill.skillTypes[SkillType.OtherThingUsesSkill] then
+			-- Player Fist of War requires SkillType.Slam (SupportFistofWar.requireSkillTypes).
+			-- Mercenary Ashen Fissure is not tagged Slam in the 3.29 extract, but
+			-- FissureSlamMercenary.possibleSupportIds includes FistOfWarHigh.
+			local fistOfWarEligible = activeSkill.skillTypes[SkillType.Slam]
+			if not fistOfWarEligible then
+				for _, effect in ipairs(activeSkill.effectList) do
+					if effect.grantedEffect and effect.grantedEffect.mercenarySupportId == "FistOfWarHigh" then
+						fistOfWarEligible = true
+						break
+					end
+				end
+			end
+			if globalOutput.FistOfWarCooldown ~= 0 and fistOfWarEligible and not activeSkill.skillTypes[SkillType.Vaal] and not activeSkill.skillTypes[SkillType.OtherThingUsesSkill] then
 				globalOutput.FistOfWarDamageMultiplier = skillModList:Sum("BASE", nil, "FistOfWarDamageMultiplier") / 100
 				globalOutput.FistOfWarUptimeRatio = m_min( (1 / globalOutput.Speed) / globalOutput.FistOfWarCooldown, 1) * 100
 				if globalBreakdown then

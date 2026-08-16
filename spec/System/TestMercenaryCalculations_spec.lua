@@ -178,7 +178,112 @@ describe("Permanent Mercenary calculations", function()
 		build.mercenaryTab.profile.skills[1].enabled = false
 		local env = calculate()
 		assert.is_nil(env.mercenary)
-		assert.matches("No usable enabled Mercenary skill", table.concat(env.mercenaryCalculationErrors, "\n"))
+		assert.matches("Enable at least one Mercenary skill", table.concat(env.mercenaryCalculationErrors, "\n"))
+	end)
+
+	it("fails closed on an unknown Mercenary build", function()
+		configure("TrapsMinesShadow", "TrapsMinesShadowLightning", "LightningTrapMercenary")
+		build.mercenaryTab.profile.buildId = "NotARealBuild"
+		local env = calculate()
+		assert.is_nil(env.mercenary)
+		assert.matches("Select a Mercenary class and build", table.concat(env.mercenaryCalculationErrors or { }, "\n"))
+	end)
+
+	it("fails closed when more than six skills are configured", function()
+		configure("MeleeAOEMarauder", "MeleeAOEMarauderFireSlam", "InfernalBlowMercenary")
+		local profile = build.mercenaryTab.profile
+		profile.skills = { }
+		for _, skillId in ipairs(build.data.mercenaries.builds.MeleeAOEMarauderFireSlam.skillIds) do
+			table.insert(profile.skills, { id = skillId, enabled = true, supports = { } })
+			if #profile.skills == 7 then break end
+		end
+		profile.mainSkillId = profile.skills[1].id
+		local env = calculate()
+		assert.is_nil(env.mercenary)
+		assert.matches("cannot have more than 6", table.concat(env.mercenaryCalculationErrors or { }, "\n"))
+	end)
+
+	it("fails closed on duplicate skills and does not substitute another main skill", function()
+		configure("TrapsMinesShadow", "TrapsMinesShadowLightning", "LightningTrapMercenary")
+		local profile = build.mercenaryTab.profile
+		table.insert(profile.skills, { id = "LightningTrapMercenary", enabled = true, supports = { } })
+		local env = calculate()
+		assert.is_nil(env.mercenary)
+		assert.matches("Duplicate skill", table.concat(env.mercenaryCalculationErrors or { }, "\n"))
+
+		profile.skills = {
+			{ id = "LightningTrapMercenary", enabled = false, supports = { } },
+			{ id = "ZealotryMercenary", enabled = true, supports = { } },
+		}
+		profile.mainSkillId = "LightningTrapMercenary"
+		env = calculate()
+		assert.is_nil(env.mercenary)
+		assert.is_true(not env.mercenary)
+		assert.matches("disabled", table.concat(env.mercenaryCalculationErrors or { }, "\n"))
+	end)
+
+	it("fails closed on pool overage, invalid supports, and an unconfigured main skill", function()
+		configure("MeleeAOEMarauder", "MeleeAOEMarauderFireSlam", "FissureSlamMercenary")
+		local profile = build.mercenaryTab.profile
+		table.insert(profile.skills, { id = "TectonicSlamFireMercenary", enabled = true, supports = { } })
+		local env = calculate()
+		assert.is_nil(env.mercenary)
+		assert.matches("Skill pool", table.concat(env.mercenaryCalculationErrors or { }, "\n"))
+
+		configure("TrapsMinesShadow", "TrapsMinesShadowLightning", "LightningTrapMercenary", {
+			supports = {
+				{ id = "AddedLightningHigh", tier = 3 },
+				{ id = "AddedLightningMid", tier = 2 },
+			},
+		})
+		env = calculate()
+		assert.is_nil(env.mercenary)
+		assert.matches("Duplicate support family", table.concat(env.mercenaryCalculationErrors or { }, "\n"))
+
+		configure("TrapsMinesShadow", "TrapsMinesShadowLightning", "LightningTrapMercenary")
+		build.mercenaryTab.profile.mainSkillId = "ZealotryMercenary"
+		env = calculate()
+		assert.is_nil(env.mercenary)
+		assert.matches("Selected Calcs skill is not configured", table.concat(env.mercenaryCalculationErrors or { }, "\n"))
+	end)
+
+	it("does not calculate a Mercenary with illegal equipment", function()
+		configure("MeleeAOEMarauder", "MeleeAOEMarauderFireSlam", "InfernalCryMercenary")
+		local uniqueBody = {
+			id = 9040, name = "Illegal Unique Body", type = "Body Armour", base = { type = "Body Armour" },
+			rarity = "UNIQUE", requirements = { str = 1 }, grantedSkills = { }, modList = { },
+		}
+		build.itemsTab.items[uniqueBody.id] = uniqueBody
+		equipmentSlot("Body Armour").selItemId = uniqueBody.id
+		local env = calculate()
+		assert.is_nil(env.mercenary)
+		assert.matches("Body Armour", table.concat(env.mercenaryCalculationErrors or { }, "\n"))
+
+		configure("MeleeAOEMarauder", "MeleeAOEMarauderFireSlam", "InfernalCryMercenary")
+		local dexHelmet = {
+			id = 9043, name = "Dex Helmet", type = "Helmet", base = { type = "Helmet" },
+			rarity = "RARE", requirements = { dex = 1 }, grantedSkills = { }, modList = { },
+		}
+		build.itemsTab.items[dexHelmet.id] = dexHelmet
+		equipmentSlot("Helmet").selItemId = dexHelmet.id
+		env = calculate()
+		assert.is_nil(env.mercenary)
+		assert.matches("Helmet", table.concat(env.mercenaryCalculationErrors or { }, "\n"))
+
+		configure("EleBowRanger", "EleBowRangerFire", "BurningArrowMercenary")
+		local bow = new("Item"):Item("Rarity: Normal\nCrude Bow")
+		bow.id = 9044
+		build.itemsTab.items[bow.id] = bow
+		equipmentSlot("Weapon 1").selItemId = bow.id
+		env = calculate()
+		assert.is_nil(env.mercenary)
+		assert.matches("Weapon 2", table.concat(env.mercenaryCalculationErrors or { }, "\n"))
+	end)
+
+	it("leaves an unconfigured Mercenary as a clean no-actor state", function()
+		local env = calculate()
+		assert.is_nil(env.mercenary)
+		assert.is_nil(env.mercenaryCalculationErrors)
 	end)
 
 	it("shows and applies Configuration settings required by the Mercenary", function()
@@ -189,7 +294,7 @@ describe("Permanent Mercenary calculations", function()
 		}
 		local helmet = {
 			id = 9036, name = "Mercenary Config Test", type = "Helmet", base = { type = "Helmet" }, rarity = "RARE",
-			requirements = { dex = 1 }, grantedSkills = { }, modList = { focusedDamage },
+			requirements = { str = 1 }, grantedSkills = { }, modList = { focusedDamage },
 		}
 		build.itemsTab.items[helmet.id] = helmet
 		equipmentSlot("Helmet").selItemId = helmet.id
@@ -221,9 +326,10 @@ describe("Permanent Mercenary calculations", function()
 	it("applies the configured Onslaught buff to Mercenary attack DPS", function()
 		configure("EleBowRanger", "EleBowRangerFire", "BurningArrowMercenary")
 		local bow = new("Item"):Item("Rarity: Normal\nCrude Bow")
-		bow.id = 9038
-		build.itemsTab.items[bow.id] = bow
-		equipmentSlot("Weapon 1").selItemId = bow.id
+		local quiver = new("Item"):Item("Rarity: Normal\nSerrated Arrow Quiver")
+		bow.id, quiver.id = 9038, 9039
+		build.itemsTab.items[bow.id], build.itemsTab.items[quiver.id] = bow, quiver
+		equipmentSlot("Weapon 1").selItemId, equipmentSlot("Weapon 2").selItemId = bow.id, quiver.id
 
 		local baseline = assert(calculate().mercenary.output)
 		build.configTab.input.buffOnslaught = true
@@ -252,12 +358,11 @@ describe("Permanent Mercenary calculations", function()
 		assert.is_true(env.mercenary.averageDamage > 0)
 	end)
 
-	it("clamps found-area levels above 100 to the monster damage tables", function()
+	it("fails closed on found-area levels above 100", function()
 		configure("TrapsMinesShadow", "TrapsMinesShadowLightning", "LightningTrapMercenary", { foundAreaLevel = 101 })
-		local env = assert(calculate(85).mercenary)
-		assert.are.equal(100, env.level)
-		assert.is_number(env.averageDamage)
-		assert.is_true(env.averageDamage > 0)
+		local env = calculate(85)
+		assert.is_nil(env.mercenary)
+		assert.matches("Found%-area level must be an integer between 1 and 100", table.concat(env.mercenaryCalculationErrors or { }, "\n"))
 	end)
 
 	it("uses base gem behavior and both Mercenary and inherent skill levels for base spell damage", function()
@@ -331,6 +436,11 @@ describe("Permanent Mercenary calculations", function()
 			count = 4,
 			skillMinionSkill = 2,
 		})
+		local mace = new("Item"):Item("Rarity: Normal\nDriftwood Club")
+		local shield = new("Item"):Item("Rarity: Normal\nTwig Spirit Shield")
+		mace.id, shield.id = 9050, 9051
+		build.itemsTab.items[mace.id], build.itemsTab.items[shield.id] = mace, shield
+		equipmentSlot("Weapon 1").selItemId, equipmentSlot("Weapon 2").selItemId = mace.id, shield.id
 		local env = calculate(83)
 		local summon = env.mercenary.mainSkill
 		local fireball = env.mercenaryMinion.mainSkill
@@ -343,6 +453,8 @@ describe("Permanent Mercenary calculations", function()
 		assert.is_true(env.mercenaryMinion.output.TotalDPS > 0)
 		assert.are.near(env.mercenaryMinion.output.TotalDPS * 4 + env.mercenary.output.FullDotDPS, env.mercenary.output.FullDPS, 10 ^ -6)
 
+		equipmentSlot("Weapon 1").selItemId = 0
+		equipmentSlot("Weapon 2").selItemId = 0
 		configure("ChaosMinionWitch", "ChaosMinionWitchChaosHit", "SSMMercenarySoulrendOrb", {
 			foundAreaLevel = 83,
 			skillMinionSkill = 2,
@@ -354,7 +466,12 @@ describe("Permanent Mercenary calculations", function()
 	end)
 
 	it("fails closed when an extracted Mercenary minion has no skill data", function()
-		configure("ChaosMinionWitch", "ChaosMinionWitchChaosHit", "SSMMercenaryRelic")
+		configure("ChaosMinionWitch", "ChaosMinionWitchInstability", "SSMMercenaryRelic")
+		local dagger = new("Item"):Item("Rarity: Normal\nGlass Shank")
+		local shield = new("Item"):Item("Rarity: Normal\nTwig Spirit Shield")
+		dagger.id, shield.id = 9052, 9053
+		build.itemsTab.items[dagger.id], build.itemsTab.items[shield.id] = dagger, shield
+		equipmentSlot("Weapon 1").selItemId, equipmentSlot("Weapon 2").selItemId = dagger.id, shield.id
 		local env = calculate(83)
 		assert.is_nil(env.mercenary)
 		assert.matches("Unholy Relic has no exported skills", table.concat(env.mercenaryCalculationErrors or { }, "\n"))
@@ -407,6 +524,15 @@ describe("Permanent Mercenary calculations", function()
 		assert.are.equal(env.mercenary.output.Life, compare({ comparisonActor = "MERCENARY" }).Life)
 	end)
 
+	it("rejects a missing explicit override item set id", function()
+		configure("TrapsMinesShadow", "TrapsMinesShadowLightning", "LightningTrapMercenary")
+		local compare = build.calcsTab.calcs.getMiscCalculator(build)
+		local ok, err = pcall(compare, { itemSetId = 99999 })
+		assert.is_true(not ok)
+		assert.matches("Unknown item set id", tostring(err))
+		assert.is_number(compare({ }).Life)
+	end)
+
 	it("uses player, Animate Guardian, and Mercenary equipment simultaneously", function()
 		configure("TrapsMinesShadow", "TrapsMinesShadowLightning", "LightningTrapMercenary")
 		local itemsTab = build.itemsTab
@@ -417,7 +543,7 @@ describe("Permanent Mercenary calculations", function()
 
 		local playerHelmet = new("Item"):Item("Rarity: Normal\nIron Hat")
 		local guardianHelmet = new("Item"):Item("Rarity: Normal\nIron Hat")
-		local mercenaryHelmet = new("Item"):Item("Rarity: Normal\nIron Hat")
+		local mercenaryHelmet = new("Item"):Item("Rarity: Normal\nLeather Cap")
 		itemsTab:AddItem(playerHelmet, true)
 		itemsTab:AddItem(guardianHelmet, true)
 		itemsTab:AddItem(mercenaryHelmet, true)
@@ -452,8 +578,8 @@ describe("Permanent Mercenary calculations", function()
 		local secondSet = itemsTab:NewItemSet(nil, "Mercenary")
 		secondSet.title = "Alternate Equipment"
 		table.insert(itemsTab.itemSetOrderList, secondSet.id)
-		local firstHelmet = new("Item"):Item("Rarity: Normal\nIron Hat")
-		local secondHelmet = new("Item"):Item("Rarity: Normal\nIron Hat")
+		local firstHelmet = new("Item"):Item("Rarity: Normal\nLeather Cap")
+		local secondHelmet = new("Item"):Item("Rarity: Normal\nLeather Cap")
 		itemsTab:AddItem(firstHelmet, true)
 		itemsTab:AddItem(secondHelmet, true)
 		firstSet[MercenaryTools.itemSlotName("Helmet")].selItemId = firstHelmet.id
@@ -469,7 +595,7 @@ describe("Permanent Mercenary calculations", function()
 		configure("TrapsMinesShadow", "TrapsMinesShadowLightning", "LightningTrapMercenary")
 		local itemsTab = build.itemsTab
 		local mercenarySet = assert(build.mercenaryTab:GetItemSet(true))
-		local currentHelmet = new("Item"):Item("Rarity: Normal\nIron Hat")
+		local currentHelmet = new("Item"):Item("Rarity: Normal\nLeather Cap")
 		itemsTab:AddItem(currentHelmet, true)
 		mercenarySet[MercenaryTools.itemSlotName("Helmet")].selItemId = currentHelmet.id
 
@@ -478,7 +604,7 @@ describe("Permanent Mercenary calculations", function()
 		tradeQuery.slotTables[1] = { slotName = MercenaryTools.itemSlotName("Helmet"), itemSetId = mercenarySet.id }
 		tradeQuery.resultTbl[1] = { { item_string = [[Rarity: Rare
 Mercenary's Test
-Iron Hat
+Leather Cap
 --------
 +100 to maximum Life]] } }
 		tradeQuery.statSortSelectionList = { { stat = "Life", weightMult = 1 } }
@@ -489,6 +615,19 @@ Iron Hat
 		assert.is_number(evaluation[1].output.Life)
 		assert.is_true(evaluation[1].output.Life > actorOutputs.MERCENARY.Life)
 		assert.is_true(evaluation[1].weight > 0)
+	end)
+
+	it("keeps the default comparison baseline on the player while Mercenary gear is visible", function()
+		configure("TrapsMinesShadow", "TrapsMinesShadowLightning", "LightningTrapMercenary")
+		local mercSet = assert(build.mercenaryTab:GetItemSet(true))
+		calculate()
+		assert(build.itemsTab:SetViewItemSet(mercSet.id))
+		build.calcsTab:BuildOutput()
+		local calcFunc, calcBase, actorOutputs = build.calcsTab:GetMiscCalculator()
+		assert.are.equal(actorOutputs.PLAYER, calcBase)
+		assert.are.equal(calcFunc().Life, calcBase.Life)
+		assert.is_truthy(actorOutputs.MERCENARY)
+		assert.are.equal(calcFunc({ comparisonActor = "MERCENARY" }).Life, actorOutputs.MERCENARY.Life)
 	end)
 
 	it("uses the selected Animate Guardian set for trade stat replacements", function()
@@ -794,6 +933,14 @@ Iron Hat
 		local env = calculate()
 		assert.are.equal(1, env.mercenary.modDB.multipliers.CurseOnEnemy)
 		assert.is_true(env.enemy.modDB.conditions.Cursed)
+	end)
+
+	it("applies a player curse to the enemy once while a Mercenary is present", function()
+		build.skillsTab:PasteSocketGroup("Vulnerability 20/0  1")
+		configure("TrapsMinesShadow", "TrapsMinesShadowLightning", "LightningTrapMercenary")
+		local env = calculate()
+		assert.is_true(env.enemy.modDB.conditions.Cursed)
+		assert.are.equal(1, env.player.modDB.multipliers.CurseOnEnemy)
 	end)
 
 	it("accepts imported allied auras but excludes party-only charge effects", function()
@@ -1125,6 +1272,7 @@ Iron Hat
 	end)
 
 	it("applies Fist of War to Ashen Fissure", function()
+		-- Extract: FissureSlamMercenary is not SkillType.Slam, but possibleSupportIds includes FistOfWarHigh.
 		configure("MeleeAOEMarauder", "MeleeAOEMarauderFireSlam", "FissureSlamMercenary", {
 			supports = { { id = "FistOfWarHigh", tier = 3 } },
 		})
@@ -1141,9 +1289,10 @@ Iron Hat
 	it("counts Barrage of Volley Fire first and final volley projectiles", function()
 		configure("NonEleBowRanger", "NonEleBowRangerPhys", "BarrageAltMercenary", { skillPart = 2 })
 		local bow = new("Item"):Item("Rarity: Normal\nCrude Bow")
-		bow.id = 9018
-		build.itemsTab.items[bow.id] = bow
-		equipmentSlot("Weapon 1").selItemId = bow.id
+		local quiver = new("Item"):Item("Rarity: Normal\nSerrated Arrow Quiver")
+		bow.id, quiver.id = 9018, 9017
+		build.itemsTab.items[bow.id], build.itemsTab.items[quiver.id] = bow, quiver
+		equipmentSlot("Weapon 1").selItemId, equipmentSlot("Weapon 2").selItemId = bow.id, quiver.id
 
 		local skill = assert(calculate(83).mercenary.mainSkill)
 		assert.are.equal("All Projectiles", skill.skillPartName)
@@ -1152,8 +1301,8 @@ Iron Hat
 	end)
 
 	it("counts both initial Vaal Double Strike hits", function()
-		configure("MeleeAOEStrikeDuelist", "MeleeAOEStrikeDuelistRangeStrikes", "VaalDoubleStrikeMercenary")
-		local sword = new("Item"):Item("Rarity: Normal\nRusted Sword")
+		configure("MeleeAOEStrikeDuelist", "MeleeAOEStrikeDuelistCyclone", "VaalDoubleStrikeMercenary")
+		local sword = new("Item"):Item("Rarity: Normal\nCorroded Blade")
 		sword.id = 9019
 		build.itemsTab.items[sword.id] = sword
 		equipmentSlot("Weapon 1").selItemId = sword.id
@@ -1178,7 +1327,7 @@ Iron Hat
 	end)
 
 	it("includes Mercenary Mirage Archer damage in Full DPS", function()
-		configure("EleBowRanger", "EleBowRangerFire", "CausticArrowMercenary", {
+		configure("NonEleBowRanger", "NonEleBowRangerChaos", "CausticArrowMercenary", {
 			includeInFullDPS = true,
 			supports = { { id = "MirageArcherHigh", tier = 3 } },
 		})
@@ -1197,6 +1346,7 @@ Iron Hat
 		assert.is_table(mirageBreakdown)
 		assert.are.near(mercenary.mainSkill.mirage.output.TotalDPS, mirageBreakdown.dps, 10 ^ -6)
 		assert.are.near(mercenary.output.CombinedDPS, mercenary.output.FullDPS, 10 ^ -6)
+		assert.is_true(not mercenary.mainSkill.skillCfg.skillCond.usedByMirage)
 	end)
 
 	it("uses the player Full DPS count-once option for Mercenary summoning skills", function()
@@ -1271,6 +1421,7 @@ Iron Hat
 			skillMinionSkill = 2,
 			supports = { { id = "AddedLightningHigh", tier = 3 } },
 		})
+		assert(build.mercenaryTab:GetItemSet(true))
 		local function savedState()
 			local saved = { elem = "Mercenary", attrib = { } }
 			build.mercenaryTab:Save(saved)
@@ -1283,5 +1434,18 @@ Iron Hat
 
 		build.calcsTab:Load({ { elem = "Input", attrib = { name = "showMinion", boolean = "true" } } })
 		assert.are.equal("PLAYER_MINION", build.calcsTab.input.actor)
+	end)
+
+	it("shows actor unavailable status without a synthetic mainSkill", function()
+		build.calcsTab.input.actor = "MERCENARY"
+		local env = calculate()
+		assert.is_nil(env.mercenary)
+		assert.is_nil(build.calcsTab:GetDisplayActor(build.calcsTab.calcsEnv))
+		assert.is_truthy(build.calcsTab.calcsOutput.ActorUnavailableMessage)
+		assert.is_true(build.calcsTab:CheckFlag({ haveOutput = "ActorUnavailableMessage" }))
+		assert.is_true(not build.calcsTab:CheckFlag({ flag = "attack" }))
+		local statusOnly = { output = build.calcsTab.calcsOutput }
+		assert.is_nil(statusOnly.mainSkill)
+		assert.matches("unavailable", formatCalcStr("{output:ActorUnavailableMessage}", statusOnly))
 	end)
 end)

@@ -1266,10 +1266,7 @@ function ItemsTabClass:Load(xml, dbFileName)
 	self.viewItemSet = nil
 	self.itemSets = { }
 	self.itemSetOrderList = { }
-	self.legacyMercenaryItemSetIds = { }
-	self.legacyMercenaryItemSetId = nil
 	self.tradeQuery.statSortSelectionList = { }
-	local legacyMercenaryItemSets = { }
 	for _, node in ipairs(xml) do
 		if node.elem == "Item" then
 			local item = new("Item"):Item("")
@@ -1330,37 +1327,21 @@ function ItemsTabClass:Load(xml, dbFileName)
 				end
 			end
 		elseif node.elem == "ItemSet" then
-			local title = node.attrib.title
-			local legacyOwnerlessItemSet = node.attrib.owner == nil
 			local owner = node.attrib.owner
-			if owner == "Player" then
+			if owner ~= "Mercenary" and owner ~= "Animate Guardian" then
 				owner = nil
-			elseif not owner and title == "Animate Guardian" then
-				-- Older saves used the title to identify the Animate Guardian set.
-				owner = "Animate Guardian"
 			end
 			local itemSet = self:NewItemSet(tonumber(node.attrib.id), owner)
 			itemSet.title = node.attrib.title
 			itemSet.useSecondWeaponSet = node.attrib.useSecondWeaponSet == "true"
-			local legacyMercenarySlots = { }
 			for _, child in ipairs(node) do
 				if child.elem == "Slot" then
 					local slotName = child.attrib.name or ""
-					local savedSlot = {
-						selItemId = tonumber(child.attrib.itemId) or 0,
-						active = child.attrib.active == "true",
-						pbURL = child.attrib.itemPbURL or "",
-					}
-					if legacyOwnerlessItemSet and MercenaryTools.baseItemSlotName(slotName)
-						and (savedSlot.selItemId ~= 0 or savedSlot.active or savedSlot.pbURL ~= "") then
-						legacyMercenarySlots[slotName] = savedSlot
-					else
-						local itemSlot = itemSet[slotName]
-						if itemSlot then
-							itemSlot.selItemId = savedSlot.selItemId
-							itemSlot.active = savedSlot.active
-							itemSlot.pbURL = savedSlot.pbURL
-						end
+					local itemSlot = itemSet[slotName]
+					if itemSlot then
+						itemSlot.selItemId = tonumber(child.attrib.itemId) or 0
+						itemSlot.active = child.attrib.active == "true"
+						itemSlot.pbURL = child.attrib.itemPbURL or ""
 					end
 				elseif child.elem == "SocketIdURL" then
 					local id = tonumber(child.attrib.nodeId)
@@ -1368,13 +1349,6 @@ function ItemsTabClass:Load(xml, dbFileName)
 				end
 			end
 			t_insert(self.itemSetOrderList, itemSet.id)
-			if next(legacyMercenarySlots) then
-				t_insert(legacyMercenaryItemSets, {
-					sourceItemSetId = itemSet.id,
-					sourceTitle = title,
-					slots = legacyMercenarySlots,
-				})
-			end
 		elseif node.elem == "TradeSearchWeights" then
 			for _, child in ipairs(node) do
 				local statSort = {
@@ -1395,24 +1369,6 @@ function ItemsTabClass:Load(xml, dbFileName)
 		end
 	end
 	local savedActiveItemSetId = tonumber(xml.attrib.activeItemSet)
-	for _, legacyItemSet in ipairs(legacyMercenaryItemSets) do
-		local itemSet = self:NewItemSet(nil, "Mercenary")
-		itemSet.title = legacyItemSet.sourceTitle and legacyItemSet.sourceTitle ~= ""
-			and legacyItemSet.sourceTitle.." - Mercenary Equipment" or "Mercenary Equipment"
-		for slotName, savedSlot in pairs(legacyItemSet.slots) do
-			if itemSet[slotName] then
-				itemSet[slotName] = savedSlot
-			end
-		end
-		t_insert(self.itemSetOrderList, itemSet.id)
-		self.legacyMercenaryItemSetIds[legacyItemSet.sourceItemSetId] = itemSet.id
-		if legacyItemSet.sourceItemSetId == savedActiveItemSetId then
-			self.legacyMercenaryItemSetId = itemSet.id
-		end
-	end
-	if not self.legacyMercenaryItemSetId and #legacyMercenaryItemSets == 1 then
-		self.legacyMercenaryItemSetId = self.legacyMercenaryItemSetIds[legacyMercenaryItemSets[1].sourceItemSetId]
-	end
 	if not self.itemSetOrderList[1] then
 		local itemSet = self:NewItemSet(1)
 		itemSet.useSecondWeaponSet = xml.attrib.useSecondWeaponSet == "true"
@@ -1434,10 +1390,6 @@ function ItemsTabClass:Load(xml, dbFileName)
 		t_insert(self.itemSetOrderList, 1, itemSet.id)
 	end
 	self:SetActiveItemSet(activeItemSetId)
-	local viewItemSetId = tonumber(xml.attrib.viewItemSet)
-	if viewItemSetId and self.itemSets[viewItemSetId] then
-		self:SetViewItemSet(viewItemSetId)
-	end
 	if xml.attrib.showStatDifferences then
 		self.showStatDifferences = xml.attrib.showStatDifferences == "true"
 	end
@@ -1447,7 +1399,6 @@ end
 function ItemsTabClass:Save(xml)
 	xml.attrib = {
 		activeItemSet = tostring(self.activeItemSetId),
-		viewItemSet = tostring(self.viewItemSetId or self.activeItemSetId),
 		useSecondWeaponSet = tostring(self.activeItemSet.useSecondWeaponSet),
 		showStatDifferences = tostring(self.showStatDifferences),
 	}
@@ -1503,7 +1454,10 @@ function ItemsTabClass:Save(xml)
 	for _, itemSetId in ipairs(self.itemSetOrderList) do
 		local itemSet = self.itemSets[itemSetId]
 		local owner = self:GetItemSetOwner(itemSet)
-		local child = { elem = "ItemSet", attrib = { id = tostring(itemSetId), title = itemSet.title, owner = owner or "Player", useSecondWeaponSet = tostring(itemSet.useSecondWeaponSet) } }
+		local child = { elem = "ItemSet", attrib = { id = tostring(itemSetId), title = itemSet.title, useSecondWeaponSet = tostring(itemSet.useSecondWeaponSet) } }
+		if owner then
+			child.attrib.owner = owner
+		end
 		local slots = owner == "Mercenary" and self.mercenarySlots or self.orderedSlots
 		for _, slot in ipairs(slots) do
 			if not slot.nodeId then
@@ -1736,7 +1690,7 @@ function ItemsTabClass:GetMinionItemSetOrderList()
 end
 
 function ItemsTabClass:GetVisibleItemSet()
-	return self.viewItemSet or self.activeItemSet
+	return self.viewItemSet
 end
 
 function ItemsTabClass:IsMercenaryView()
@@ -1799,30 +1753,32 @@ end
 function ItemsTabClass:SetViewItemSet(itemSetId)
 	local itemSet = self.itemSets[itemSetId]
 	if not itemSet then
-		itemSetId = self.activeItemSetId or self.itemSetOrderList[1]
-		itemSet = self.itemSets[itemSetId]
+		return false
 	end
-	if not itemSet then return end
 	if self:IsPlayerItemSet(itemSet) then
-		self:SetActiveItemSet(itemSet.id)
+		self.activeItemSetId = itemSet.id
+		self.activeItemSet = itemSet
 		self.viewItemSetId = itemSet.id
 		self.viewItemSet = itemSet
+		self.build.buildFlag = true
 		self:PopulateSlots()
 		self:UpdateSockets()
-		return
+		self.build:SyncLoadouts()
+		return true
 	end
 	self.viewItemSetId = itemSet.id
 	self.viewItemSet = itemSet
 	self.build.buildFlag = true
 	self:PopulateSlots()
 	self:UpdateSockets()
+	return true
 end
 
--- Changes the active player item set. Actor-owned sets are presentation-only.
+-- Changes the active player item set. Actor-owned and missing IDs are rejected.
 function ItemsTabClass:SetActiveItemSet(itemSetId)
 	local itemSet = self.itemSets[itemSetId]
 	if not self:IsPlayerItemSet(itemSet) then
-		return self:SetViewItemSet(itemSetId)
+		return false
 	end
 	self.activeItemSetId = itemSetId
 	self.activeItemSet = itemSet
@@ -1834,6 +1790,7 @@ function ItemsTabClass:SetActiveItemSet(itemSetId)
 	self:PopulateSlots()
 	self:UpdateSockets()
 	self.build:SyncLoadouts()
+	return true
 end
 
 -- Equips the given item in the given item set
@@ -1858,7 +1815,7 @@ function ItemsTabClass:EquipItemInSet(item, itemSetId)
 		end
 	end
 	if itemSet == self:GetVisibleItemSet() and self.slots[slotName] then
-		self.slots[slotName]:SetSelItemId(item.id)
+		self.slots[slotName]:SetSelItemId(item.id, itemSet)
 	else
 		local itemSlot = itemSet[self:GetItemSetSlotName(slotName, itemSet)]
 		if itemSlot then itemSlot.selItemId = item.id end
@@ -1936,9 +1893,10 @@ function ItemsTabClass:AddItem(item, noAutoEquip, index)
 
 		if not noAutoEquip then
 			-- Autoequip it
+			local visibleItemSet = self:GetVisibleItemSet()
 			for _, slot in ipairs(self:GetVisibleItemSlots()) do
-				if not slot.nodeId and slot.selItemId == 0 and slot:IsShown() and self:IsItemValidForSlot(item, slot.slotName) then
-					slot:SetSelItemId(item.id)
+				if not slot.nodeId and slot.selItemId == 0 and slot:IsShown() and self:IsItemValidForSlot(item, slot.slotName, visibleItemSet) then
+					slot:SetSelItemId(item.id, visibleItemSet)
 					break
 				end
 			end
@@ -2803,7 +2761,7 @@ end
 -- Check if the given item could be equipped in the given slot, taking into account possible conflicts with currently equipped items
 -- For example, a shield is not valid for Weapon 2 if Weapon 1 is a staff, and a wand is not valid for Weapon 2 if Weapon 1 is a dagger
 function ItemsTabClass:IsItemValidForSlot(item, slotName, itemSet)
-	itemSet = itemSet or self:GetVisibleItemSet()
+	itemSet = itemSet or self.activeItemSet
 	local mercenarySlotName = MercenaryTools.baseItemSlotName(slotName)
 	slotName = mercenarySlotName or slotName
 	local slotType, slotId = slotName:match("^([%a ]+) (%d+)$")
@@ -5190,7 +5148,12 @@ function ItemsTabClass:AddItemStatDifferences(tooltip, item, base, slot)
 				header = string.format("^7Equipping this item in %s will give you:%s", compareSlot.label or compareSlot.slotName, selItem and "\n(replacing " .. colorCodes[selItem.rarity] .. selItem.name .. "^7)" or "")
 			end
 			local comparisonActor = compareSlot.mercenarySlotName and "MERCENARY"
-			self.build:AddStatComparesToTooltip(tooltip, comparisonActor and calcBaseByActor.MERCENARY or calcBase, output, header, nil, comparisonActor)
+			local compareBase = comparisonActor and calcBaseByActor.MERCENARY or calcBase
+			if comparisonActor and not MercenaryTools.mercenaryOutputAvailable(compareBase) then
+				tooltip:AddLine(16, colorCodes.WARNING.."Mercenary comparison unavailable")
+				return
+			end
+			self.build:AddStatComparesToTooltip(tooltip, compareBase, output, header, nil, comparisonActor)
 		end
 
 		-- if we have a specific slot to compare to, and the user has "Show
@@ -5303,8 +5266,12 @@ function ItemsTabClass:RestoreUndoState(state)
 	end
 	self.activeItemSetId = state.activeItemSetId
 	self.activeItemSet = self.itemSets[self.activeItemSetId]
-	self.viewItemSetId = state.viewItemSetId or self.activeItemSetId
-	self.viewItemSet = self.itemSets[self.viewItemSetId] or self.activeItemSet
+	local viewItemSetId = state.viewItemSetId
+	if not self.itemSets[viewItemSetId] then
+		viewItemSetId = self.activeItemSetId
+	end
+	self.viewItemSetId = viewItemSetId
+	self.viewItemSet = self.itemSets[self.viewItemSetId]
 	for slotName, selItemId in pairs(state.slotSelItemId) do
 		local slot = self.slots[slotName]
 		if slot and slot.nodeId then slot:SetSelItemId(selItemId) end

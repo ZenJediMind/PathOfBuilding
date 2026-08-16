@@ -787,6 +787,10 @@ function TradeQueryGeneratorClass:StartQuery(slot, options)
 	else
 		baseOutput = MercenaryTools.comparisonBaseOutput(baseOutput, actorOutputs, slotName)
 	end
+	if comparisonActor == "MERCENARY" and not MercenaryTools.mercenaryOutputAvailable(baseOutput) then
+		logToFile("Mercenary calculation unavailable for weighted trade query")
+		return
+	end
 	local baseItemOutput = slot and calcFunc(itemCalculationOverride(itemSetId, slotName, testItem)) or baseOutput
 	-- make weights more human readable
 	local compStatValue = TradeQueryGeneratorClass.WeightedRatioOutputs(baseOutput, baseItemOutput, options.statWeights) * 1000

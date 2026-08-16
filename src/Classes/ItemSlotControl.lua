@@ -21,7 +21,7 @@ local ItemSlotClass = newClass("ItemSlotControl", "DropDownControl")
 function ItemSlotClass:ItemSlotControl(anchor, x, y, itemsTab, slotName, slotLabel, nodeId)
 	self:DropDownControl(anchor, { x, y, 310, 20 }, {}, function(index, value)
 		if self.items[index] ~= self.selItemId then
-			self:SetSelItemId(self.items[index])
+			self:SetSelItemId(self.items[index], itemsTab:GetVisibleItemSet())
 			itemsTab:PopulateSlots()
 			itemsTab:AddUndoState()
 			itemsTab.build.buildFlag = true
@@ -80,7 +80,7 @@ function ItemSlotClass:SetSelItemId(selItemId, targetItemSet)
 			end
 		end
 	else
-		local itemSet = targetItemSet or self.itemsTab:GetVisibleItemSet()
+		local itemSet = targetItemSet or self.itemsTab.activeItemSet
 		local itemSlot = itemSet and itemSet[self.itemsTab:GetItemSetSlotName(self.slotName, itemSet)]
 		if itemSlot then itemSlot.selItemId = selItemId end
 	end
@@ -120,7 +120,7 @@ function ItemSlotClass:Populate()
 		self.selIndex = #self.list
 	end
 	if not preserveInvalid and (not self.selItemId or not selectedItem or not self.itemsTab:IsItemValidForSlot(selectedItem, self.slotName, self.itemsTab:GetVisibleItemSet())) then
-		self:SetSelItemId(0)
+		self:SetSelItemId(0, self.itemsTab:GetVisibleItemSet())
 	end
 
 	-- Update Abyssal Sockets
@@ -134,7 +134,7 @@ function ItemSlotClass:Populate()
 		if abyssalSocket.inactive then
 			-- this can be inconvenient, but otherwise it is possible to double
 			-- equip jewels by moving the jewel while the socket is inactive
-			abyssalSocket:SetSelItemId(0)
+			abyssalSocket:SetSelItemId(0, self.itemsTab:GetVisibleItemSet())
 		end
 	end
 end
@@ -145,12 +145,12 @@ end
 
 function ItemSlotClass:ReceiveDrag(type, value, source)
 	if value.id and self.itemsTab.items[value.id] then
-		self:SetSelItemId(value.id)
+		self:SetSelItemId(value.id, self.itemsTab:GetVisibleItemSet())
 	else
 		local newItem = new("Item"):Item(value.raw)
 		newItem:NormaliseQuality()
 		self.itemsTab:AddItem(newItem, true)
-		self:SetSelItemId(newItem.id)
+		self:SetSelItemId(newItem.id, self.itemsTab:GetVisibleItemSet())
 		self.itemsTab:AddForbiddenJewelCounterpart(newItem)
 	end
 	self.itemsTab:PopulateSlots()

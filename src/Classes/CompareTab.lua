@@ -20,25 +20,21 @@ local configVisibility = require("Modules.ConfigVisibility")
 local CLUSTER_NODE_OFFSET = 65536
 
 local function getComparisonItemSet(itemsTab)
-	if itemsTab and itemsTab.IsMercenaryView and itemsTab:IsMercenaryView() then
-		return itemsTab:GetVisibleItemSet()
-	end
-	return itemsTab and itemsTab.activeItemSet
+	if not itemsTab then return end
+	return itemsTab:GetVisibleItemSet()
 end
 
 local function isMercenaryComparisonSet(itemsTab)
-	local itemSet = getComparisonItemSet(itemsTab)
-	return itemSet and itemsTab and itemsTab.IsMercenaryItemSet and itemsTab:IsMercenaryItemSet(itemSet)
+	return itemsTab and itemsTab:IsMercenaryItemSet(itemsTab:GetVisibleItemSet())
 end
 
 local function getComparisonSlotName(itemsTab, slotName)
-	local itemSet = getComparisonItemSet(itemsTab)
-	return itemsTab and itemsTab.GetItemSetSlotName and itemsTab:GetItemSetSlotName(slotName, itemSet) or slotName
+	if not itemsTab then return slotName end
+	return itemsTab:GetItemSetSlotName(slotName, itemsTab:GetVisibleItemSet())
 end
 
 local function getActiveItemSetSlot(itemsTab, slotName)
-	local itemSet = getComparisonItemSet(itemsTab)
-	return itemSet and itemsTab:GetItemSetSlot(itemSet, slotName)
+	return itemsTab and itemsTab:GetItemSetSlot(itemsTab:GetVisibleItemSet(), slotName)
 end
 
 local function getActiveItem(itemsTab, slotName)
@@ -47,9 +43,10 @@ local function getActiveItem(itemsTab, slotName)
 end
 
 local function hasActiveAbyssalSocket(itemsTab, slotName, socketIndex)
-	local itemSet = getComparisonItemSet(itemsTab)
-	local visibleSlotName = getComparisonSlotName(itemsTab, slotName)
-	local slot = itemsTab and itemsTab.slots and (itemsTab.slots[visibleSlotName] or itemsTab.slots[slotName])
+	if not itemsTab then return false end
+	local itemSet = itemsTab:GetVisibleItemSet()
+	local visibleSlotName = itemsTab:GetItemSetSlotName(slotName, itemSet)
+	local slot = itemsTab.slots and (itemsTab.slots[visibleSlotName] or itemsTab.slots[slotName])
 	if slot and slot.weaponSet and itemSet and slot.weaponSet ~= (itemSet.useSecondWeaponSet and 2 or 1) then
 		return false
 	end
@@ -59,23 +56,20 @@ end
 
 local function getComparisonItemSetOrderList(itemsTab)
 	if not itemsTab then return { } end
-	if itemsTab.IsMercenaryView and itemsTab:IsMercenaryView() then
+	if itemsTab:IsMercenaryView() then
 		local orderList = { }
-		for _, itemSetId in ipairs(itemsTab.itemSetOrderList or { }) do
+		for _, itemSetId in ipairs(itemsTab.itemSetOrderList) do
 			if itemsTab:IsMercenaryItemSet(itemsTab.itemSets[itemSetId]) then
 				t_insert(orderList, itemSetId)
 			end
 		end
 		return orderList
 	end
-	return itemsTab.GetPlayerItemSetOrderList and itemsTab:GetPlayerItemSetOrderList() or itemsTab.itemSetOrderList or { }
+	return itemsTab:GetPlayerItemSetOrderList()
 end
 
 local function getComparisonItemSetId(itemsTab)
-	if itemsTab and itemsTab.IsMercenaryView and itemsTab:IsMercenaryView() then
-		return itemsTab.viewItemSetId
-	end
-	return itemsTab and itemsTab.activeItemSetId
+	return itemsTab and itemsTab.viewItemSetId
 end
 
 -- Wrap a string into lines for a given pixel width at font height 14 ("VAR").

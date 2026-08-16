@@ -178,6 +178,30 @@ describe("TradeQuery", function()
 
 			assert.are.equal(2, evaluation[1].weight)
 		end)
+
+		it("does not weight Mercenary equipment against player output", function()
+			local weightedCalls = 0
+			local originalWeighted = mock_queryGen.WeightedRatioOutputs
+			mock_queryGen.WeightedRatioOutputs = function(...)
+				weightedCalls = weightedCalls + 1
+				return originalWeighted(...)
+			end
+			mock_tradeQuery.tradeQueryGenerator = mock_queryGen
+			mock_tradeQuery.itemsTab.build = { calcsTab = { GetMiscCalculator = function()
+				return function() return { Life = 200 } end, { Life = 10 }, {
+					PLAYER = { Life = 10 },
+				}
+			end } }
+			mock_tradeQuery.slotTables[1] = { slotName = "Mercenary Helmet" }
+			mock_tradeQuery.resultTbl[1] = { { item_string = "Rarity: NORMAL\nIron Hat" } }
+			mock_tradeQuery.statSortSelectionList = { { stat = "Life", weightMult = 1 } }
+
+			local evaluation = mock_tradeQuery:GetResultEvaluation(1, 1)
+
+			assert.same({ }, evaluation)
+			assert.are.equal(0, weightedCalls)
+			assert.are.equal("Mercenary actor unavailable", mock_tradeQuery.resultTbl[1][1].unavailableMessage)
+		end)
 	end)
 	describe("PriceItem slot rows", function()
 		it("only includes slots shown by the visible item set", function()

@@ -374,7 +374,7 @@ function ItemDBClass:OnSelClick(index, item, doubleClick)
 					slotName = altSlot
 				end
 			end
-			self.itemsTab.slots[slotName]:SetSelItemId(newItem.id)
+			self.itemsTab.slots[slotName]:SetSelItemId(newItem.id, visibleItemSet)
 		end
 
 		self.itemsTab:AddForbiddenJewelCounterpart(newItem)

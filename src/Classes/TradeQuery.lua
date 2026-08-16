@@ -844,6 +844,11 @@ function TradeQueryClass:GetResultEvaluation(row_idx, result_index, calcFunc, ba
 		else
 			baseOutput = MercenaryTools.comparisonBaseOutput(baseOutput, actorOutputs, slotName)
 		end
+		if comparisonActor == "MERCENARY" and not MercenaryTools.mercenaryOutputAvailable(baseOutput) then
+			result.evaluation = { }
+			result.unavailableMessage = "Mercenary actor unavailable"
+			return result.evaluation
+		end
 		local onlyWeightedBaseOutput = self:ReduceOutput(baseOutput)
 		if not self.onlyWeightedBaseOutput[row_idx] then
 			self.onlyWeightedBaseOutput[row_idx] = { }
@@ -1054,7 +1059,7 @@ function TradeQueryClass:FilterToSafeItems(itemEntries, slotName)
 	local itemsSafe = {}
 	for _, entry in ipairs(itemEntries) do
 		local item = new("Item"):Item(entry.item_string)
-		if item.base and ((not slotName) or self.itemsTab:IsItemValidForSlot(item, slotName)) then
+		if item.base and ((not slotName) or self.itemsTab:IsItemValidForSlot(item, slotName, self.itemsTab:GetVisibleItemSet())) then
 			t_insert(itemsSafe, entry)
 		end
 	end
@@ -1282,7 +1287,7 @@ you can add them, copy the link here, and press "Price Item" to evaluate the ite
 		local jewelNodeId = slotTbl.nodeId or slotTbl.selectedJewelNodeId
 		local slotName = slotTbl.fullName or slotTbl.slotName
 		local slot = jewelNodeId and self.itemsTab.sockets[jewelNodeId] or self.itemsTab.slots[slotName]
-		if slot and slot:IsShown() and self.itemsTab:IsItemValidForSlot(item, slot.slotName) then
+		if slot and slot:IsShown() and self.itemsTab:IsItemValidForSlot(item, slot.slotName, getVisibleItemSet()) then
 			slot:SetSelItemId(item.id, getVisibleItemSet())
 			self.itemsTab:PopulateSlots()
 			self.itemsTab:AddUndoState()

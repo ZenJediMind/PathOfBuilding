@@ -13,8 +13,8 @@ describe("Mercenary review regressions", function()
 		first.id, second.id = 99101, 99102
 		build.itemsTab.items[first.id] = first
 		build.itemsTab.items[second.id] = second
-		build.itemsTab.slots[MercenaryTools.itemSlotName("Ring 1")]:SetSelItemId(first.id)
-		build.itemsTab.slots[MercenaryTools.itemSlotName("Ring 2")]:SetSelItemId(second.id)
+		build.itemsTab.slots[MercenaryTools.itemSlotName("Ring 1")]:SetSelItemId(first.id, build.itemsTab:GetVisibleItemSet())
+		build.itemsTab.slots[MercenaryTools.itemSlotName("Ring 2")]:SetSelItemId(second.id, build.itemsTab:GetVisibleItemSet())
 		local equippedSlot = assert(build.itemsTab:GetEquippedSlotForItem(first))
 		assert.are.equal(MercenaryTools.itemSlotName("Ring 1"), equippedSlot.slotName)
 		assert.are.equal(MercenaryTools.itemSlotName("Ring 1"), build.itemsTab:GetComparisonSlotNameForItem(first))
@@ -57,11 +57,18 @@ describe("Mercenary review regressions", function()
 		newBuild()
 		local profile = build.mercenaryTab.profile
 		profile.classId = "AurasMinionsTemplar"
-		profile.buildId = "AurasMinionsTemplarSpectres"
+		profile.buildId = "AurasMinionsTemplarSmite"
 		profile.foundAreaLevel = 68
 		profile.mainSkillId = "SSMHolySpectresMercenary"
 		profile.skills = { { id = "SSMHolySpectresMercenary", enabled = true, skillMinionSkill = 1, supports = { } } }
 		build.mercenaryTab:Changed()
+		local itemSet = build.mercenaryTab:GetItemSet(true)
+		local mace = new("Item"):Item("Rarity: Normal\nDriftwood Club")
+		local shield = new("Item"):Item("Rarity: Normal\nTwig Spirit Shield")
+		build.itemsTab:AddItem(mace, true)
+		build.itemsTab:AddItem(shield, true)
+		itemSet[MercenaryTools.itemSlotName("Weapon 1")].selItemId = mace.id
+		itemSet[MercenaryTools.itemSlotName("Weapon 2")].selItemId = shield.id
 		build.calcsTab.input.actor = "MERCENARY"
 		build.configTab:BuildModList()
 		build.calcsTab:BuildOutput()
@@ -115,6 +122,6 @@ describe("Mercenary review regressions", function()
 		build.configTab:BuildModList()
 		local calculated, calculationError = pcall(function() build.calcsTab:BuildOutput() end)
 		assert.is_true(calculated, calculationError)
-		assert.matches("Missing generated Mercenary skill: nil", table.concat(build.calcsTab.mainEnv.mercenaryCalculationErrors, "\n"))
+		assert.matches("Invalid skill for selected build", table.concat(build.calcsTab.mainEnv.mercenaryCalculationErrors, "\n"))
 	end)
 end)

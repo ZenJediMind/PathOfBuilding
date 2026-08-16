@@ -125,6 +125,57 @@ describe("Mercenary equipment validation", function()
 		assert.are.equal(itemSet.id, itemsTab.activeItemSetId)
 	end)
 
+	it("keeps generic item mutation on the active player set while Mercenary equipment is visible", function()
+		selectBuild("MeleeAOEMarauderFireSlam")
+		local itemsTab = build.itemsTab
+		local mercSet = showMercenaryEquipment()
+		local playerHelmet = new("Item"):Item("Rarity: Normal\nIron Hat")
+		local mercHelmet = new("Item"):Item("Rarity: Normal\nIron Hat")
+		itemsTab:AddItem(playerHelmet, true)
+		itemsTab:AddItem(mercHelmet, true)
+		itemsTab.activeItemSet.Helmet.selItemId = playerHelmet.id
+		mercSet[MercenaryTools.itemSlotName("Helmet")].selItemId = mercHelmet.id
+		itemsTab:PopulateSlots()
+		itemsTab.slots.Helmet:SetSelItemId(0)
+		assert.are.equal(0, itemsTab.activeItemSet.Helmet.selItemId)
+		assert.are.equal(mercHelmet.id, mercSet[MercenaryTools.itemSlotName("Helmet")].selItemId)
+		itemsTab.slots[MercenaryTools.itemSlotName("Helmet")]:SetSelItemId(0, itemsTab:GetVisibleItemSet())
+		assert.are.equal(0, mercSet[MercenaryTools.itemSlotName("Helmet")].selItemId)
+	end)
+
+	it("rejects actor-owned and missing item-set IDs without changing view", function()
+		selectBuild("MeleeAOEMarauderFireSlam")
+		local itemsTab = build.itemsTab
+		local mercSet = showMercenaryEquipment()
+		local activeId, viewId = itemsTab.activeItemSetId, itemsTab.viewItemSetId
+		assert.is_true(not itemsTab:SetActiveItemSet(mercSet.id))
+		assert.are.equal(activeId, itemsTab.activeItemSetId)
+		assert.are.equal(viewId, itemsTab.viewItemSetId)
+		assert.is_true(not itemsTab:SetActiveItemSet(99999))
+		assert.are.equal(activeId, itemsTab.activeItemSetId)
+		assert.are.equal(viewId, itemsTab.viewItemSetId)
+		assert.is_true(not itemsTab:SetViewItemSet(99999))
+		assert.are.equal(viewId, itemsTab.viewItemSetId)
+		assert.are.equal(mercSet.id, itemsTab.viewItemSetId)
+	end)
+
+	it("refreshes player item slots only once when switching the active player set", function()
+		local itemsTab = build.itemsTab
+		local secondSet = itemsTab:NewItemSet()
+		table.insert(itemsTab.itemSetOrderList, secondSet.id)
+		local populateCount = 0
+		local originalPopulate = itemsTab.PopulateSlots
+		itemsTab.PopulateSlots = function(tab)
+			populateCount = populateCount + 1
+			return originalPopulate(tab)
+		end
+		assert(itemsTab:SetActiveItemSet(secondSet.id))
+		itemsTab.PopulateSlots = originalPopulate
+		assert.are.equal(1, populateCount)
+		assert.are.equal(secondSet.id, itemsTab.activeItemSetId)
+		assert.are.equal(secondSet.id, itemsTab.viewItemSetId)
+	end)
+
 	it("numbers active Mercenary Abyssal sockets sequentially", function()
 		selectBuild("MeleeAOEMarauderFireSlam")
 		local itemsTab = build.itemsTab
@@ -215,90 +266,38 @@ describe("Mercenary equipment validation", function()
 		end
 		assert.are.equal("9001", savedItemId)
 		assert.are.equal("Mercenary", savedOwner)
+		assert.is_nil(itemsXml.attrib.viewItemSet)
+		for _, node in ipairs(itemsXml) do
+			if node.elem == "ItemSet" and tonumber(node.attrib.id) == itemSet.id then
+				assert.is_nil(node.attrib.owner)
+			end
+		end
 		local mercenaryXml = { }
 		tab:Save(mercenaryXml)
 		assert.are.equal(tostring(mercSet.id), mercenaryXml.attrib.itemSetId)
 	end)
 
-	it("migrates every legacy Mercenary equipment slot into owned item sets", function()
+	it("does not migrate mixed mercenary slots from ownerless player sets", function()
 		local itemsTab = build.itemsTab
-		local activeLegacySet = {
-			elem = "ItemSet",
-			attrib = { id = "7", title = "Legacy Active", useSecondWeaponSet = "false" },
-			{ elem = "Slot", attrib = { name = "Helmet", itemId = "9001" } },
-		}
-		local expectedSlots = { }
-		for index, slot in ipairs(itemsTab.mercenarySlots) do
-			local itemId = 9100 + index
-			expectedSlots[slot.slotName] = itemId
-			table.insert(activeLegacySet, { elem = "Slot", attrib = {
-				name = slot.slotName,
-				itemId = tostring(itemId),
-				itemPbURL = "legacy-"..index,
-			} })
-		end
-		local alternateLegacySet = {
-			elem = "ItemSet",
-			attrib = { id = "8", title = "Legacy Alternate", useSecondWeaponSet = "false" },
-			{ elem = "Slot", attrib = {
-				name = MercenaryTools.itemSlotName("Helmet"),
-				itemId = "9999",
-			} },
-		}
+		local mercenaryHelmetSlot = MercenaryTools.itemSlotName("Helmet")
 		itemsTab:Load({
 			attrib = { activeItemSet = "7", useSecondWeaponSet = "false" },
-			activeLegacySet,
-			alternateLegacySet,
-		})
-		tab:Load({
-			attrib = {
-				buildId = "MeleeAOEMarauderFireSlam",
-				foundAreaLevel = "68",
-				mainSkillId = "ConsecratedPathMercenary",
+			{
+				elem = "ItemSet",
+				attrib = { id = "7", title = "Legacy Active", useSecondWeaponSet = "false" },
+				{ elem = "Slot", attrib = { name = "Helmet", itemId = "9001" } },
+				{ elem = "Slot", attrib = { name = mercenaryHelmetSlot, itemId = "9100" } },
 			},
-			{ elem = "Skill", attrib = {
-				id = "ConsecratedPathMercenary",
-				enabled = "true",
-				count = "1",
-			} },
 		})
-		tab:PostLoad()
-
-		local migratedActiveId = itemsTab.legacyMercenaryItemSetIds[7]
-		local migratedAlternateId = itemsTab.legacyMercenaryItemSetIds[8]
-		assert.is_not_nil(migratedActiveId)
-		assert.is_not_nil(migratedAlternateId)
-		assert.are_not.equal(migratedActiveId, migratedAlternateId)
-		assert.are.equal(migratedActiveId, tab.itemSetId)
 		assert.is_true(itemsTab:IsPlayerItemSet(itemsTab.itemSets[7]))
-		assert.is_nil(itemsTab.itemSets[7][MercenaryTools.itemSlotName("Helmet")])
-		assert.are.equal(9999, itemsTab.itemSets[migratedAlternateId][MercenaryTools.itemSlotName("Helmet")].selItemId)
-
-		local migratedActiveSet = tab:GetItemSet(false)
-		assert.is_true(itemsTab:IsMercenaryItemSet(migratedActiveSet))
-		for slotName, itemId in pairs(expectedSlots) do
-			assert.are.equal(itemId, migratedActiveSet[slotName].selItemId, slotName)
-		end
-
-		local savedItems = { }
-		itemsTab:Save(savedItems)
-		local savedMigratedSlots = { }
-		for _, node in ipairs(savedItems) do
-			if node.elem == "ItemSet" and tonumber(node.attrib.id) == migratedActiveId then
-				assert.are.equal("Mercenary", node.attrib.owner)
-				for _, child in ipairs(node) do
-					if child.elem == "Slot" then
-						savedMigratedSlots[child.attrib.name] = tonumber(child.attrib.itemId)
-					end
-				end
+		assert.is_nil(itemsTab.itemSets[7][mercenaryHelmetSlot])
+		local mercenarySetCount = 0
+		for _, itemSetId in ipairs(itemsTab.itemSetOrderList) do
+			if itemsTab:IsMercenaryItemSet(itemsTab.itemSets[itemSetId]) then
+				mercenarySetCount = mercenarySetCount + 1
 			end
 		end
-		for slotName, itemId in pairs(expectedSlots) do
-			assert.are.equal(itemId, savedMigratedSlots[slotName], slotName)
-		end
-		local savedMercenary = { }
-		tab:Save(savedMercenary)
-		assert.are.equal(tostring(migratedActiveId), savedMercenary.attrib.itemSetId)
+		assert.are.equal(0, mercenarySetCount)
 	end)
 
 	it("selects the Mercenary equipment item set from the Mercenary tab", function()
@@ -359,9 +358,46 @@ describe("Mercenary equipment validation", function()
 		itemsTab:Load(itemsXml)
 		tab:Load(mercenaryXml)
 		assert.are.equal(activePlayerSetId, itemsTab.activeItemSetId)
-		assert.are.equal(mercSet.id, itemsTab.viewItemSetId)
+		assert.are.equal(activePlayerSetId, itemsTab.viewItemSetId)
+		assert.is_nil(itemsXml.attrib.viewItemSet)
+		for _, node in ipairs(itemsXml) do
+			if node.elem == "ItemSet" and tonumber(node.attrib.id) == activePlayerSetId then
+				assert.is_nil(node.attrib.owner)
+			end
+		end
 		assert.are.equal(playerHelmet.id, itemsTab.itemSets[activePlayerSetId].Helmet.selItemId)
 		assert.are.equal(mercHelmet.id, tab:GetItemSet(true)[MercenaryTools.itemSlotName("Helmet")].selItemId)
+	end)
+
+	it("treats unknown ItemSet owners as player ownership", function()
+		local itemsTab = build.itemsTab
+		itemsTab:Load({
+			attrib = { activeItemSet = "1", useSecondWeaponSet = "false" },
+			{
+				elem = "ItemSet",
+				attrib = { id = "1", owner = "Player", title = "Branch Owner", useSecondWeaponSet = "false" },
+			},
+		})
+		assert.is_true(itemsTab:IsPlayerItemSet(itemsTab.itemSets[1]))
+		assert.is_nil(itemsTab:GetItemSetOwner(itemsTab.itemSets[1]))
+	end)
+
+	it("restores undo view state without substituting another item set", function()
+		selectBuild("MeleeAOEMarauderFireSlam")
+		local itemsTab = build.itemsTab
+		local mercSet = showMercenaryEquipment()
+		local playerSetId = itemsTab.activeItemSetId
+		assert(itemsTab:SetViewItemSet(playerSetId))
+		local state = itemsTab:CreateUndoState()
+		assert(itemsTab:SetViewItemSet(mercSet.id))
+		itemsTab:RestoreUndoState(state)
+		assert.are.equal(playerSetId, itemsTab.viewItemSetId)
+		assert.are.equal(playerSetId, itemsTab.activeItemSetId)
+
+		state.viewItemSetId = nil
+		itemsTab:RestoreUndoState(state)
+		assert.are.equal(playerSetId, itemsTab.viewItemSetId)
+		assert.is_true(itemsTab:IsPlayerItemSet(itemsTab.viewItemSet))
 	end)
 
 	it("formats validity rows for TextListControl", function()
@@ -581,7 +617,7 @@ Note: ~b/o 1 mirror
 		local mercSet = showMercenaryEquipment()
 		local invalidHelmet = item({ id = 9015, name = "Invalid Mercenary Helmet", type = "Helmet", base = { type = "Helmet" }, requirements = { int = 1 } })
 		build.itemsTab.items[invalidHelmet.id] = invalidHelmet
-		build.itemsTab.slots[MercenaryTools.itemSlotName("Helmet")]:SetSelItemId(invalidHelmet.id)
+		build.itemsTab.slots[MercenaryTools.itemSlotName("Helmet")]:SetSelItemId(invalidHelmet.id, build.itemsTab:GetVisibleItemSet())
 		build.itemsTab:PopulateSlots()
 		assert.are.equal(invalidHelmet.id, mercSet[MercenaryTools.itemSlotName("Helmet")].selItemId)
 		assert.matches("Helmet: armour attribute alignment", table.concat(tab:GetErrors(), "\n"))
@@ -600,7 +636,7 @@ Note: ~b/o 1 mirror
 		end
 		assert.is_number(candidateIndex)
 		assert.matches(colorCodes[invalidHelmet.rarity], helmetSlot.list[candidateIndex], nil, true)
-		helmetSlot:SetSelItemId(invalidHelmet.id)
+		helmetSlot:SetSelItemId(invalidHelmet.id, build.itemsTab:GetVisibleItemSet())
 		build.itemsTab:PopulateSlots()
 		assert.are.equal(invalidHelmet.id, helmetSlot.selItemId)
 		assert.matches("Helmet: armour attribute alignment", table.concat(tab:GetErrors(), "\n"))
@@ -816,9 +852,10 @@ Note: ~b/o 1 mirror
 	end)
 
 	it("keeps support selections contiguous", function()
-		tab:SetSkill(1, "ConsecratedPathMercenary")
+		selectBuild("MeleeAOEMarauderFireSlam")
+		assert(tab:SetSkill(1, "ConsecratedPathMercenary"))
 		local supportId = assert(tab.data.skills.ConsecratedPathMercenary.possibleSupportIds[1])
-		tab:SetSupport(5, supportId)
+		assert(tab:SetSupport(5, supportId))
 		assert.are.equal(1, #tab.profile.skills[1].supports)
 		assert.are.equal(supportId, tab.profile.skills[1].supports[1].id)
 	end)
@@ -844,7 +881,7 @@ Note: ~b/o 1 mirror
 
 	it("registers Ice Shot support pickers with the Mercenary control host", function()
 		selectBuild("EleBowRangerClones")
-		tab:SetSkill(1, "IceShotMercenary")
+		assert(tab:SetSkill(1, "IceShotMercenary"))
 		assert.is_true(#tab.supportControls[1].list > 1)
 		for index = 1, 5 do
 			assert.are.equal(tab.supportControls[index], tab.controls["support"..index])
@@ -853,18 +890,21 @@ Note: ~b/o 1 mirror
 		assert.is_nil(tab.controls.skillLink)
 	end)
 
-	it("keeps every support slot editable while reporting capacity warnings", function()
+	it("does not mutate support slots beyond capacity and keeps persisted extras", function()
 		selectBuild("MeleeAOEMarauderFireSlam")
-		tab:SetSkill(1, "ConsecratedPathMercenary")
-		assert.is_true(tab.supportControls[3].enabled)
-		assert.is_true(tab.supportControls[4].enabled)
+		assert(tab:SetSkill(1, "ConsecratedPathMercenary"))
+		assert.is_true(tab.supportControls[3].shown)
+		assert.is_true(not tab.supportControls[4].shown)
 		local supportId = tab.data.skills.ConsecratedPathMercenary.possibleSupportIds[1]
 		local support = tab.data.supports[supportId]
 		for index = 1, 4 do tab.profile.skills[1].supports[index] = { id = supportId, tier = support.variant } end
 		tab:RefreshControls()
-		assert.is_true(tab.supportControls[4].enabled)
-		assert.is_true(tab.supportControls[5].enabled)
+		assert.are.equal(4, #tab.profile.skills[1].supports)
 		assert.matches("has more than 3 supports", table.concat(tab:GetErrors(), "\n"))
+		local otherId = tab.data.skills.ConsecratedPathMercenary.possibleSupportIds[4]
+		assert.is_nil(select(1, tab:SetSupport(4, otherId)))
+		assert.are.equal(4, #tab.profile.skills[1].supports)
+		assert.are.equal(supportId, tab.profile.skills[1].supports[4].id)
 	end)
 
 	it("shows clean Mercenary class and build labels", function()
@@ -879,33 +919,163 @@ Note: ~b/o 1 mirror
 		assert.are.equal("Infamous Warpriest", labels.AurasMinionsTemplarSmiteNoble)
 	end)
 
-	it("offers zero-capacity data skills and reports them as warnings", function()
+	it("does not add a zero-capacity data skill through New", function()
 		tab.profile.classId = "Crit1HShadow"
 		tab.profile.buildId = "Crit1HShadowSpectral"
 		tab:RefreshControls()
-		assert.is_true(#tab.controls.skill.list > 1)
+		assert.is_true(not tab.controls.skillList.controls.new.enabled())
 		tab.controls.skillList.controls.new.onClick()
-		assert.are.equal(1, #tab.profile.skills)
-		assert.matches("allows at most 0 skills", table.concat(tab:GetErrors(), "\n"))
+		assert.are.equal(0, #tab.profile.skills)
 	end)
 
-	it("allows New beyond the six-skill validation limit", function()
+	it("does not create more than six skills through New", function()
 		selectBuild("MeleeAOEMarauderFireSlam")
 		tab:RefreshControls()
 		for _ = 1, 7 do tab.controls.skillList.controls.new.onClick() end
+		assert.are.equal(6, #tab.profile.skills)
+		assert.is_true(not tab.controls.skillList.controls.new.enabled())
+	end)
+
+	it("keeps a malformed XML fixture for diagnosis and blocks calculation", function()
+		local skillIds = { }
+		for _, skillId in ipairs(tab.data.builds.MeleeAOEMarauderFireSlam.skillIds) do
+			table.insert(skillIds, skillId)
+			if #skillIds == 7 then break end
+		end
+		local mercenaryXml = {
+			attrib = {
+				buildId = "MeleeAOEMarauderFireSlam",
+				foundAreaLevel = "68",
+				mainSkillId = skillIds[1],
+			},
+		}
+		for _, skillId in ipairs(skillIds) do
+			table.insert(mercenaryXml, { elem = "Skill", attrib = { id = skillId, enabled = "true" } })
+		end
+		tab:Load(mercenaryXml)
 		assert.are.equal(7, #tab.profile.skills)
-		assert.is_true(tab.controls.skillList.controls.new.enabled())
-		assert.matches("cannot have more than 6", table.concat(tab:GetErrors(), "\n"))
+		for index, skillId in ipairs(skillIds) do
+			assert.are.equal(skillId, tab.profile.skills[index].id)
+		end
+
+		local mercSet = tab:GetItemSet(true)
+		local uniqueBody = new("Item"):Item("Rarity: Unique\nIllegal Unique Body\nPlate Vest")
+		build.itemsTab:AddItem(uniqueBody, true)
+		mercSet[MercenaryTools.itemSlotName("Body Armour")].selItemId = uniqueBody.id
+
+		local itemsXml, savedMercenary = { }, { }
+		build.itemsTab:Save(itemsXml)
+		tab:Save(savedMercenary)
+		newBuild()
+		selectScionLuminary()
+		tab = build.mercenaryTab
+		build.itemsTab:Load(itemsXml)
+		tab:Load(savedMercenary)
+		tab:PostLoad()
+
+		assert.are.equal(7, #tab.profile.skills)
+		for index, skillId in ipairs(skillIds) do
+			assert.are.equal(skillId, tab.profile.skills[index].id)
+		end
+		assert.are.equal(uniqueBody.id, tab:GetItemSet(true)[MercenaryTools.itemSlotName("Body Armour")].selItemId)
+		local errors = table.concat(tab:GetErrors(), "\n")
+		assert.matches("cannot have more than 6", errors)
+		assert.matches("Body Armour", errors)
+		assert.is_true(not tab.controls.skillList.controls.new.enabled())
+		tab:AddSkill()
+		assert.are.equal(7, #tab.profile.skills)
+
+		build.configTab.input.enemyLevel = 83
+		build.configTab:BuildModList()
+		build.spec.modFlag = true
+		build.buildFlag = true
+		runCallback("OnFrame")
+		runCallback("OnFrame")
+		assert.is_nil(build.calcsTab.mainEnv.mercenary)
+		assert.matches("cannot have more than 6", table.concat(build.calcsTab.mainEnv.mercenaryCalculationErrors or { }, "\n"))
+	end)
+
+	it("rejects duplicate and pool-invalid skill edits without mutating", function()
+		selectBuild("MeleeAOEMarauderFireSlam")
+		assert(tab:SetSkill(1, "InfernalCryMercenary"))
+		assert.is_nil(select(1, tab:SetSkill(2, "InfernalCryMercenary")))
+		assert.are.equal(1, #tab.profile.skills)
+		assert(tab:SetSkill(2, "FissureSlamMercenary"))
+		assert.is_nil(select(1, tab:SetSkill(3, "TectonicSlamFireMercenary")))
+		assert.are.equal(2, #tab.profile.skills)
+		assert.are.equal("FissureSlamMercenary", tab.profile.skills[2].id)
 	end)
 
 	it("keeps the selected Calcs skill consistent with skill-row edits", function()
 		assert.is_nil(tab.controls.skillMain)
 		assert.is_nil(tab.controls.skillMainLabel)
-		tab:SetSkill(1, "InfernalBlowMercenary")
-		assert.are.equal("InfernalBlowMercenary", tab.profile.mainSkillId)
-		tab:SetSkill(1, "CombustMercenary")
-		assert.are.equal("CombustMercenary", tab.profile.mainSkillId)
-		tab:SetSkill(1, nil)
+		selectBuild("MeleeAOEMarauderFireSlam")
+		assert(tab:SetSkill(1, "InfernalCryMercenary"))
+		assert.are.equal("InfernalCryMercenary", tab.profile.mainSkillId)
+		assert(tab:SetSkill(1, "FissureSlamMercenary"))
+		assert.are.equal("FissureSlamMercenary", tab.profile.mainSkillId)
+		assert(tab:SetSkill(1, nil))
 		assert.is_nil(tab.profile.mainSkillId)
+	end)
+
+	it("does not allocate a Mercenary item set when changing a support", function()
+		tab.profile.buildId = "MeleeAOEMarauderFireSlam"
+		tab.profile.classId = "MeleeAOEMarauder"
+		tab.profile.skills = { { id = "FissureSlamMercenary", enabled = true, supports = { } } }
+		tab.profile.mainSkillId = "FissureSlamMercenary"
+		local before = #build.itemsTab.itemSetOrderList
+		assert(tab:SetSupport(1, "FistOfWarHigh"))
+		assert.are.equal(before, #build.itemsTab.itemSetOrderList)
+		assert.are.equal("FistOfWarHigh", tab.profile.skills[1].supports[1].id)
+	end)
+
+	it("restores support selections when preview comparison fails", function()
+		selectBuild("MeleeAOEMarauderFireSlam")
+		assert(tab:SetSkill(1, "FissureSlamMercenary"))
+		local skill = tab.profile.skills[1]
+		skill.supports = { { id = "AddedFireHigh", tier = 3 } }
+		local original = copyTable(skill.supports, true)
+		local originalGet = build.calcsTab.GetMiscCalculator
+		build.calcsTab.GetMiscCalculator = function() error("preview boom") end
+		local support = assert(tab.data.supports.FistOfWarHigh)
+		assert.has_error(function()
+			tab:AddSupportTooltip(new("Tooltip"):Tooltip(), support, 1, true)
+		end)
+		build.calcsTab.GetMiscCalculator = originalGet
+		assert.same(original, skill.supports)
+	end)
+
+	it("surfaces support-sort failures without caching them", function()
+		selectBuild("MeleeAOEMarauderFireSlam")
+		assert(tab:SetSkill(1, "FissureSlamMercenary"))
+		tab.sortGemsByDPS = true
+		tab:RefreshSupportLists()
+		local originalGet = build.calcsTab.GetMiscCalculator
+		build.calcsTab.GetMiscCalculator = function() error("sort boom") end
+		tab:QueueSupportSort(1)
+		assert.has_error(function()
+			tab:ProcessSupportSort()
+		end)
+		build.calcsTab.GetMiscCalculator = originalGet
+		assert.is_nil(tab.supportSortCache[1])
+		assert.is_nil(tab.supportSortCoroutine)
+	end)
+
+	it("does not rerun full validation on idle error refresh", function()
+		selectBuild("MeleeAOEMarauderFireSlam")
+		local calls = 0
+		local original = tab.GetErrors
+		tab.GetErrors = function(self)
+			calls = calls + 1
+			return original(self)
+		end
+		tab:RefreshErrors()
+		local afterRefresh = calls
+		tab:RefreshErrorsIfNeeded()
+		assert.are.equal(afterRefresh, calls)
+		tab.errorsDirty = true
+		tab:RefreshErrorsIfNeeded()
+		assert.are.equal(afterRefresh + 1, calls)
+		tab.GetErrors = original
 	end)
 end)

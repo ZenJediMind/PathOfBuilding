@@ -25,6 +25,25 @@ describe("Mercenary tools", function()
 		assert.is_nil(tools.baseItemSlotName(1))
 	end)
 
+	it("does not substitute player output for a missing Mercenary actor", function()
+		local playerOutput = { CombinedDPS = 100 }
+		local actorOutputs = { PLAYER = playerOutput }
+		assert.is_nil(tools.comparisonBaseOutput(playerOutput, actorOutputs, "Mercenary Helmet"))
+		assert.are.equal(playerOutput, tools.comparisonBaseOutput(playerOutput, actorOutputs, "Helmet"))
+		assert.is_true(not tools.mercenaryOutputAvailable(nil))
+		assert.is_true(not tools.mercenaryOutputAvailable({ ActorUnavailableMessage = "missing" }))
+	end)
+
+	it("uses Mercenary output when the actor is present", function()
+		local playerOutput = { CombinedDPS = 100 }
+		local mercenaryOutput = { CombinedDPS = 50 }
+		assert.are.equal(mercenaryOutput, tools.comparisonBaseOutput(playerOutput, {
+			PLAYER = playerOutput,
+			MERCENARY = mercenaryOutput,
+		}, "Mercenary Helmet"))
+		assert.is_true(tools.mercenaryOutputAvailable(mercenaryOutput))
+	end)
+
 	it("groups numbered class variants for the picker", function()
 		local groups, byClassId = tools.classGroups({
 			classOrder = { "templar2", "witch2", "templar1", "scion" },
@@ -111,6 +130,49 @@ Can be used in a personal Map Device alongside a Map to have this previously fou
 		assert.are.equal(2, firstSupport.tier)
 		assert.are.equal("Withering Step", mercenaryData.skills[imported.mainSkillId].name)
 		assert.is_true(imported.importedWarrant)
+	end)
+
+	it("rejects oversized, malformed, and ambiguous Warrant input", function()
+		local mercenaryData = LoadModule("Data/Mercenaries")
+		mercenaryData.supportCounts = _G.data.mercenaryStatData.supportCounts
+		local _, err = tools.importWarrant(string.rep("x", 256 * 1024 + 1), mercenaryData)
+		assert.matches("256 KiB", err)
+
+		local header = "Mercenary Warrant\n--------\nBuild: Toxicologist\nMercenary Level: 83\n--------\n"
+		_, err = tools.importWarrant(header.."Withering Step\nNot a support\n", mercenaryData)
+		assert.matches("Invalid support line", err)
+		_, err = tools.importWarrant(header.."Withering Step\nIncreased Area of Effect (Tier: 2)\nIncreased Area of Effect (Tier: 2)\n", mercenaryData)
+		assert.matches("Duplicate support", err)
+		_, err = tools.importWarrant(header.."Withering Step\nIncreased Area of Effect (Tier: 9)\n", mercenaryData)
+		assert.matches("is not valid", err)
+		_, err = tools.importWarrant(header.."Withering Step\nIncreased Area of Effect (Tier: 2)\n--------\nLeftover garbage\n", mercenaryData)
+		assert.matches("Unknown Mercenary skill", err)
+
+		local fake = {
+			builds = {
+				a = { id = "a", name = "Dup", classId = "c", skillIds = { "s" } },
+				b = { id = "b", name = "Dup", classId = "c", skillIds = { "s" } },
+			},
+			buildOrder = { "a", "b" },
+			skills = { s = { id = "s", name = "Skill", possibleSupportIds = { }, supportCountId = "None" } },
+			supports = { },
+			supportCounts = { None = { maximum = 0 } },
+		}
+		_, err = tools.importWarrant("Mercenary Warrant\n--------\nBuild: Dup\nMercenary Level: 10\n--------\nSkill\n", fake)
+		assert.matches("Ambiguous Mercenary build", err)
+
+		local familyData = {
+			builds = { only = { id = "only", name = "Solo", classId = "c", skillIds = { "s" }, skillPools = { { skillIds = { "s" } } } } },
+			buildOrder = { "only" },
+			skills = { s = { id = "s", name = "Skill", possibleSupportIds = { "s1", "s2" }, supportCountId = "Low" } },
+			supports = {
+				s1 = { id = "s1", name = "SuppA", variant = 1, familyId = "fam" },
+				s2 = { id = "s2", name = "SuppB", variant = 1, familyId = "fam" },
+			},
+			supportCounts = { Low = { maximum = 2 } },
+		}
+		_, err = tools.importWarrant("Mercenary Warrant\n--------\nBuild: Solo\nMercenary Level: 10\n--------\nSkill\nSuppA (Tier: 1)\nSuppB (Tier: 1)\n", familyData)
+		assert.matches("Duplicate support family", err)
 	end)
 
 	it("calculates effective Mercenary levels and found-area requirements", function()
@@ -208,6 +270,41 @@ Can be used in a personal Map Device alongside a Map to have this previously fou
 		}, data), "\n")
 		assert.matches("Skill pool 1 allows at most 1", errors)
 	end)
+
+	it("treats a missing support-count policy as an error rather than zero", function()
+		assert.are.equal(2, tools.supportLimit(data, data.skills.skill))
+		data.supportCounts.None = { maximum = 0 }
+		assert.are.equal(0, tools.supportLimit(data, { id = "zero", supportCountId = "None" }))
+		assert.is_nil(tools.supportLimit(data, { id = "drift", supportCountId = "MissingPolicy" }))
+		data.skills.skill.supportCountId = "MissingPolicy"
+		local errors = table.concat(tools.validateProfile({
+			buildId = "build",
+			foundAreaLevel = 68,
+			mainSkillId = "skill",
+			skills = { { id = "skill", enabled = true, supports = { } } },
+		}, data), "\n")
+		assert.matches("Missing support%-count policy for MissingPolicy", errors)
+		data.skills.skill.supportCountId = "Low"
+		data.supportCounts.None = nil
+	end)
+
+	it("rejects illegal editor skill and support candidates before mutation", function()
+		local profile = {
+			buildId = "build",
+			foundAreaLevel = 68,
+			mainSkillId = "skill",
+			skills = { { id = "skill", enabled = true, supports = { } } },
+		}
+		assert.matches("Duplicate skill", tools.skillCandidateError(profile, data, 2, "skill"))
+		assert.matches("allows at most 1", tools.skillCandidateError(profile, data, 2, "other_skill"))
+		assert.is_nil(tools.firstLegalSkillId(profile, data))
+		assert.matches("Duplicate support family", tools.supportCandidateError({
+			skills = { { id = "skill", supports = { { id = "support_t1", tier = 1 } } } },
+		}, data, 1, 2, "support_t2"))
+		assert.is_nil(tools.supportCandidateError({
+			skills = { { id = "skill", supports = { } } },
+		}, data, 1, 1, "support_t1"))
+	end)
 end)
 
 describe("Generated Mercenary data", function()
@@ -252,6 +349,7 @@ describe("Generated Mercenary data", function()
 			local resolved = mercenaries.skillsByHash[tostring(skill.hash)]
 			assert.is_table(resolved)
 			assert.is_true(has(resolved, skillId))
+			assert.is_table(mercenaries.supportCounts[skill.supportCountId], skillId..": "..tostring(skill.supportCountId))
 			for _, supportId in ipairs(skill.possibleSupportIds) do
 				assert.is_table(mercenaries.supports[supportId])
 			end
@@ -301,6 +399,20 @@ describe("Generated Mercenary data", function()
 			assert.is_table(data.skills[templateId], templateId)
 		end
 		assert.are.equal(5, mercenaries.supportCounts.High.maximum)
+		assert.are.equal(0, mercenaries.supportCounts.None.maximum)
+		for skillId, skill in pairs(mercenaries.skills) do
+			assert.are.equal(skillId, skill.id)
+		end
+		for _, buildId in ipairs(mercenaries.buildOrder) do
+			assert.is_table(assert(mercenaries.builds[buildId]).weaponConfiguration, buildId)
+		end
+		for policyId in pairs(data.mercenaryStatData.supportCounts) do
+			local used = false
+			for _, skill in pairs(mercenaries.skills) do
+				if skill.supportCountId == policyId then used = true break end
+			end
+			assert.is_true(used, "unused support-count policy: "..policyId)
+		end
 	end)
 
 	it("populates every input of an inherited preDamageFunc", function()

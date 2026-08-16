@@ -97,8 +97,11 @@ describe("CompareTab", function()
 		build.mercenaryTab:Changed()
 		local primaryMercenarySet = assert(build.mercenaryTab:GetItemSet(true))
 		local item = new("Item"):Item("Rarity: Normal\nCrude Bow")
+		local quiver = new("Item"):Item("Rarity: Normal\nSerrated Arrow Quiver")
 		build.itemsTab:AddItem(item, true)
+		build.itemsTab:AddItem(quiver, true)
 		primaryMercenarySet[MercenaryTools.itemSlotName("Weapon 1")].selItemId = item.id
+		primaryMercenarySet[MercenaryTools.itemSlotName("Weapon 2")].selItemId = quiver.id
 
 		build.configTab.input.enemyLevel = 83
 		build.configTab:BuildModList()
@@ -110,7 +113,8 @@ describe("CompareTab", function()
 		build.itemsTab:SetViewItemSet(primaryMercenarySet.id)
 		build.calcsTab:BuildOutput()
 		local _, baseOutput, actorOutputs = build.calcsTab:GetMiscCalculator()
-		assert.are.equal(actorOutputs.MERCENARY, baseOutput)
+		assert.are.equal(actorOutputs.PLAYER, baseOutput)
+		assert.is_truthy(actorOutputs.MERCENARY)
 
 		local playerWeapon = build.itemsTab.activeItemSet["Weapon 1"]
 		playerWeapon.selItemId = 0

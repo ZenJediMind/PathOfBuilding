@@ -321,9 +321,9 @@ function ItemListClass:OnSelClick(index, itemId, doubleClick)
 				end
 			end
 			if self.itemsTab.slots[slotName].selItemId == item.id then
-				self.itemsTab.slots[slotName]:SetSelItemId(0)
+				self.itemsTab.slots[slotName]:SetSelItemId(0, visibleItemSet)
 			else
-				self.itemsTab.slots[slotName]:SetSelItemId(item.id)
+				self.itemsTab.slots[slotName]:SetSelItemId(item.id, visibleItemSet)
 			end
 			self.itemsTab:PopulateSlots()
 			self.itemsTab:AddUndoState()

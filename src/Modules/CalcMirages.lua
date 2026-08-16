@@ -38,7 +38,10 @@ local function calculateMirage(env, config)
 
 	if mirageSkill then
 		local newSkill, newEnv, fullEnv = calcs.copyActiveSkill(env, "CALCULATOR", mirageSkill)
-		if not newSkill then return end
+		if not newSkill then
+			config.mirageSkillNotFoundFunc(env, config)
+			return
+		end
 		newSkill.skillCfg.skillCond["usedByMirage"] = true
 		newSkill.skillFlags.multiPart = nil
 		newSkill.skillFlags.haveMinion = nil
@@ -51,13 +54,19 @@ local function calculateMirage(env, config)
 		config.preCalcFunc(env, newSkill, newEnv)
 
 		newEnv.player.mainSkill = newSkill
+		local restoredUsedByMirage = { }
 		for _, actorName in ipairs({ "player", "mercenary" }) do
 			local otherActor = fullEnv[actorName]
 			if otherActor and otherActor ~= newEnv.player and otherActor.mainSkill then
-				otherActor.mainSkill.skillCfg.skillCond.usedByMirage = true
+				local cond = otherActor.mainSkill.skillCfg.skillCond
+				t_insert(restoredUsedByMirage, { cond = cond, previous = cond.usedByMirage })
+				cond.usedByMirage = true
 			end
 		end
 		calcs.perform(fullEnv)
+		for _, entry in ipairs(restoredUsedByMirage) do
+			entry.cond.usedByMirage = entry.previous
+		end
 		if newEnv.player.isMercenary then newEnv.minion = fullEnv.mercenaryMinion end
 		config.postCalcFunc(env, newSkill, newEnv)
 	else

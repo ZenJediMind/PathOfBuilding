@@ -258,14 +258,10 @@ function ItemDBClass:ListBuilder()
 		local calcFunc, calcBase = self.itemsTab.build.calcsTab:GetMiscCalculator(self.build)
 		local visibleItemSet = self.itemsTab:GetVisibleItemSet()
 		local visibleSlots = self.itemsTab:GetVisibleItemSlots()
-		local function isSlotShown(slot)
-			if slot.shown == nil then return true end
-			return type(slot.shown) == "function" and slot.shown() or slot.shown
-		end
 		for itemIndex, item in ipairs(list) do
 			item.measuredPower = -math.huge
 			local function measureSlot(slotName, slot)
-				if self.itemsTab:IsItemValidForSlot(item, slotName, visibleItemSet) and not slot.inactive and isSlotShown(slot) and (not slot.weaponSet or slot.weaponSet == (visibleItemSet.useSecondWeaponSet and 2 or 1)) then
+				if self.itemsTab:IsItemValidForSlot(item, slotName, visibleItemSet) and not slot.inactive and slot:IsShown() and (not slot.weaponSet or slot.weaponSet == (visibleItemSet.useSecondWeaponSet and 2 or 1)) then
 					local output = calcFunc(item.base.flask and { toggleFlask = item } or item.base.tincture and { toggleTincture = item } or { repSlotName = slotName, repItem = item }, useFullDPS)
 					local measuredPower = data.powerStatList.GetFromOutput(output, self.sortDetail)
 					item.measuredPower = m_max(item.measuredPower, measuredPower)

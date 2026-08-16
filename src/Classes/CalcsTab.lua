@@ -283,11 +283,11 @@ function CalcsTabClass:RefreshMercenarySkillSelectControls(controls, suffix)
 		controls.mainSkillPart.shown = true
 	end
 	if activeSkill and activeSkill.skillFlags.multiStage then
-		controls.mainSkillStageCount.buf = tostring(selectedSkill.skillStageCount or activeSkill.skillData.stagesMax or activeSkill.skillData.stagesMin or 1)
+		controls.mainSkillStageCount.buf = tostring(selectedSkill and selectedSkill.skillStageCount or activeSkill.skillData.stagesMax or activeSkill.skillData.stagesMin or 1)
 		controls.mainSkillStageCount.shown = true
 	end
 	if activeSkill and activeSkill.skillFlags.mine then
-		controls.mainSkillMineCount.buf = tostring(selectedSkill.skillMineCount or "")
+		controls.mainSkillMineCount.buf = tostring(selectedSkill and selectedSkill.skillMineCount or "")
 		controls.mainSkillMineCount.shown = true
 	end
 end

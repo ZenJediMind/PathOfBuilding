@@ -29,7 +29,7 @@ describe("ItemDBControl", function()
 		}
 		local itemsTab = {
 			activeItemSet = { useSecondWeaponSet = false },
-			slots = { ["Body Armour"] = { slotName = "Body Armour" } },
+			slots = { ["Body Armour"] = { slotName = "Body Armour", IsShown = function() return true end } },
 			build = {
 				calcsTab = {
 					GetMiscCalculator = function()

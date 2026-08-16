@@ -262,11 +262,11 @@ Blight 20/0  1
 		build.mercenaryTab:Changed()
 		local mercenaryItemSet = build.mercenaryTab:GetItemSet(true)
 		itemsTab:SetViewItemSet(mercenaryItemSet.id)
-		local equippedMercenaryHelmet = new("Item", "Rarity: Normal\nIron Hat")
+		local equippedMercenaryHelmet = new("Item"):Item("Rarity: Normal\nIron Hat")
 		itemsTab:AddItem(equippedMercenaryHelmet, true)
 		itemsTab.slots[mercenaryHelmetSlotName]:SetSelItemId(equippedMercenaryHelmet.id)
 
-		local sharedMercenaryHelmet = new("Item", "Rarity: Normal\nCone Helmet")
+		local sharedMercenaryHelmet = new("Item"):Item("Rarity: Normal\nCone Helmet")
 		itemsTab:AddItem(sharedMercenaryHelmet, true)
 		local secondItemSet = itemsTab:NewItemSet()
 		table.insert(itemsTab.itemSetOrderList, secondItemSet.id)
@@ -302,7 +302,7 @@ Blight 20/0  1
 		local itemsTab = build.itemsTab
 		local mercenaryItemSet = build.mercenaryTab:EnsureItemSet()
 		build.mercenaryTab.itemSetId = nil
-		local mercenaryHelmet = new("Item", "Rarity: Normal\nIron Hat")
+		local mercenaryHelmet = new("Item"):Item("Rarity: Normal\nIron Hat")
 		itemsTab:AddItem(mercenaryHelmet, true)
 		mercenaryItemSet[MercenaryTools.itemSlotName("Helmet")].selItemId = mercenaryHelmet.id
 

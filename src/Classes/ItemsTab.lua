@@ -1266,7 +1266,10 @@ function ItemsTabClass:Load(xml, dbFileName)
 	self.viewItemSet = nil
 	self.itemSets = { }
 	self.itemSetOrderList = { }
+	self.legacyMercenaryItemSetIds = { }
+	self.legacyMercenaryItemSetId = nil
 	self.tradeQuery.statSortSelectionList = { }
+	local legacyMercenaryItemSets = { }
 	for _, node in ipairs(xml) do
 		if node.elem == "Item" then
 			local item = new("Item"):Item("")
@@ -1328,6 +1331,7 @@ function ItemsTabClass:Load(xml, dbFileName)
 			end
 		elseif node.elem == "ItemSet" then
 			local title = node.attrib.title
+			local legacyOwnerlessItemSet = node.attrib.owner == nil
 			local owner = node.attrib.owner
 			if owner == "Player" then
 				owner = nil
@@ -1338,14 +1342,25 @@ function ItemsTabClass:Load(xml, dbFileName)
 			local itemSet = self:NewItemSet(tonumber(node.attrib.id), owner)
 			itemSet.title = node.attrib.title
 			itemSet.useSecondWeaponSet = node.attrib.useSecondWeaponSet == "true"
+			local legacyMercenarySlots = { }
 			for _, child in ipairs(node) do
 				if child.elem == "Slot" then
 					local slotName = child.attrib.name or ""
-					local itemSlot = itemSet[slotName]
-					if itemSlot then
-						itemSlot.selItemId = tonumber(child.attrib.itemId) or 0
-						itemSlot.active = child.attrib.active == "true"
-						itemSlot.pbURL = child.attrib.itemPbURL or ""
+					local savedSlot = {
+						selItemId = tonumber(child.attrib.itemId) or 0,
+						active = child.attrib.active == "true",
+						pbURL = child.attrib.itemPbURL or "",
+					}
+					if legacyOwnerlessItemSet and MercenaryTools.baseItemSlotName(slotName)
+						and (savedSlot.selItemId ~= 0 or savedSlot.active or savedSlot.pbURL ~= "") then
+						legacyMercenarySlots[slotName] = savedSlot
+					else
+						local itemSlot = itemSet[slotName]
+						if itemSlot then
+							itemSlot.selItemId = savedSlot.selItemId
+							itemSlot.active = savedSlot.active
+							itemSlot.pbURL = savedSlot.pbURL
+						end
 					end
 				elseif child.elem == "SocketIdURL" then
 					local id = tonumber(child.attrib.nodeId)
@@ -1353,6 +1368,13 @@ function ItemsTabClass:Load(xml, dbFileName)
 				end
 			end
 			t_insert(self.itemSetOrderList, itemSet.id)
+			if next(legacyMercenarySlots) then
+				t_insert(legacyMercenaryItemSets, {
+					sourceItemSetId = itemSet.id,
+					sourceTitle = title,
+					slots = legacyMercenarySlots,
+				})
+			end
 		elseif node.elem == "TradeSearchWeights" then
 			for _, child in ipairs(node) do
 				local statSort = {
@@ -1372,12 +1394,30 @@ function ItemsTabClass:Load(xml, dbFileName)
 			end
 		end
 	end
+	local savedActiveItemSetId = tonumber(xml.attrib.activeItemSet)
+	for _, legacyItemSet in ipairs(legacyMercenaryItemSets) do
+		local itemSet = self:NewItemSet(nil, "Mercenary")
+		itemSet.title = legacyItemSet.sourceTitle and legacyItemSet.sourceTitle ~= ""
+			and legacyItemSet.sourceTitle.." - Mercenary Equipment" or "Mercenary Equipment"
+		for slotName, savedSlot in pairs(legacyItemSet.slots) do
+			if itemSet[slotName] then
+				itemSet[slotName] = savedSlot
+			end
+		end
+		t_insert(self.itemSetOrderList, itemSet.id)
+		self.legacyMercenaryItemSetIds[legacyItemSet.sourceItemSetId] = itemSet.id
+		if legacyItemSet.sourceItemSetId == savedActiveItemSetId then
+			self.legacyMercenaryItemSetId = itemSet.id
+		end
+	end
+	if not self.legacyMercenaryItemSetId and #legacyMercenaryItemSets == 1 then
+		self.legacyMercenaryItemSetId = self.legacyMercenaryItemSetIds[legacyMercenaryItemSets[1].sourceItemSetId]
+	end
 	if not self.itemSetOrderList[1] then
 		local itemSet = self:NewItemSet(1)
 		itemSet.useSecondWeaponSet = xml.attrib.useSecondWeaponSet == "true"
 		t_insert(self.itemSetOrderList, itemSet.id)
 	end
-	local savedActiveItemSetId = tonumber(xml.attrib.activeItemSet)
 	local activeItemSetId = savedActiveItemSetId
 	if not self:IsPlayerItemSet(self.itemSets[activeItemSetId]) then
 		for _, itemSetId in ipairs(self.itemSetOrderList) do

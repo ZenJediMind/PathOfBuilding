@@ -58,23 +58,26 @@ local UNIQUE_SLOT_DESCRIPTION = {
 	MercenaryCanEquipUniqueBelts = "Unique Belts",
 }
 
-local MercenarySkillListClass = newClass("MercenarySkillListControl", "ListControl", function(self, anchor, rect, mercenaryTab)
-	self.ListControl(anchor, rect, 16, "VERTICAL", true, mercenaryTab.profile.skills)
+local MercenarySkillListClass = newClass("MercenarySkillListControl", "ListControl")
+
+function MercenarySkillListClass:MercenarySkillListControl(anchor, rect, mercenaryTab)
+	self:ListControl(anchor, rect, 16, "VERTICAL", true, mercenaryTab.profile.skills)
 	self.mercenaryTab = mercenaryTab
 	self.label = "^7Skill Groups:"
-	self.controls.delete = new("ButtonControl", { "BOTTOMRIGHT", self, "TOPRIGHT" }, { 0, -2, 60, 18 }, "Delete", function()
+	self.controls.delete = new("ButtonControl"):ButtonControl({ "BOTTOMRIGHT", self, "TOPRIGHT" }, { 0, -2, 60, 18 }, "Delete", function()
 		self:OnSelDelete(self.selIndex)
 	end)
 	self.controls.delete.enabled = function()
 		return self.selValue ~= nil
 	end
-	self.controls.new = new("ButtonControl", { "RIGHT", self.controls.delete, "LEFT" }, { -4, 0, 60, 18 }, "New", function()
+	self.controls.new = new("ButtonControl"):ButtonControl({ "RIGHT", self.controls.delete, "LEFT" }, { -4, 0, 60, 18 }, "New", function()
 		mercenaryTab:AddSkill()
 	end)
 	self.controls.new.enabled = function()
 		return mercenaryTab.skillOptions and #mercenaryTab.skillOptions > 1
 	end
-end)
+	return self
+end
 
 function MercenarySkillListClass:GetRowValue(_, _, skill)
 	local skillData = self.mercenaryTab.data.skills[skill.id]
@@ -123,9 +126,11 @@ function MercenarySkillListClass:OnOrderChange(_, newIndex)
 	self.mercenaryTab:Changed()
 end
 
-local MercenaryTabClass = newClass("MercenaryTab", "ControlHost", "Control", function(self, build)
-	self.ControlHost()
-	self.Control()
+local MercenaryTabClass = newClass("MercenaryTab", "ControlHost", "Control")
+
+function MercenaryTabClass:MercenaryTab(build)
+	self:ControlHost()
+	self:Control()
 	self.build = build
 	self.data = build.data.mercenaries
 	self.classGroups, self.classGroupsByClassId = MercenaryTools.classGroups(self.data)
@@ -144,8 +149,8 @@ local MercenaryTabClass = newClass("MercenaryTab", "ControlHost", "Control", fun
 	self.selectedSkillIndex = 1
 	self.errors = { }
 
-	self.controls.classLabel = new("LabelControl", { "TOPLEFT", self, "TOPLEFT" }, { 12, 12, 0, 16 }, "^7Mercenary class:")
-	self.controls.class = new("DropDownControl", { "LEFT", self.controls.classLabel, "RIGHT" }, { 8, 0, 240, 20 }, { }, function(_, value)
+	self.controls.classLabel = new("LabelControl"):LabelControl({ "TOPLEFT", self, "TOPLEFT" }, { 12, 12, 0, 16 }, "^7Mercenary class:")
+	self.controls.class = new("DropDownControl"):DropDownControl({ "LEFT", self.controls.classLabel, "RIGHT" }, { 8, 0, 240, 20 }, { }, function(_, value)
 		local classGroup = value
 		self.profile.importedWarrant = nil
 		self.profile.classId = classGroup and classGroup.classIds[1]
@@ -156,19 +161,19 @@ local MercenaryTabClass = newClass("MercenaryTab", "ControlHost", "Control", fun
 		self:Changed()
 	end)
 	self.controls.class:SetList(self.classGroups)
-	self.controls.setLabel = new("LabelControl", { "LEFT", self.controls.class, "RIGHT" }, { 20, 0, 0, 16 }, "^7Mercenary set:")
-	self.controls.setSelect = new("DropDownControl", { "LEFT", self.controls.setLabel, "RIGHT" }, { 8, 0, 210, 20 }, { }, function(_, value)
+	self.controls.setLabel = new("LabelControl"):LabelControl({ "LEFT", self.controls.class, "RIGHT" }, { 20, 0, 0, 16 }, "^7Mercenary set:")
+	self.controls.setSelect = new("DropDownControl"):DropDownControl({ "LEFT", self.controls.setLabel, "RIGHT" }, { 8, 0, 210, 20 }, { }, function(_, value)
 		if value then self:SetActiveMercenarySet(value.id) end
 	end)
 	self.controls.setSelect.enableDroppedWidth = true
 	self.controls.setSelect.enabled = function()
 		return #self.mercenarySetOrderList > 1
 	end
-	self.controls.setManage = new("ButtonControl", { "LEFT", self.controls.setSelect, "RIGHT" }, { 4, 0, 90, 20 }, "Manage...", function()
+	self.controls.setManage = new("ButtonControl"):ButtonControl({ "LEFT", self.controls.setSelect, "RIGHT" }, { 4, 0, 90, 20 }, "Manage...", function()
 		self:OpenMercenarySetManagePopup()
 	end)
-	self.controls.buildLabel = new("LabelControl", { "TOPLEFT", self.controls.classLabel, "BOTTOMLEFT" }, { 0, 12, 0, 16 }, "^7Class and build:")
-	self.controls.build = new("DropDownControl", { "LEFT", self.controls.buildLabel, "RIGHT" }, { 8, 0, 300, 20 }, { }, function(_, value)
+	self.controls.buildLabel = new("LabelControl"):LabelControl({ "TOPLEFT", self.controls.classLabel, "BOTTOMLEFT" }, { 0, 12, 0, 16 }, "^7Class and build:")
+	self.controls.build = new("DropDownControl"):DropDownControl({ "LEFT", self.controls.buildLabel, "RIGHT" }, { 8, 0, 300, 20 }, { }, function(_, value)
 		self.profile.importedWarrant = nil
 		self.profile.buildId = value and value.id
 		self.profile.classId = value and value.classId or self.profile.classId
@@ -177,25 +182,25 @@ local MercenaryTabClass = newClass("MercenaryTab", "ControlHost", "Control", fun
 		self.selectedSkillIndex = 1
 		self:Changed()
 	end)
-	self.controls.levelLabel = new("LabelControl", { "LEFT", self.controls.build, "RIGHT" }, { 20, 0, 0, 16 }, "^7Found-area level:")
-	self.controls.level = new("EditControl", { "LEFT", self.controls.levelLabel, "RIGHT" }, { 6, 0, 55, 20 }, "68", nil, "%D", 3, function(buf)
+	self.controls.levelLabel = new("LabelControl"):LabelControl({ "LEFT", self.controls.build, "RIGHT" }, { 20, 0, 0, 16 }, "^7Found-area level:")
+	self.controls.level = new("EditControl"):EditControl({ "LEFT", self.controls.levelLabel, "RIGHT" }, { 6, 0, 55, 20 }, "68", nil, "%D", 3, function(buf)
 		self.profile.foundAreaLevel = m_min(m_max(tonumber(buf) or 1, 1), 100)
 		self:Changed()
 	end)
 
-	self.controls.editEquipment = new("ButtonControl", { "TOPLEFT", self.controls.buildLabel, "BOTTOMLEFT" }, { 0, 14, 150, 20 }, "Edit Equipment", function()
+	self.controls.editEquipment = new("ButtonControl"):ButtonControl({ "TOPLEFT", self.controls.buildLabel, "BOTTOMLEFT" }, { 0, 14, 150, 20 }, "Edit Equipment", function()
 		local itemSet = self:GetItemSet(true)
 		if itemSet then build.itemsTab:SetViewItemSet(itemSet.id) end
 		build.viewMode = "ITEMS"
 	end)
-	self.controls.reset = new("ButtonControl", { "LEFT", self.controls.editEquipment, "RIGHT" }, { 8, 0, 80, 20 }, "Reset", function()
+	self.controls.reset = new("ButtonControl"):ButtonControl({ "LEFT", self.controls.editEquipment, "RIGHT" }, { 8, 0, 80, 20 }, "Reset", function()
 		self:Reset()
 	end)
-	self.controls.importWarrant = new("ButtonControl", { "LEFT", self.controls.reset, "RIGHT" }, { 8, 0, 120, 20 }, "Import Warrant...", function()
+	self.controls.importWarrant = new("ButtonControl"):ButtonControl({ "LEFT", self.controls.reset, "RIGHT" }, { 8, 0, 120, 20 }, "Import Warrant...", function()
 		self:OpenWarrantImportPopup()
 	end)
-	self.controls.lifeComparisonLabel = new("LabelControl", { "LEFT", self.controls.importWarrant, "RIGHT" }, { 20, 0, 0, 16 }, "^7Loyal Bodyguard:")
-	self.controls.lifeComparison = new("DropDownControl", { "LEFT", self.controls.lifeComparisonLabel, "RIGHT" }, { 6, 0, 170, 20 }, {
+	self.controls.lifeComparisonLabel = new("LabelControl"):LabelControl({ "LEFT", self.controls.importWarrant, "RIGHT" }, { 20, 0, 0, 16 }, "^7Loyal Bodyguard:")
+	self.controls.lifeComparison = new("DropDownControl"):DropDownControl({ "LEFT", self.controls.lifeComparisonLabel, "RIGHT" }, { 6, 0, 170, 20 }, {
 		{ label = "Automatic Life comparison", id = "AUTO" },
 		{ label = "Mercenary has higher Life", id = "MERCENARY" },
 		{ label = "Player has higher Life", id = "PLAYER" },
@@ -203,39 +208,39 @@ local MercenaryTabClass = newClass("MercenaryTab", "ControlHost", "Control", fun
 		self.profile.lifeComparison = value.id
 		self:Changed()
 	end)
-	self.controls.itemSetLabel = new("LabelControl", { "TOPLEFT", self.controls.editEquipment, "BOTTOMLEFT" }, { 0, 12, 0, 16 }, "^7Equipment item set:")
-	self.controls.itemSetSelect = new("DropDownControl", { "LEFT", self.controls.itemSetLabel, "RIGHT" }, { 6, 0, 230, 20 }, { }, function(_, value)
+	self.controls.itemSetLabel = new("LabelControl"):LabelControl({ "TOPLEFT", self.controls.editEquipment, "BOTTOMLEFT" }, { 0, 12, 0, 16 }, "^7Equipment item set:")
+	self.controls.itemSetSelect = new("DropDownControl"):DropDownControl({ "LEFT", self.controls.itemSetLabel, "RIGHT" }, { 6, 0, 230, 20 }, { }, function(_, value)
 		if value and value.id then self:SetItemSet(value.id) end
 	end)
 	self.controls.itemSetSelect.enableDroppedWidth = true
-	self.controls.itemSetManage = new("ButtonControl", { "LEFT", self.controls.itemSetSelect, "RIGHT" }, { 4, 0, 90, 20 }, "Manage...", function()
+	self.controls.itemSetManage = new("ButtonControl"):ButtonControl({ "LEFT", self.controls.itemSetSelect, "RIGHT" }, { 4, 0, 90, 20 }, "Manage...", function()
 		self:OpenMercenaryItemSetManagePopup()
 	end)
 
-	self.controls.skillList = new("MercenarySkillListControl", { "TOPLEFT", self.controls.itemSetLabel, "BOTTOMLEFT" }, { 0, 32, 360, 300 }, self)
-	self.controls.skillTip = new("LabelControl", { "TOPLEFT", self.controls.skillList, "BOTTOMLEFT" }, { 0, 8, 0, 14 }, [[
+	self.controls.skillList = new("MercenarySkillListControl"):MercenarySkillListControl({ "TOPLEFT", self.controls.itemSetLabel, "BOTTOMLEFT" }, { 0, 32, 360, 300 }, self)
+	self.controls.skillTip = new("LabelControl"):LabelControl({ "TOPLEFT", self.controls.skillList, "BOTTOMLEFT" }, { 0, 8, 0, 14 }, [[
 ^7Usage Tips:
 - Ctrl + Click to enable/disable skill groups.
 - Ctrl + Right click to include/exclude in Full DPS calculations.
 ]])
-	self.controls.optionSection = new("SectionControl", { "TOPLEFT", self.controls.skillList, "BOTTOMLEFT" }, { 0, 60, 360, 70 }, "Gem Options")
-	self.controls.sortGemsByDPS = new("CheckBoxControl", { "TOPLEFT", self.controls.optionSection, "TOPLEFT" }, { 170, 20, 20 }, "Sort gems by DPS:", function(state)
+	self.controls.optionSection = new("SectionControl"):SectionControl({ "TOPLEFT", self.controls.skillList, "BOTTOMLEFT" }, { 0, 60, 360, 70 }, "Gem Options")
+	self.controls.sortGemsByDPS = new("CheckBoxControl"):CheckBoxControl({ "TOPLEFT", self.controls.optionSection, "TOPLEFT" }, { 170, 20, 20 }, "Sort gems by DPS:", function(state)
 		self.sortGemsByDPS = state
 		self:InvalidateSupportSort()
 		self:RefreshSupportLists()
 	end, nil, true)
-	self.controls.sortGemsByDPSFieldControl = new("DropDownControl", { "LEFT", self.controls.sortGemsByDPS, "RIGHT" }, { 10, 0, 140, 20 }, skillOptions.sortGemTypeList, function(_, value)
+	self.controls.sortGemsByDPSFieldControl = new("DropDownControl"):DropDownControl({ "LEFT", self.controls.sortGemsByDPS, "RIGHT" }, { 10, 0, 140, 20 }, skillOptions.sortGemTypeList, function(_, value)
 		self.sortGemsByDPSField = value.type
 		self:InvalidateSupportSort()
 		self:RefreshSupportLists()
 	end)
 	self.controls.sortGemsByDPSFieldControl:SelByValue(self.sortGemsByDPSField, "type")
-	self.controls.skillDetailAnchor = new("Control", { "TOPLEFT", self.controls.skillList, "TOPRIGHT" }, { 20, 0, 0, 0 })
+	self.controls.skillDetailAnchor = new("Control"):Control({ "TOPLEFT", self.controls.skillList, "TOPRIGHT" }, { 20, 0, 0, 0 })
 	self.controls.skillDetailAnchor.shown = function()
 		return self.profile.skills[self.selectedSkillIndex] ~= nil
 	end
-	self.controls.skillLabel = new("LabelControl", { "TOPLEFT", self.controls.skillDetailAnchor, "TOPLEFT" }, { 0, 2, 0, 16 }, "^7Skill:")
-	self.controls.skill = new("DropDownControl", { "TOPLEFT", self.controls.skillDetailAnchor, "TOPLEFT" }, { 85, 0, 380, 20 }, { }, function(_, value)
+	self.controls.skillLabel = new("LabelControl"):LabelControl({ "TOPLEFT", self.controls.skillDetailAnchor, "TOPLEFT" }, { 0, 2, 0, 16 }, "^7Skill:")
+	self.controls.skill = new("DropDownControl"):DropDownControl({ "TOPLEFT", self.controls.skillDetailAnchor, "TOPLEFT" }, { 85, 0, 380, 20 }, { }, function(_, value)
 		self:SetSkill(self.selectedSkillIndex, value and value.id)
 	end)
 	self.controls.skill.tooltipFunc = function(tooltip, mode, index, value)
@@ -246,55 +251,55 @@ local MercenaryTabClass = newClass("MercenaryTab", "ControlHost", "Control", fun
 			end
 		end
 	end
-	self.controls.skillEnabledLabel = new("LabelControl", { "TOPLEFT", self.controls.skillDetailAnchor, "TOPLEFT" }, { 0, 32, 0, 16 }, "^7Enabled:")
-	self.controls.skillEnabled = new("CheckBoxControl", { "TOPLEFT", self.controls.skillDetailAnchor, "TOPLEFT" }, { 68, 30, 20 }, nil, function(state)
+	self.controls.skillEnabledLabel = new("LabelControl"):LabelControl({ "TOPLEFT", self.controls.skillDetailAnchor, "TOPLEFT" }, { 0, 32, 0, 16 }, "^7Enabled:")
+	self.controls.skillEnabled = new("CheckBoxControl"):CheckBoxControl({ "TOPLEFT", self.controls.skillDetailAnchor, "TOPLEFT" }, { 68, 30, 20 }, nil, function(state)
 		local skill = self.profile.skills[self.selectedSkillIndex]
 		if skill then skill.enabled = state end
 		self:Changed()
 	end)
-	self.controls.skillFullDPSLabel = new("LabelControl", { "TOPLEFT", self.controls.skillDetailAnchor, "TOPLEFT" }, { 108, 32, 0, 16 }, "^7Include in Full DPS:")
-	self.controls.skillFullDPS = new("CheckBoxControl", { "TOPLEFT", self.controls.skillDetailAnchor, "TOPLEFT" }, { 247, 30, 20 }, nil, function(state)
+	self.controls.skillFullDPSLabel = new("LabelControl"):LabelControl({ "TOPLEFT", self.controls.skillDetailAnchor, "TOPLEFT" }, { 108, 32, 0, 16 }, "^7Include in Full DPS:")
+	self.controls.skillFullDPS = new("CheckBoxControl"):CheckBoxControl({ "TOPLEFT", self.controls.skillDetailAnchor, "TOPLEFT" }, { 247, 30, 20 }, nil, function(state)
 		local skill = self.profile.skills[self.selectedSkillIndex]
 		if skill then skill.includeInFullDPS = state end
 		self:Changed()
 	end)
-	self.controls.skillCountLabel = new("LabelControl", { "TOPLEFT", self.controls.skillDetailAnchor, "TOPLEFT" }, { 287, 32, 0, 16 }, "^7Count:")
-	self.controls.skillCount = new("EditControl", { "TOPLEFT", self.controls.skillDetailAnchor, "TOPLEFT" }, { 335, 30, 50, 20 }, "1", nil, "%D", 2, function(buf)
+	self.controls.skillCountLabel = new("LabelControl"):LabelControl({ "TOPLEFT", self.controls.skillDetailAnchor, "TOPLEFT" }, { 287, 32, 0, 16 }, "^7Count:")
+	self.controls.skillCount = new("EditControl"):EditControl({ "TOPLEFT", self.controls.skillDetailAnchor, "TOPLEFT" }, { 335, 30, 50, 20 }, "1", nil, "%D", 2, function(buf)
 		local skill = self.profile.skills[self.selectedSkillIndex]
 		if skill then skill.count = m_min(m_max(tonumber(buf) or 1, 1), 99) end
 		self:Changed()
 	end)
-	self.controls.skillPartLabel = new("LabelControl", { "TOPLEFT", self.controls.skillDetailAnchor, "TOPLEFT" }, { 0, 64, 0, 16 }, "^7Skill part:")
-	self.controls.skillPart = new("DropDownControl", { "TOPLEFT", self.controls.skillDetailAnchor, "TOPLEFT" }, { 85, 62, 180, 20 }, { }, function(_, value)
+	self.controls.skillPartLabel = new("LabelControl"):LabelControl({ "TOPLEFT", self.controls.skillDetailAnchor, "TOPLEFT" }, { 0, 64, 0, 16 }, "^7Skill part:")
+	self.controls.skillPart = new("DropDownControl"):DropDownControl({ "TOPLEFT", self.controls.skillDetailAnchor, "TOPLEFT" }, { 85, 62, 180, 20 }, { }, function(_, value)
 		local selected = self.profile.skills[self.selectedSkillIndex]
 		if selected and value then selected.skillPart = value.index end
 		self:Changed()
 	end)
-	self.controls.skillMinionSkillLabel = new("LabelControl", { "TOPLEFT", self.controls.skillDetailAnchor, "TOPLEFT" }, { 285, 64, 0, 16 }, "^7Minion skill:")
-	self.controls.skillMinionSkill = new("DropDownControl", { "TOPLEFT", self.controls.skillDetailAnchor, "TOPLEFT" }, { 375, 62, 230, 20 }, { }, function(_, value)
+	self.controls.skillMinionSkillLabel = new("LabelControl"):LabelControl({ "TOPLEFT", self.controls.skillDetailAnchor, "TOPLEFT" }, { 285, 64, 0, 16 }, "^7Minion skill:")
+	self.controls.skillMinionSkill = new("DropDownControl"):DropDownControl({ "TOPLEFT", self.controls.skillDetailAnchor, "TOPLEFT" }, { 375, 62, 230, 20 }, { }, function(_, value)
 		local selected = self.profile.skills[self.selectedSkillIndex]
 		if selected and value then selected.skillMinionSkill = value.index end
 		self:Changed()
 	end)
 
-	self.controls.supportsHeader = new("LabelControl", { "TOPLEFT", self.controls.skillDetailAnchor, "TOPLEFT" }, { 0, 102, 0, 16 }, function()
+	self.controls.supportsHeader = new("LabelControl"):LabelControl({ "TOPLEFT", self.controls.skillDetailAnchor, "TOPLEFT" }, { 0, 102, 0, 16 }, function()
 		local skill = self.profile.skills[self.selectedSkillIndex]
 		return "^7Supports for "..(skill and self.data.skills[skill.id] and self.data.skills[skill.id].name or "selected skill")..":"
 	end)
-	self.controls.supportSortStatus = new("LabelControl", { "LEFT", self.controls.supportsHeader, "RIGHT" }, { 8, 0, 0, 16 }, function()
+	self.controls.supportSortStatus = new("LabelControl"):LabelControl({ "LEFT", self.controls.supportsHeader, "RIGHT" }, { 8, 0, 0, 16 }, function()
 		return self.supportSortCoroutine and "^7Sorting "..self.supportSortStatus or ""
 	end)
 	self.supportControls = { }
 	local function createSupportRow(index)
 		local y = 124 + (index - 1) * 22
-		local clear = new("ButtonControl", { "TOPLEFT", self.controls.skillDetailAnchor, "TOPLEFT" }, { 0, y, 20, 20 }, "x", function()
+		local clear = new("ButtonControl"):ButtonControl({ "TOPLEFT", self.controls.skillDetailAnchor, "TOPLEFT" }, { 0, y, 20, 20 }, "x", function()
 			self:SetSupport(index, nil)
 		end)
 		clear.enabled = function()
 			local skill = self.profile.skills[self.selectedSkillIndex]
 			return skill and skill.supports[index] ~= nil
 		end
-		local control = new("DropDownControl", { "LEFT", clear, "RIGHT" }, { 2, 0, 380, 20 }, { }, function(_, value)
+		local control = new("DropDownControl"):DropDownControl({ "LEFT", clear, "RIGHT" }, { 2, 0, 380, 20 }, { }, function(_, value)
 			self:SetSupport(index, value and value.id)
 		end)
 		control.tooltipFunc = function(tooltip, mode, _, value)
@@ -320,10 +325,11 @@ local MercenaryTabClass = newClass("MercenaryTab", "ControlHost", "Control", fun
 		self.supportControls[index] = createSupportRow(index)
 	end
 
-	self.controls.errorsHeader = new("LabelControl", { "TOPLEFT", self.controls.optionSection, "BOTTOMLEFT" }, { 0, 12, 0, 16 }, "^7Warnings (informational):")
-	self.controls.errors = new("TextListControl", { "TOPLEFT", self.controls.errorsHeader, "BOTTOMLEFT" }, { 0, 4, 760, 110 }, { { x = 4, align = "LEFT" } }, self.errors)
+	self.controls.errorsHeader = new("LabelControl"):LabelControl({ "TOPLEFT", self.controls.optionSection, "BOTTOMLEFT" }, { 0, 12, 0, 16 }, "^7Warnings (informational):")
+	self.controls.errors = new("TextListControl"):TextListControl({ "TOPLEFT", self.controls.errorsHeader, "BOTTOMLEFT" }, { 0, 4, 760, 110 }, { { x = 4, align = "LEFT" } }, self.errors)
 	self:RefreshControls()
-end)
+	return self
+end
 
 local function makeMercenarySkillGem(build, skillData, actorLevel)
 	local grantedEffect = build.data.skills[skillData.id]
@@ -494,8 +500,21 @@ function MercenaryTabClass:GetMercenaryItemSetOrderList()
 	return orderList
 end
 
+function MercenaryTabClass:ResolveItemSetId()
+	local itemsTab = self.build.itemsTab
+	local migratedItemSetId = self.itemSetId and itemsTab.legacyMercenaryItemSetIds
+		and itemsTab.legacyMercenaryItemSetIds[self.itemSetId]
+	if migratedItemSetId then
+		self.itemSetId = migratedItemSetId
+	elseif not self.itemSetId and itemsTab.legacyMercenaryItemSetId then
+		self.itemSetId = itemsTab.legacyMercenaryItemSetId
+	end
+	return self.itemSetId
+end
+
 function MercenaryTabClass:EnsureItemSet()
 	local itemsTab = self.build.itemsTab
+	self:ResolveItemSetId()
 	local itemSet = self.itemSetId and itemsTab.itemSets[self.itemSetId]
 	if itemSet and itemsTab:IsMercenaryItemSet(itemSet) then
 		itemSet.owner = "Mercenary"
@@ -517,6 +536,7 @@ function MercenaryTabClass:EnsureItemSet()
 end
 
 function MercenaryTabClass:GetItemSet(create)
+	self:ResolveItemSetId()
 	local itemSet = self.itemSetId and self.build.itemsTab.itemSets[self.itemSetId]
 	if itemSet and self.build.itemsTab:IsMercenaryItemSet(itemSet) then return itemSet end
 	if create == true then return self:EnsureItemSet() end
@@ -771,8 +791,8 @@ end
 
 function MercenaryTabClass:OpenMercenarySetManagePopup()
 	main:OpenPopup(370, 290, "Manage Mercenary Loadouts", {
-		new("MercenarySetListControl", nil, {0, 50, 350, 200}, self),
-		new("ButtonControl", nil, {0, 260, 90, 20}, "Done", function()
+		new("MercenarySetListControl"):MercenarySetListControl(nil, {0, 50, 350, 200}, self),
+		new("ButtonControl"):ButtonControl(nil, {0, 260, 90, 20}, "Done", function()
 			main:ClosePopup()
 		end),
 	})
@@ -780,8 +800,8 @@ end
 
 function MercenaryTabClass:OpenMercenaryItemSetManagePopup()
 	main:OpenPopup(370, 290, "Manage Mercenary Equipment Sets", {
-		new("MercenaryItemSetListControl", nil, {0, 50, 350, 200}, self),
-		new("ButtonControl", nil, {0, 260, 90, 20}, "Done", function()
+		new("MercenaryItemSetListControl"):MercenaryItemSetListControl(nil, {0, 50, 350, 200}, self),
+		new("ButtonControl"):ButtonControl(nil, {0, 260, 90, 20}, "Done", function()
 			main:ClosePopup()
 		end),
 	})
@@ -838,13 +858,13 @@ end
 function MercenaryTabClass:OpenWarrantImportPopup()
 	local controls = { }
 	local importError
-	controls.edit = new("EditControl", nil, { 0, 40, 600, 420 }, "", nil, "^%C\t\n", nil, nil, 14)
+	controls.edit = new("EditControl"):EditControl(nil, { 0, 40, 600, 420 }, "", nil, "^%C\t\n", nil, nil, 14)
 	controls.edit.font = "FIXED"
 	controls.edit.pasteFilter = sanitiseText
-	controls.error = new("LabelControl", { "TOPLEFT", controls.edit, "BOTTOMLEFT" }, { 0, 8, 600, 16 }, function()
+	controls.error = new("LabelControl"):LabelControl({ "TOPLEFT", controls.edit, "BOTTOMLEFT" }, { 0, 8, 600, 16 }, function()
 		return importError and colorCodes.NEGATIVE..importError or ""
 	end)
-	controls.import = new("ButtonControl", nil, { -45, 510, 80, 20 }, "Import", function()
+	controls.import = new("ButtonControl"):ButtonControl(nil, { -45, 510, 80, 20 }, "Import", function()
 		local ok, err = self:ImportWarrant(controls.edit.buf)
 		if not ok then
 			importError = err
@@ -852,7 +872,7 @@ function MercenaryTabClass:OpenWarrantImportPopup()
 		end
 		main:ClosePopup()
 	end, nil, true)
-	controls.cancel = new("ButtonControl", nil, { 45, 510, 80, 20 }, "Cancel", function()
+	controls.cancel = new("ButtonControl"):ButtonControl(nil, { 45, 510, 80, 20 }, "Cancel", function()
 		main:ClosePopup()
 	end)
 	main:OpenPopup(620, 550, "Import Mercenary Warrant", controls, "import", "edit", "cancel")
@@ -932,7 +952,7 @@ function MercenaryTabClass:ValidateEquippedItem(item, slotName, itemSet, playerI
 	if (self.profile.foundAreaLevel or 0) < requiredFoundLevel then
 		return false, "requires found-area level "..requiredFoundLevel
 	end
-	if item.rarity == "UNIQUE" or item.rarity == "RELIC" then
+	if (item.rarity == "UNIQUE" or item.rarity == "RELIC") and not (item.type == "Jewel" and item.base.subType == "Abyss") then
 		local requiredFlag = UNIQUE_FLAG_BY_SLOT[slotName]
 		if not requiredFlag then
 			return false, "Unique items are never permitted in this slot"
@@ -1078,6 +1098,15 @@ function MercenaryTabClass:Load(xml)
 	self:SetActiveMercenarySet(tonumber(xml.attrib.activeMercenarySet) or 1)
 	self.modFlag = false
 	self:RefreshControls()
+end
+
+function MercenaryTabClass:PostLoad()
+	self:ResolveItemSetId()
+	if self.profile and self.profile.buildId then
+		self:GetItemSet(true)
+	end
+	self:RefreshControls()
+	self.modFlag = false
 end
 
 function MercenaryTabClass:Save(xml)

@@ -1031,7 +1031,7 @@ end
 -- Load skills
 data.skills = { }
 data.skillStatMap = LoadModule("Data/SkillStatMap")(makeSkillMod, makeFlagMod, makeSkillDataMod)
-data.mercenaryStatData = LoadModule("Data/MercenaryStatMap", makeSkillMod, makeFlagMod, makeSkillDataMod)
+data.mercenaryStatData = LoadModule("Data/MercenaryStatMap")(makeSkillMod, makeFlagMod, makeSkillDataMod)
 data.mercenaryStatMap = data.mercenaryStatData.statMap
 data.skillStatMapMeta = {
 	__index = function(t, key)

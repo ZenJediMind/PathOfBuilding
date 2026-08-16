@@ -50,8 +50,8 @@ describe("Light Radius integration", function()
 
 	local function equipRings()
 		local itemsTab = build.itemsTab
-		local playerRing = new("Item", "Rarity: Normal\nPaua Ring")
-		local mercenaryRing = new("Item", "Rarity: Normal\nPaua Ring")
+		local playerRing = new("Item"):Item("Rarity: Normal\nPaua Ring")
+		local mercenaryRing = new("Item"):Item("Rarity: Normal\nPaua Ring")
 		itemsTab:AddItem(playerRing, true)
 		itemsTab:AddItem(mercenaryRing, true)
 		itemsTab.activeItemSet["Ring 1"].selItemId = playerRing.id
@@ -103,7 +103,7 @@ describe("Light Radius integration", function()
 	local function generateLightRadiusQuery(slotName, expectedBaseLightRadius)
 		local stat = lightRadiusStat()
 		local slot = assert(build.itemsTab.slots[slotName])
-		local queryGenerator = new("TradeQueryGenerator", build.itemsTab.tradeQuery)
+		local queryGenerator = new("TradeQueryGenerator"):TradeQueryGenerator(build.itemsTab.tradeQuery)
 		local queryJson, queryError
 		queryGenerator.tradeTypeIndex = 1
 		queryGenerator.requesterCallback = function(_, json, errMsg)
@@ -167,7 +167,7 @@ describe("Light Radius integration", function()
 		local baselinePlayerLightRadius = baseline.player.output.LightRadiusMod
 		local baselineMercenaryLightRadius = baseline.mercenary.output.LightRadiusMod
 		local mercenaryItemSet = assert(build.mercenaryTab:GetItemSet(true))
-		local lightRadiusRing = new("Item", [[Rarity: Rare
+		local lightRadiusRing = new("Item"):Item([[Rarity: Rare
 Mercenary Light Radius Test
 Paua Ring
 --------

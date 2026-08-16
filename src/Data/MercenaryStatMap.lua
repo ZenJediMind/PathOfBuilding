@@ -4,7 +4,7 @@
 -- Raw values are exported from MercenarySupports; this file only describes
 -- how those values participate in PoB's existing calculation model.
 --
-local mod, flag, skill = ...
+return function(mod, flag, skill)
 
 local allyBuff = { type = "GlobalEffect", effectType = "Buff", applyAllies = true }
 local allyWarcry = { type = "GlobalEffect", effectType = "Warcry", unscalable = true }
@@ -941,3 +941,4 @@ return {
 		},
 	},
 }
+end

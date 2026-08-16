@@ -8,8 +8,8 @@ describe("Mercenary review regressions", function()
 		local mercenaryItemSet = build.mercenaryTab:GetItemSet(true)
 		build.itemsTab:SetViewItemSet(mercenaryItemSet.id)
 		local raw = "Rarity: Normal\nCoral Ring"
-		local first = new("Item", raw)
-		local second = new("Item", raw)
+		local first = new("Item"):Item(raw)
+		local second = new("Item"):Item(raw)
 		first.id, second.id = 99101, 99102
 		build.itemsTab.items[first.id] = first
 		build.itemsTab.items[second.id] = second
@@ -18,7 +18,7 @@ describe("Mercenary review regressions", function()
 		local equippedSlot = assert(build.itemsTab:GetEquippedSlotForItem(first))
 		assert.are.equal(MercenaryTools.itemSlotName("Ring 1"), equippedSlot.slotName)
 		assert.are.equal(MercenaryTools.itemSlotName("Ring 1"), build.itemsTab:GetComparisonSlotNameForItem(first))
-		local unequipped = new("Item", "Rarity: Normal\nIron Hat")
+		local unequipped = new("Item"):Item("Rarity: Normal\nIron Hat")
 		assert.are.equal(MercenaryTools.itemSlotName("Helmet"), build.itemsTab:GetComparisonSlotNameForItem(unequipped))
 		build.itemsTab.itemOrderList = { first.id, second.id }
 

@@ -226,7 +226,7 @@ function calcs.initMercenary(env)
 		profile = profile,
 		monster = monster,
 	}
-	mercenary.modDB = new("ModDB")
+	mercenary.modDB = new("ModDB"):ModDB()
 	mercenary.modDB.actor = mercenary
 	mercenary.modDB.multipliers.Level = mercenary.level
 	calcs.initModDB(env, mercenary.modDB)

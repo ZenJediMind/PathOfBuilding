@@ -142,7 +142,7 @@ describe("Mercenary equipment validation", function()
 	it("creates and activates multiple Mercenary equipment item sets", function()
 		selectBuild("MeleeAOEMarauderFireSlam")
 		local itemsTab = build.itemsTab
-		local manager = new("MercenaryItemSetListControl", nil, {0, 0, 350, 200}, tab)
+		local manager = new("MercenaryItemSetListControl"):MercenaryItemSetListControl(nil, {0, 0, 350, 200}, tab)
 		assert.is_table(tab.controls.itemSetManage)
 		assert.is_table(manager.controls.copy)
 		assert.is_table(manager.controls.delete)
@@ -176,9 +176,9 @@ describe("Mercenary equipment validation", function()
 		guardianSet.title = "Animate Guardian"
 		table.insert(itemsTab.itemSetOrderList, guardianSet.id)
 		local mercSet = showMercenaryEquipment()
-		local playerHelmet = new("Item", "Rarity: Normal\nIron Hat")
-		local guardianHelmet = new("Item", "Rarity: Normal\nIron Hat")
-		local mercHelmet = new("Item", "Rarity: Normal\nIron Hat")
+		local playerHelmet = new("Item"):Item("Rarity: Normal\nIron Hat")
+		local guardianHelmet = new("Item"):Item("Rarity: Normal\nIron Hat")
+		local mercHelmet = new("Item"):Item("Rarity: Normal\nIron Hat")
 		itemsTab:AddItem(playerHelmet, true)
 		itemsTab:AddItem(guardianHelmet, true)
 		itemsTab:AddItem(mercHelmet, true)
@@ -218,6 +218,87 @@ describe("Mercenary equipment validation", function()
 		local mercenaryXml = { }
 		tab:Save(mercenaryXml)
 		assert.are.equal(tostring(mercSet.id), mercenaryXml.attrib.itemSetId)
+	end)
+
+	it("migrates every legacy Mercenary equipment slot into owned item sets", function()
+		local itemsTab = build.itemsTab
+		local activeLegacySet = {
+			elem = "ItemSet",
+			attrib = { id = "7", title = "Legacy Active", useSecondWeaponSet = "false" },
+			{ elem = "Slot", attrib = { name = "Helmet", itemId = "9001" } },
+		}
+		local expectedSlots = { }
+		for index, slot in ipairs(itemsTab.mercenarySlots) do
+			local itemId = 9100 + index
+			expectedSlots[slot.slotName] = itemId
+			table.insert(activeLegacySet, { elem = "Slot", attrib = {
+				name = slot.slotName,
+				itemId = tostring(itemId),
+				itemPbURL = "legacy-"..index,
+			} })
+		end
+		local alternateLegacySet = {
+			elem = "ItemSet",
+			attrib = { id = "8", title = "Legacy Alternate", useSecondWeaponSet = "false" },
+			{ elem = "Slot", attrib = {
+				name = MercenaryTools.itemSlotName("Helmet"),
+				itemId = "9999",
+			} },
+		}
+		itemsTab:Load({
+			attrib = { activeItemSet = "7", useSecondWeaponSet = "false" },
+			activeLegacySet,
+			alternateLegacySet,
+		})
+		tab:Load({
+			attrib = {
+				buildId = "MeleeAOEMarauderFireSlam",
+				foundAreaLevel = "68",
+				mainSkillId = "ConsecratedPathMercenary",
+			},
+			{ elem = "Skill", attrib = {
+				id = "ConsecratedPathMercenary",
+				enabled = "true",
+				count = "1",
+			} },
+		})
+		tab:PostLoad()
+
+		local migratedActiveId = itemsTab.legacyMercenaryItemSetIds[7]
+		local migratedAlternateId = itemsTab.legacyMercenaryItemSetIds[8]
+		assert.is_not_nil(migratedActiveId)
+		assert.is_not_nil(migratedAlternateId)
+		assert.are_not.equal(migratedActiveId, migratedAlternateId)
+		assert.are.equal(migratedActiveId, tab.itemSetId)
+		assert.is_true(itemsTab:IsPlayerItemSet(itemsTab.itemSets[7]))
+		assert.is_nil(itemsTab.itemSets[7][MercenaryTools.itemSlotName("Helmet")])
+		assert.are.equal(9999, itemsTab.itemSets[migratedAlternateId][MercenaryTools.itemSlotName("Helmet")].selItemId)
+
+		local migratedActiveSet = tab:GetItemSet(false)
+		assert.is_true(itemsTab:IsMercenaryItemSet(migratedActiveSet))
+		for slotName, itemId in pairs(expectedSlots) do
+			assert.are.equal(itemId, migratedActiveSet[slotName].selItemId, slotName)
+		end
+
+		local savedItems = { }
+		itemsTab:Save(savedItems)
+		local savedMigratedSlots = { }
+		for _, node in ipairs(savedItems) do
+			if node.elem == "ItemSet" and tonumber(node.attrib.id) == migratedActiveId then
+				assert.are.equal("Mercenary", node.attrib.owner)
+				for _, child in ipairs(node) do
+					if child.elem == "Slot" then
+						savedMigratedSlots[child.attrib.name] = tonumber(child.attrib.itemId)
+					end
+				end
+			end
+		end
+		for slotName, itemId in pairs(expectedSlots) do
+			assert.are.equal(itemId, savedMigratedSlots[slotName], slotName)
+		end
+		local savedMercenary = { }
+		tab:Save(savedMercenary)
+		assert.are.equal(tostring(migratedActiveId), savedMercenary.attrib.itemSetId)
 	end)
 
 	it("selects the Mercenary equipment item set from the Mercenary tab", function()
@@ -265,8 +346,8 @@ describe("Mercenary equipment validation", function()
 		selectBuild("MeleeAOEMarauderFireSlam")
 		local itemsTab = build.itemsTab
 		local mercSet = showMercenaryEquipment()
-		local playerHelmet = new("Item", "Rarity: Normal\nIron Hat")
-		local mercHelmet = new("Item", "Rarity: Normal\nIron Hat")
+		local playerHelmet = new("Item"):Item("Rarity: Normal\nIron Hat")
+		local mercHelmet = new("Item"):Item("Rarity: Normal\nIron Hat")
 		itemsTab:AddItem(playerHelmet, true)
 		itemsTab:AddItem(mercHelmet, true)
 		itemsTab.activeItemSet.Helmet.selItemId = playerHelmet.id
@@ -389,7 +470,7 @@ describe("Mercenary equipment validation", function()
 	it("protects the referenced Mercenary set in the item-set manager", function()
 		selectBuild("MeleeAOEMarauderFireSlam")
 		local mercSet = showMercenaryEquipment()
-		local manager = new("ItemSetListControl", nil, { 0, 0, 300, 200 }, build.itemsTab)
+		local manager = new("ItemSetListControl"):ItemSetListControl(nil, { 0, 0, 300, 200 }, build.itemsTab)
 		manager.selValue = mercSet.id
 		manager.selIndex = isValueInArray(manager.list, mercSet.id)
 		assert.is_false(manager.controls.copy.enabled())
@@ -405,7 +486,7 @@ describe("Mercenary equipment validation", function()
 		actorSet.title = "Animate Guardian"
 		local secondPlayerSet = itemsTab:NewItemSet()
 		itemsTab.itemSetOrderList = { actorSet.id, activePlayerSetId, secondPlayerSet.id }
-		local manager = new("ItemSetListControl", nil, { 0, 0, 300, 200 }, itemsTab)
+		local manager = new("ItemSetListControl"):ItemSetListControl(nil, { 0, 0, 300, 200 }, itemsTab)
 		local originalOpenConfirmPopup = main.OpenConfirmPopup
 		main.OpenConfirmPopup = function(_, _, _, _, onConfirm)
 			onConfirm()
@@ -424,7 +505,7 @@ describe("Mercenary equipment validation", function()
 		local itemsTab = build.itemsTab
 		local actorSet = itemsTab:NewItemSet(nil, "Animate Guardian")
 		itemsTab.itemSetOrderList = { itemsTab.activeItemSetId, actorSet.id }
-		local manager = new("ItemSetListControl", nil, { 0, 0, 300, 200 }, itemsTab)
+		local manager = new("ItemSetListControl"):ItemSetListControl(nil, { 0, 0, 300, 200 }, itemsTab)
 		manager.selValue = itemsTab.activeItemSetId
 
 		assert.is_false(manager.controls.delete.enabled())
@@ -434,15 +515,15 @@ describe("Mercenary equipment validation", function()
 		selectBuild("MeleeAOEMarauderFireSlam")
 		local itemsTab = build.itemsTab
 		local playerSet = itemsTab.activeItemSet
-		local playerItem = new("Item", "Rarity: Normal\nIron Hat")
-		local actorOnlyItem = new("Item", "Rarity: Normal\nIron Hat")
+		local playerItem = new("Item"):Item("Rarity: Normal\nIron Hat")
+		local actorOnlyItem = new("Item"):Item("Rarity: Normal\nIron Hat")
 		itemsTab:AddItem(playerItem, true)
 		itemsTab:AddItem(actorOnlyItem, true)
 		playerSet.Helmet.selItemId = playerItem.id
 		itemsTab:PopulateSlots()
 		itemsTab.slots[MercenaryTools.itemSlotName("Helmet")].selItemId = actorOnlyItem.id
 
-		local sharedList = new("SharedItemSetListControl", nil, { 0, 0, 300, 200 }, itemsTab)
+		local sharedList = new("SharedItemSetListControl"):SharedItemSetListControl(nil, { 0, 0, 300, 200 }, itemsTab)
 		local sharedSetCount = #sharedList.list
 		sharedList:ReceiveDrag("ItemList", playerSet)
 
@@ -537,6 +618,23 @@ Note: ~b/o 1 mirror
 		assert.is_false(tab:IsSlotSupported("Jewel 12345"))
 	end)
 
+	it("allows Unique Abyss jewels in sockets without equipment permissions", function()
+		selectBuild("MeleeAOEMarauderFireSlam")
+		local mercSet = showMercenaryEquipment()
+		local uniqueJewel = item({ id = 9024, name = "Mercenary Unique Abyss Jewel", type = "Jewel", base = { type = "Jewel", subType = "Abyss" }, rarity = "UNIQUE", requirements = { level = 1 } })
+		build.itemsTab.items[uniqueJewel.id] = uniqueJewel
+		local cases = {
+			{ type = "Body Armour", slotName = "Body Armour" },
+			{ type = "Helmet", slotName = "Helmet" },
+		}
+		for index, case in ipairs(cases) do
+			local parent = item({ id = 9024 + index, name = "Mercenary Abyss "..case.type, type = case.type, base = { type = case.type }, requirements = { str = 1 }, abyssalSocketCount = 1 })
+			build.itemsTab.items[parent.id] = parent
+			mercSet[MercenaryTools.itemSlotName(case.slotName)].selItemId = parent.id
+			assert.is_true(tab:ValidateEquippedItem(uniqueJewel, case.slotName.." Abyssal Socket 1", mercSet))
+		end
+	end)
+
 	it("bounds Full DPS count edits in the Mercenary UI", function()
 		tab.profile.skills[1] = { id = "InfernalBlowMercenary", enabled = true, supports = { } }
 		tab.controls.skillCount.changeFunc("200")
@@ -574,7 +672,7 @@ Note: ~b/o 1 mirror
 			table.insert(tab.mercenarySetOrderList, set.id)
 		end
 		assert.are.equal(17, #tab.mercenarySetOrderList)
-		local manager = new("MercenarySetListControl", nil, {0, 0, 350, 200}, tab)
+		local manager = new("MercenarySetListControl"):MercenarySetListControl(nil, {0, 0, 350, 200}, tab)
 		assert.is_table(manager.controls.copy)
 		assert.is_table(manager.controls.delete)
 
@@ -652,7 +750,7 @@ Note: ~b/o 1 mirror
 		end
 		assert(skillOption)
 		assert.are.equal(expectedSkillColor, skillOption.label:sub(1, #expectedSkillColor))
-		local tooltip = new("Tooltip")
+		local tooltip = new("Tooltip"):Tooltip()
 		local function tooltipText()
 			local lines = { }
 			for _, line in ipairs(tooltip.lines) do if line.text then table.insert(lines, line.text) end end
@@ -682,7 +780,7 @@ Note: ~b/o 1 mirror
 		selectBuild("TrapsMinesShadowLightning", 80)
 		build.configTab.enemyLevel = 60
 		tab:SetSkill(1, "LightningTrapMercenary")
-		local tooltip = new("Tooltip")
+		local tooltip = new("Tooltip"):Tooltip()
 		tab.controls.skillList:AddValueTooltip(tooltip, 1, tab.profile.skills[1])
 		local displayedLevel
 		for _, line in ipairs(tooltip.lines) do

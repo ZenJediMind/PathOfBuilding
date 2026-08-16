@@ -32,7 +32,7 @@ describe("Build display stats", function()
 	end)
 
 	it("shows Mercenary sidebar stats", function()
-		local _, _, _, mercenaryDisplayStats = LoadModule("Modules/BuildDisplayStats")
+		local mercenaryDisplayStats = LoadModule("Modules/BuildDisplayStats").mercenaryDisplayStats
 		build.controls.statBox.list = { }
 		build:AddDisplayStatList(mercenaryDisplayStats, {
 			mainSkill = { skillFlags = { attack = true, hit = true } },

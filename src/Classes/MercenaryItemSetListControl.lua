@@ -7,10 +7,12 @@ local t_insert = table.insert
 local t_remove = table.remove
 local m_max = math.max
 
-local MercenaryItemSetListClass = newClass("MercenaryItemSetListControl", "ListControl", function(self, anchor, rect, mercenaryTab)
-	self.ListControl(anchor, rect, 16, "VERTICAL", true, mercenaryTab:GetMercenaryItemSetOrderList())
+local MercenaryItemSetListClass = newClass("MercenaryItemSetListControl", "ListControl")
+
+function MercenaryItemSetListClass:MercenaryItemSetListControl(anchor, rect, mercenaryTab)
+	self:ListControl(anchor, rect, 16, "VERTICAL", true, mercenaryTab:GetMercenaryItemSetOrderList())
 	self.mercenaryTab = mercenaryTab
-	self.controls.copy = new("ButtonControl", {"BOTTOMLEFT", self, "TOP"}, {2, -4, 60, 18}, "Copy", function()
+	self.controls.copy = new("ButtonControl"):ButtonControl({"BOTTOMLEFT", self, "TOP"}, {2, -4, 60, 18}, "Copy", function()
 		local itemsTab = mercenaryTab.build.itemsTab
 		local newSet = copyTable(itemsTab.itemSets[self.selValue], true)
 		newSet.id = 1
@@ -24,30 +26,31 @@ local MercenaryItemSetListClass = newClass("MercenaryItemSetListControl", "ListC
 	self.controls.copy.enabled = function()
 		return self.selValue ~= nil
 	end
-	self.controls.delete = new("ButtonControl", {"LEFT", self.controls.copy, "RIGHT"}, {4, 0, 60, 18}, "Delete", function()
+	self.controls.delete = new("ButtonControl"):ButtonControl({"LEFT", self.controls.copy, "RIGHT"}, {4, 0, 60, 18}, "Delete", function()
 		self:OnSelDelete(self.selIndex, self.selValue)
 	end)
 	self.controls.delete.enabled = function()
 		return self.selValue ~= nil and #self.list > 1
 	end
-	self.controls.rename = new("ButtonControl", {"BOTTOMRIGHT", self, "TOP"}, {-2, -4, 60, 18}, "Rename", function()
+	self.controls.rename = new("ButtonControl"):ButtonControl({"BOTTOMRIGHT", self, "TOP"}, {-2, -4, 60, 18}, "Rename", function()
 		self:RenameSet(mercenaryTab.build.itemsTab.itemSets[self.selValue])
 	end)
 	self.controls.rename.enabled = function()
 		return self.selValue ~= nil
 	end
-	self.controls.new = new("ButtonControl", {"RIGHT", self.controls.rename, "LEFT"}, {-4, 0, 60, 18}, "New", function()
+	self.controls.new = new("ButtonControl"):ButtonControl({"RIGHT", self.controls.rename, "LEFT"}, {-4, 0, 60, 18}, "New", function()
 		self:RenameSet(mercenaryTab.build.itemsTab:NewItemSet(nil, "Mercenary"), true)
 	end)
-end)
+	return self
+end
 
 function MercenaryItemSetListClass:RenameSet(itemSet, addOnName)
 	local controls = { }
-	controls.label = new("LabelControl", nil, {0, 20, 0, 16}, "^7Enter name for this Mercenary equipment set:")
-	controls.edit = new("EditControl", nil, {0, 40, 350, 20}, itemSet.title, nil, nil, 100, function(buf)
+	controls.label = new("LabelControl"):LabelControl(nil, {0, 20, 0, 16}, "^7Enter name for this Mercenary equipment set:")
+	controls.edit = new("EditControl"):EditControl(nil, {0, 40, 350, 20}, itemSet.title, nil, nil, 100, function(buf)
 		controls.save.enabled = buf:match("%S")
 	end)
-	controls.save = new("ButtonControl", nil, {-45, 70, 80, 20}, "Save", function()
+	controls.save = new("ButtonControl"):ButtonControl(nil, {-45, 70, 80, 20}, "Save", function()
 		local itemsTab = self.mercenaryTab.build.itemsTab
 		itemSet.title = controls.edit.buf
 		if addOnName then
@@ -67,7 +70,7 @@ function MercenaryItemSetListClass:RenameSet(itemSet, addOnName)
 		main:ClosePopup()
 	end)
 	controls.save.enabled = false
-	controls.cancel = new("ButtonControl", nil, {45, 70, 80, 20}, "Cancel", function()
+	controls.cancel = new("ButtonControl"):ButtonControl(nil, {45, 70, 80, 20}, "Cancel", function()
 		if addOnName then
 			self.mercenaryTab.build.itemsTab.itemSets[itemSet.id] = nil
 		end

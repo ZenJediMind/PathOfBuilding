@@ -15,7 +15,7 @@ describe("CompareTab", function()
 		}
 		build.mercenaryTab:Changed()
 		local mercenaryItemSet = build.mercenaryTab:GetItemSet(true)
-		local item = new("Item", "Rarity: Normal\nCrude Bow")
+		local item = new("Item"):Item("Rarity: Normal\nCrude Bow")
 		item.id = 999903
 		build.itemsTab.items[item.id] = item
 		mercenaryItemSet[MercenaryTools.itemSlotName("Weapon 1")].selItemId = item.id
@@ -96,7 +96,7 @@ describe("CompareTab", function()
 		}
 		build.mercenaryTab:Changed()
 		local primaryMercenarySet = assert(build.mercenaryTab:GetItemSet(true))
-		local item = new("Item", "Rarity: Normal\nCrude Bow")
+		local item = new("Item"):Item("Rarity: Normal\nCrude Bow")
 		build.itemsTab:AddItem(item, true)
 		primaryMercenarySet[MercenaryTools.itemSlotName("Weapon 1")].selItemId = item.id
 

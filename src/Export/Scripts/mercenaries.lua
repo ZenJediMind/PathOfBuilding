@@ -187,7 +187,7 @@ local passiveStatFormats = {
 -- are still evaluated as the file loads.
 dofile("../Data/Global.lua")
 local function stubMod() return { } end
-local mercenaryStatData = LoadModule("../Data/MercenaryStatMap.lua", stubMod, stubMod, stubMod)
+local mercenaryStatData = LoadModule("../Data/MercenaryStatMap.lua")(stubMod, stubMod, stubMod)
 local optionalShieldBuilds = mercenaryStatData.optionalShieldBuilds
 local supportCounts = mercenaryStatData.supportCounts
 

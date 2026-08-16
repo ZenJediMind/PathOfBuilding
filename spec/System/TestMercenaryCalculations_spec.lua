@@ -220,7 +220,7 @@ describe("Permanent Mercenary calculations", function()
 
 	it("applies the configured Onslaught buff to Mercenary attack DPS", function()
 		configure("EleBowRanger", "EleBowRangerFire", "BurningArrowMercenary")
-		local bow = new("Item", "Rarity: Normal\nCrude Bow")
+		local bow = new("Item"):Item("Rarity: Normal\nCrude Bow")
 		bow.id = 9038
 		build.itemsTab.items[bow.id] = bow
 		equipmentSlot("Weapon 1").selItemId = bow.id
@@ -415,9 +415,9 @@ describe("Permanent Mercenary calculations", function()
 		table.insert(itemsTab.itemSetOrderList, guardianSet.id)
 		local mercenarySet = assert(build.mercenaryTab:GetItemSet(true))
 
-		local playerHelmet = new("Item", "Rarity: Normal\nIron Hat")
-		local guardianHelmet = new("Item", "Rarity: Normal\nIron Hat")
-		local mercenaryHelmet = new("Item", "Rarity: Normal\nIron Hat")
+		local playerHelmet = new("Item"):Item("Rarity: Normal\nIron Hat")
+		local guardianHelmet = new("Item"):Item("Rarity: Normal\nIron Hat")
+		local mercenaryHelmet = new("Item"):Item("Rarity: Normal\nIron Hat")
 		itemsTab:AddItem(playerHelmet, true)
 		itemsTab:AddItem(guardianHelmet, true)
 		itemsTab:AddItem(mercenaryHelmet, true)
@@ -452,8 +452,8 @@ describe("Permanent Mercenary calculations", function()
 		local secondSet = itemsTab:NewItemSet(nil, "Mercenary")
 		secondSet.title = "Alternate Equipment"
 		table.insert(itemsTab.itemSetOrderList, secondSet.id)
-		local firstHelmet = new("Item", "Rarity: Normal\nIron Hat")
-		local secondHelmet = new("Item", "Rarity: Normal\nIron Hat")
+		local firstHelmet = new("Item"):Item("Rarity: Normal\nIron Hat")
+		local secondHelmet = new("Item"):Item("Rarity: Normal\nIron Hat")
 		itemsTab:AddItem(firstHelmet, true)
 		itemsTab:AddItem(secondHelmet, true)
 		firstSet[MercenaryTools.itemSlotName("Helmet")].selItemId = firstHelmet.id
@@ -469,12 +469,12 @@ describe("Permanent Mercenary calculations", function()
 		configure("TrapsMinesShadow", "TrapsMinesShadowLightning", "LightningTrapMercenary")
 		local itemsTab = build.itemsTab
 		local mercenarySet = assert(build.mercenaryTab:GetItemSet(true))
-		local currentHelmet = new("Item", "Rarity: Normal\nIron Hat")
+		local currentHelmet = new("Item"):Item("Rarity: Normal\nIron Hat")
 		itemsTab:AddItem(currentHelmet, true)
 		mercenarySet[MercenaryTools.itemSlotName("Helmet")].selItemId = currentHelmet.id
 
 		local tradeQuery = itemsTab.tradeQuery
-		tradeQuery.tradeQueryGenerator = new("TradeQueryGenerator", itemsTab)
+		tradeQuery.tradeQueryGenerator = new("TradeQueryGenerator"):TradeQueryGenerator(itemsTab)
 		tradeQuery.slotTables[1] = { slotName = MercenaryTools.itemSlotName("Helmet"), itemSetId = mercenarySet.id }
 		tradeQuery.resultTbl[1] = { { item_string = [[Rarity: Rare
 Mercenary's Test
@@ -501,13 +501,13 @@ Iron Hat
 		selectedGuardianSet.title = "Trader Guardian"
 		table.insert(itemsTab.itemSetOrderList, selectedGuardianSet.id)
 
-		local configuredHelmet = new("Item", "Rarity: Normal\nIron Hat")
-		local selectedHelmet = new("Item", [[Rarity: Rare
+		local configuredHelmet = new("Item"):Item("Rarity: Normal\nIron Hat")
+		local selectedHelmet = new("Item"):Item([[Rarity: Rare
 Selected Guardian Helmet
 Iron Hat
 --------
 +10 to maximum Life]])
-		local replacementHelmet = new("Item", [[Rarity: Rare
+		local replacementHelmet = new("Item"):Item([[Rarity: Rare
 Replacement Guardian Helmet
 Iron Hat
 --------
@@ -534,7 +534,7 @@ Iron Hat
 
 		calculate()
 		itemsTab:SetViewItemSet(selectedGuardianSet.id)
-		local tradeQueryGenerator = new("TradeQueryGenerator", itemsTab.tradeQuery)
+		local tradeQueryGenerator = new("TradeQueryGenerator"):TradeQueryGenerator(itemsTab.tradeQuery)
 		tradeQueryGenerator:StartQuery(itemsTab.slots.Helmet, {
 			itemSetId = selectedGuardianSet.id,
 			influence1 = 1,
@@ -594,7 +594,7 @@ Iron Hat
 		local nextItemId = 990000
 		local function equip(slotName, itemType)
 			if not itemType or itemType == "None" then return end
-			local item = new("Item", "Rarity: Normal\n"..lowestBaseName(itemType))
+			local item = new("Item"):Item("Rarity: Normal\n"..lowestBaseName(itemType))
 			item.id = nextItemId
 			nextItemId = nextItemId + 1
 			build.itemsTab.items[item.id] = item
@@ -799,7 +799,7 @@ Iron Hat
 	it("accepts imported allied auras but excludes party-only charge effects", function()
 		configure("TrapsMinesShadow", "TrapsMinesShadowLightning", "LightningTrapMercenary")
 		local baselineDamage = calculate().mercenary.modDB:Sum("INC", nil, "Damage")
-		local auraMods = new("ModList")
+		local auraMods = new("ModList"):ModList()
 		auraMods:NewMod("Damage", "INC", 20, "Imported Party Aura")
 		build.partyTab.actor.Aura = { Aura = { ImportedAura = { effectMult = 100, modList = auraMods } } }
 		build.partyTab.actor.modDB:NewMod("PartyMemberMaximumEnduranceChargesEqualToYours", "FLAG", true, "Imported Party Member")
@@ -869,12 +869,12 @@ Iron Hat
 		build.skillsTab:PasteSocketGroup("Flame Link 20/0  1")
 		local linkGroup = build.skillsTab.socketGroupList[#build.skillsTab.socketGroupList]
 		configure("TrapsMinesShadow", "TrapsMinesShadowLightning", "LightningTrapMercenary")
-		local recipientBelt = new("Item", "Rarity: Rare\nRecipient Effect\nCloth Belt\nFlasks applied to you have 25% increased Effect")
+		local recipientBelt = new("Item"):Item("Rarity: Rare\nRecipient Effect\nCloth Belt\nFlasks applied to you have 25% increased Effect")
 		recipientBelt.id = 9029
 		build.itemsTab.items[recipientBelt.id] = recipientBelt
 		equipmentSlot("Belt").selItemId = recipientBelt.id
 
-		local granite = new("Item", "Rarity: Magic\nChemist's Granite Flask of the Opossum\n12% increased Movement Speed during Effect")
+		local granite = new("Item"):Item("Rarity: Magic\nChemist's Granite Flask of the Opossum\n12% increased Movement Speed during Effect")
 		granite.id = 9030
 		granite.flaskData.effectInc = 10
 		build.itemsTab.items[granite.id] = granite
@@ -890,7 +890,7 @@ Iron Hat
 		assert.is_true(env.player.modDB.conditions.UsingGraniteFlask)
 		assert.is_nil(env.mercenary.modDB.conditions.UsingGraniteFlask)
 
-		local ceinture = new("Item", "Rarity: Unique\nCeinture of Benevolence\nCloth Belt\nNon-Unique Utility Flasks you Use apply to Linked Targets")
+		local ceinture = new("Item"):Item("Rarity: Unique\nCeinture of Benevolence\nCloth Belt\nNon-Unique Utility Flasks you Use apply to Linked Targets")
 		ceinture.id = 9031
 		build.itemsTab.items[ceinture.id] = ceinture
 		build.itemsTab.slots.Belt.selItemId = ceinture.id
@@ -914,7 +914,7 @@ Iron Hat
 		assert.is_nil(env.mercenary.modDB.conditions.UsingGraniteFlask)
 		assert.are.equal(baseArmour, env.mercenary.modDB:Sum("BASE", nil, "Armour"))
 
-		local lifeFlask = new("Item", "Rarity: Normal\nEternal Life Flask")
+		local lifeFlask = new("Item"):Item("Rarity: Normal\nEternal Life Flask")
 		lifeFlask.id = 9032
 		build.itemsTab.items[lifeFlask.id] = lifeFlask
 		build.itemsTab.slots["Flask 1"].selItemId = lifeFlask.id
@@ -1051,7 +1051,7 @@ Iron Hat
 
 	it("displays configuration warnings without blocking calculations", function()
 		configure("TrapsMinesShadow", "TrapsMinesShadowLightning", "LightningTrapMercenary", { foundAreaLevel = 68 })
-		local forbiddenFlask = new("Item", "Rarity: Normal\nSmall Life Flask")
+		local forbiddenFlask = new("Item"):Item("Rarity: Normal\nSmall Life Flask")
 		forbiddenFlask.id = 9020
 		build.itemsTab.items[forbiddenFlask.id] = forbiddenFlask
 		build.itemsTab.activeItemSet["Flask 1"].selItemId = forbiddenFlask.id
@@ -1085,8 +1085,8 @@ Iron Hat
 		configure("EleBowRanger", "EleBowRangerFire", "BurningArrowMercenary", {
 			supports = { { id = "ArrowNovaHigh", tier = 3 } },
 		})
-		local bow = new("Item", "Rarity: Normal\nCrude Bow")
-		local quiver = new("Item", "Rarity: Normal\nSerrated Arrow Quiver")
+		local bow = new("Item"):Item("Rarity: Normal\nCrude Bow")
+		local quiver = new("Item"):Item("Rarity: Normal\nSerrated Arrow Quiver")
 		bow.id, quiver.id = 9010, 9011
 		build.itemsTab.items[bow.id], build.itemsTab.items[quiver.id] = bow, quiver
 		equipmentSlot("Weapon 1").selItemId, equipmentSlot("Weapon 2").selItemId = bow.id, quiver.id
@@ -1100,8 +1100,8 @@ Iron Hat
 		configure("EleBowRanger", "EleBowRangerClones", "MirrorArrowMercenary", {
 			includeInFullDPS = true,
 		})
-		local bow = new("Item", "Rarity: Normal\nCrude Bow")
-		local quiver = new("Item", "Rarity: Normal\nSerrated Arrow Quiver")
+		local bow = new("Item"):Item("Rarity: Normal\nCrude Bow")
+		local quiver = new("Item"):Item("Rarity: Normal\nSerrated Arrow Quiver")
 		bow.id, quiver.id = 9016, 9017
 		build.itemsTab.items[bow.id], build.itemsTab.items[quiver.id] = bow, quiver
 		equipmentSlot("Weapon 1").selItemId, equipmentSlot("Weapon 2").selItemId = bow.id, quiver.id
@@ -1140,7 +1140,7 @@ Iron Hat
 
 	it("counts Barrage of Volley Fire first and final volley projectiles", function()
 		configure("NonEleBowRanger", "NonEleBowRangerPhys", "BarrageAltMercenary", { skillPart = 2 })
-		local bow = new("Item", "Rarity: Normal\nCrude Bow")
+		local bow = new("Item"):Item("Rarity: Normal\nCrude Bow")
 		bow.id = 9018
 		build.itemsTab.items[bow.id] = bow
 		equipmentSlot("Weapon 1").selItemId = bow.id
@@ -1153,7 +1153,7 @@ Iron Hat
 
 	it("counts both initial Vaal Double Strike hits", function()
 		configure("MeleeAOEStrikeDuelist", "MeleeAOEStrikeDuelistRangeStrikes", "VaalDoubleStrikeMercenary")
-		local sword = new("Item", "Rarity: Normal\nRusted Sword")
+		local sword = new("Item"):Item("Rarity: Normal\nRusted Sword")
 		sword.id = 9019
 		build.itemsTab.items[sword.id] = sword
 		equipmentSlot("Weapon 1").selItemId = sword.id
@@ -1165,8 +1165,8 @@ Iron Hat
 		configure("EleBowRanger", "EleBowRangerClones", "VaalIceShotMercenary", {
 			supports = { { id = "MultipleProjectilesHigh", tier = 3 } },
 		})
-		local bow = new("Item", "Rarity: Normal\nCrude Bow")
-		local quiver = new("Item", "Rarity: Normal\nSerrated Arrow Quiver")
+		local bow = new("Item"):Item("Rarity: Normal\nCrude Bow")
+		local quiver = new("Item"):Item("Rarity: Normal\nSerrated Arrow Quiver")
 		bow.id, quiver.id = 9020, 9021
 		build.itemsTab.items[bow.id], build.itemsTab.items[quiver.id] = bow, quiver
 		equipmentSlot("Weapon 1").selItemId, equipmentSlot("Weapon 2").selItemId = bow.id, quiver.id
@@ -1182,8 +1182,8 @@ Iron Hat
 			includeInFullDPS = true,
 			supports = { { id = "MirageArcherHigh", tier = 3 } },
 		})
-		local bow = new("Item", "Rarity: Normal\nCrude Bow")
-		local quiver = new("Item", "Rarity: Normal\nSerrated Arrow Quiver")
+		local bow = new("Item"):Item("Rarity: Normal\nCrude Bow")
+		local quiver = new("Item"):Item("Rarity: Normal\nSerrated Arrow Quiver")
 		bow.id, quiver.id = 9014, 9015
 		build.itemsTab.items[bow.id], build.itemsTab.items[quiver.id] = bow, quiver
 		equipmentSlot("Weapon 1").selItemId, equipmentSlot("Weapon 2").selItemId = bow.id, quiver.id
@@ -1213,8 +1213,8 @@ Iron Hat
 
 	it("calculates Full DPS from the persisted Mercenary equipment item set", function()
 		configure("EleBowRanger", "EleBowRangerFire", "BurningArrowMercenary", { includeInFullDPS = true })
-		local bow = new("Item", "Rarity: Normal\nCrude Bow")
-		local quiver = new("Item", "Rarity: Normal\nSerrated Arrow Quiver")
+		local bow = new("Item"):Item("Rarity: Normal\nCrude Bow")
+		local quiver = new("Item"):Item("Rarity: Normal\nSerrated Arrow Quiver")
 		bow.id, quiver.id = 9040, 9041
 		build.itemsTab.items[bow.id], build.itemsTab.items[quiver.id] = bow, quiver
 		equipmentSlot("Weapon 1").selItemId, equipmentSlot("Weapon 2").selItemId = bow.id, quiver.id
@@ -1234,7 +1234,7 @@ Iron Hat
 
 	it("applies Mercenary on-hit curses as auxiliary skills", function()
 		configure("MeleeStrikesMarauder", "MeleeStrikesMaraduerPhys", "HeavyStrikeMercenary")
-		local mace = new("Item", "Rarity: Normal\nDriftwood Club")
+		local mace = new("Item"):Item("Rarity: Normal\nDriftwood Club")
 		mace.id = 9012
 		build.itemsTab.items[mace.id] = mace
 		equipmentSlot("Weapon 1").selItemId = mace.id
@@ -1249,7 +1249,7 @@ Iron Hat
 
 	it("uses and persists explicit Mercenary skill parts", function()
 		configure("MeleeAOEStrikeDuelist", "DivingDuelist", "ElementalHitColdOnlyMercenary")
-		local sword = new("Item", "Rarity: Normal\nRusted Sword")
+		local sword = new("Item"):Item("Rarity: Normal\nRusted Sword")
 		sword.id = 9013
 		build.itemsTab.items[sword.id] = sword
 		equipmentSlot("Weapon 1").selItemId = sword.id

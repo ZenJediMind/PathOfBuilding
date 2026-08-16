@@ -75,7 +75,7 @@ local function mergeBuffOnRecipient(sourceStore, skillCfg, buff, recipient, dest
 	local inc = sourceStore:Sum("INC", skillCfg, unpack(sourceStats)) + recipient.modDB:Sum("INC", nil, unpack(recipientStats or { }))
 	local more = sourceStore:More(skillCfg, unpack(sourceStats)) * recipient.modDB:More(nil, unpack(recipientStats or { }))
 	local mult = (1 + inc / 100) * more * (scale or 1)
-	local srcList = new("ModList")
+	local srcList = new("ModList"):ModList()
 	srcList:ScaleAddList(buff.modList, mult)
 	if extraMods then srcList:ScaleAddList(extraMods, mult) end
 	if prepare then prepare(srcList) end
@@ -90,7 +90,7 @@ end
 local function mergeAllyBuffOnRecipient(recipient, destination, buffName, modList, effectMult)
 	local inc = recipient.modDB:Sum("INC", nil, "BuffEffectOnSelf", "AuraEffectOnSelf")
 	local more = recipient.modDB:More(nil, "BuffEffectOnSelf", "AuraEffectOnSelf")
-	local srcList = new("ModList")
+	local srcList = new("ModList"):ModList()
 	srcList:ScaleAddList(modList, (effectMult + inc) / 100 * more)
 	mergeBuff(srcList, destination, buffName)
 end
@@ -98,7 +98,7 @@ end
 -- As `mergeAllyBuffOnRecipient` for a Warcry, where each modifier carries its own
 -- bonus from the casting party member's Warcry Power.
 local function mergeAllyWarcryOnRecipient(recipient, destination, warcryName, warcry)
-	local srcList = new("ModList")
+	local srcList = new("ModList"):ModList()
 	for _, warcryBuff in ipairs(warcry.modList) do
 		srcList:ScaleAddList({ warcryBuff }, (warcry.effectMult or 100) / 100 * (warcryBuff[1].warcryPowerBonus or 1))
 	end
@@ -110,7 +110,7 @@ end
 local function mergeWarcryOnRecipient(sourceStore, skillCfg, buff, recipient, destination, sourceStats, recipientStats, uptime, conditionName)
 	local inc = sourceStore:Sum("INC", skillCfg, unpack(sourceStats)) + recipient.modDB:Sum("INC", nil, unpack(recipientStats or { }))
 	local more = sourceStore:More(skillCfg, unpack(sourceStats)) * recipient.modDB:More(nil, unpack(recipientStats or { }))
-	local srcList = new("ModList")
+	local srcList = new("ModList"):ModList()
 	for _, warcryBuff in ipairs(buff.modList) do
 		srcList:ScaleAddList({ warcryBuff }, (1 + inc / 100) * more * (warcryBuff[1].warcryPowerBonus or 1) * uptime)
 	end
@@ -1376,9 +1376,9 @@ function calcs.perform(env, skipEHP)
 	end
 	if env.mercenary then
 		for _, activeSkill in ipairs(env.mercenary.activeSkillList) do
-			activeSkill.skillModList = new("ModList", activeSkill.baseSkillModList)
+			activeSkill.skillModList = new("ModList"):ModList(activeSkill.baseSkillModList)
 			if activeSkill.minion then
-				activeSkill.minion.modDB = new("ModDB")
+				activeSkill.minion.modDB = new("ModDB"):ModDB()
 				activeSkill.minion.modDB.actor = activeSkill.minion
 				calcs.createMinionSkills(env.mercenary.calcEnv, activeSkill)
 				if activeSkill.minion.mainSkill then
@@ -1614,10 +1614,10 @@ function calcs.perform(env, skipEHP)
 			env.minion.breakdown = require(calcs.breakdownModule)(env.minion.modDB, env.minion.output, env.minion)
 		end
 		if env.mercenary then
-			env.mercenary.breakdown = LoadModule(calcs.breakdownModule, env.mercenary.modDB, env.mercenary.output, env.mercenary)
+			env.mercenary.breakdown = LoadModule(calcs.breakdownModule)(env.mercenary.modDB, env.mercenary.output, env.mercenary)
 		end
 		if env.mercenaryMinion then
-			env.mercenaryMinion.breakdown = LoadModule(calcs.breakdownModule, env.mercenaryMinion.modDB, env.mercenaryMinion.output, env.mercenaryMinion)
+			env.mercenaryMinion.breakdown = LoadModule(calcs.breakdownModule)(env.mercenaryMinion.modDB, env.mercenaryMinion.output, env.mercenaryMinion)
 		end
 	end
 
@@ -1903,7 +1903,7 @@ function calcs.perform(env, skipEHP)
 					mergeBuff(srcList, flaskBuffsPerBaseNonPlayer[item.baseName], key)
 				end
 				if appliesToMercenary(item) then
-					local recipientList = new("ModList")
+					local recipientList = new("ModList"):ModList()
 					recipientList:ScaleAddList(modList, effectModMercenary)
 					mergeBuff(recipientList, mercenaryFlaskBuffs, key)
 				end
@@ -2039,7 +2039,7 @@ function calcs.perform(env, skipEHP)
 			end
 
 			if modList[1] then
-				local srcList = new("ModList")
+				local srcList = new("ModList"):ModList()
 				srcList:ScaleAddList(modList, effectMod)
 				local key
 				if item.rarity == "UNIQUE" or item.rarity == "RELIC" then
@@ -3302,7 +3302,7 @@ function calcs.perform(env, skipEHP)
 							mergeBuffFromSkill(activeSkill, buff, env.mercenaryMinion, mercenaryMinionBuffs, { "AuraEffect", "BuffEffect" }, { "BuffEffectOnSelf", "AuraEffectOnSelf" }, extraAuraModList)
 						end
 						if partyTabEnableExportBuffs then
-							local exported = new("ModList")
+							local exported = new("ModList"):ModList()
 							exported:AddList(buff.modList)
 							exported:AddList(extraAuraModList)
 							buffExports.Aura[buff.name] = { effectMult = calcLib.mod(skillModList, skillCfg, "AuraEffect", "BuffEffect"), modList = exported }
@@ -3358,18 +3358,18 @@ function calcs.perform(env, skipEHP)
 					curse.modList = new("ModList"):ModList()
 						curse.modList:ScaleAddList(buff.modList, curseMult)
 					else
-						local temp = new("ModList")
+						local temp = new("ModList"):ModList()
 						temp:ScaleAddList(buff.modList, curseMult)
-						curse.buffModList = new("ModList")
+						curse.buffModList = new("ModList"):ModList()
 						curse.buffModList:ScaleAddList(temp, calcLib.mod(env.player.modDB, nil, "BuffEffectOnSelf"))
-						curse.mercenaryBuffModList = new("ModList")
+						curse.mercenaryBuffModList = new("ModList"):ModList()
 						curse.mercenaryBuffModList:ScaleAddList(temp, calcLib.mod(mercenary.modDB, nil, "BuffEffectOnSelf"))
 						if env.minion then
-							curse.minionBuffModList = new("ModList")
+							curse.minionBuffModList = new("ModList"):ModList()
 							curse.minionBuffModList:ScaleAddList(temp, calcLib.mod(env.minion.modDB, nil, "BuffEffectOnSelf"))
 						end
 						if env.mercenaryMinion then
-							curse.mercenaryMinionBuffModList = new("ModList")
+							curse.mercenaryMinionBuffModList = new("ModList"):ModList()
 							curse.mercenaryMinionBuffModList:ScaleAddList(temp, calcLib.mod(env.mercenaryMinion.modDB, nil, "BuffEffectOnSelf"))
 						end
 					end
@@ -3420,7 +3420,7 @@ function calcs.perform(env, skipEHP)
 						mergeBuffFromSkill(activeSkill, buff, mercenary, mercenaryBuffs, { "AuraEffect", "BuffEffect" }, { "AuraEffectOnSelf", "BuffEffectOnSelf" }, extraAuraModList)
 						if env.minion then mergeBuffFromSkill(activeSkill, buff, env.minion, minionBuffs, { "AuraEffect", "BuffEffect" }, { "AuraEffectOnSelf", "BuffEffectOnSelf" }, extraAuraModList) end
 						if partyTabEnableExportBuffs then
-							local exported = new("ModList")
+							local exported = new("ModList"):ModList()
 							exported:AddList(buff.modList)
 							exported:AddList(extraAuraModList)
 							buffExports.Aura[buff.name] = { effectMult = calcLib.mod(skillModList, skillCfg, "AuraEffect", "BuffEffect"), modList = exported }
@@ -3464,20 +3464,20 @@ function calcs.perform(env, skipEHP)
 						socketedCursesHexLimit = env.mercenaryMinion.modDB:Flag(activeSkill.skillCfg, "SocketedCursesAdditionalLimit"),
 						socketedCursesHexLimitValue = env.mercenaryMinion.modDB:Sum("BASE", nil, "SocketedCursesHexLimitValue"),
 					}
-					local temp = new("ModList")
+					local temp = new("ModList"):ModList()
 					temp:ScaleAddList(buff.modList, (1 + inc / 100) * more)
 					if buff.type == "Curse" then
 						curse.modList = temp
 					else
-						curse.buffModList = new("ModList")
+						curse.buffModList = new("ModList"):ModList()
 						curse.buffModList:ScaleAddList(temp, calcLib.mod(env.player.modDB, nil, "BuffEffectOnSelf"))
-						curse.mercenaryBuffModList = new("ModList")
+						curse.mercenaryBuffModList = new("ModList"):ModList()
 						curse.mercenaryBuffModList:ScaleAddList(temp, calcLib.mod(mercenary.modDB, nil, "BuffEffectOnSelf"))
 						if env.minion then
-							curse.minionBuffModList = new("ModList")
+							curse.minionBuffModList = new("ModList"):ModList()
 							curse.minionBuffModList:ScaleAddList(temp, calcLib.mod(env.minion.modDB, nil, "BuffEffectOnSelf"))
 						end
-						curse.mercenaryMinionBuffModList = new("ModList")
+						curse.mercenaryMinionBuffModList = new("ModList"):ModList()
 						curse.mercenaryMinionBuffModList:ScaleAddList(temp, calcLib.mod(env.mercenaryMinion.modDB, nil, "BuffEffectOnSelf"))
 					end
 					t_insert(mercenaryMinionCurses, curse)
@@ -3607,7 +3607,7 @@ function calcs.perform(env, skipEHP)
 			if not modDB.conditions["AffectedBy"..warcryNameCompressed] then
 				modDB.conditions["AffectedByWarcry"] = true
 				modDB.conditions["AffectedBy"..warcryNameCompressed] = true
-				local srcList = new("ModList")
+				local srcList = new("ModList"):ModList()
 				for _, warcryBuff in ipairs(warcry.modList) do
 					srcList:ScaleAddList({warcryBuff}, (warcry.effectMult or 100) / 100 * (warcryBuff[1].warcryPowerBonus or 1))
 				end
@@ -3616,7 +3616,7 @@ function calcs.perform(env, skipEHP)
 			if env.minion and not env.minion.modDB.conditions["AffectedBy"..warcryNameCompressed] then
 				env.minion.modDB.conditions["AffectedByWarcry"] = true
 				env.minion.modDB.conditions["AffectedBy"..warcryNameCompressed] = true
-				local srcList = new("ModList")
+				local srcList = new("ModList"):ModList()
 				for _, warcryBuff in ipairs(warcry.modList) do
 					srcList:ScaleAddList({warcryBuff}, (warcry.effectMult or 100) / 100 * (warcryBuff[1].warcryPowerBonus or 1))
 				end
@@ -3640,7 +3640,7 @@ function calcs.perform(env, skipEHP)
 			if not modDB.conditions["AffectedBy"..linkNameCompressed] then
 				modDB.conditions["AffectedByLink"] = true
 				modDB.conditions["AffectedBy"..linkNameCompressed] = true
-				local srcList = new("ModList")
+				local srcList = new("ModList"):ModList()
 				srcList:ScaleAddList(link.modList, (link.effectMult or 100) / 100)
 				mergeBuff(srcList, buffs, linkName)
 			end
@@ -3713,7 +3713,7 @@ function calcs.perform(env, skipEHP)
 						fromPlayer = (dest == curses),
 						priority = determineCursePriority(grantedEffect.name),
 					}
-					curse.modList = new("ModList")
+					curse.modList = new("ModList"):ModList()
 					curse.modList:ScaleAddList(curseModList, (1 + enemyDB:Sum("INC", nil, "CurseEffectOnSelf") / 100) * enemyDB:More(nil, "CurseEffectOnSelf"))
 					t_insert(dest, curse)
 				end

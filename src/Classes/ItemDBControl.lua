@@ -8,6 +8,7 @@ local ipairs = ipairs
 local t_insert = table.insert
 local m_max = math.max
 local m_floor = math.floor
+local MercenaryTools = require("Modules/MercenaryTools")
 
 
 ---@class ItemDBControl: ListControl
@@ -262,7 +263,15 @@ function ItemDBClass:ListBuilder()
 			item.measuredPower = -math.huge
 			local function measureSlot(slotName, slot)
 				if self.itemsTab:IsItemValidForSlot(item, slotName, visibleItemSet) and not slot.inactive and slot:IsShown() and (not slot.weaponSet or slot.weaponSet == (visibleItemSet.useSecondWeaponSet and 2 or 1)) then
-					local output = calcFunc(item.base.flask and { toggleFlask = item } or item.base.tincture and { toggleTincture = item } or { repSlotName = slotName, repItem = item }, useFullDPS)
+					local override
+					if item.base.flask then
+						override = { toggleFlask = item }
+					elseif item.base.tincture then
+						override = { toggleTincture = item }
+					else
+						override = MercenaryTools.itemCalculationOverride(self.itemsTab.viewItemSetId, slotName, item, self.itemsTab)
+					end
+					local output = calcFunc(override, useFullDPS)
 					local measuredPower = data.powerStatList.GetFromOutput(output, self.sortDetail)
 					item.measuredPower = m_max(item.measuredPower, measuredPower)
 				end

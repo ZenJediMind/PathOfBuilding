@@ -72,11 +72,11 @@ function SharedItemSetListClass:GetDragValue(index, value)
 end
 
 function SharedItemSetListClass:CanReceiveDrag(type, value)
-	return type == "ItemList" and not self.itemsTab:GetItemSetOwner(value)
+	return type == "ItemList"
 end
 
 function SharedItemSetListClass:ReceiveDrag(type, value, source)
-	if type == "ItemList" and not self.itemsTab:GetItemSetOwner(value) then
+	if type == "ItemList" then
 		local sharedItemList = { title = value.title, slots = { } }
 		for _, slot in ipairs(self.itemsTab.orderedSlots) do
 			if not slot.nodeId then

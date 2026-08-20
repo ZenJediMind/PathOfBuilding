@@ -113,14 +113,21 @@ function ItemSlotClass:Populate()
 		end
 	end
 	local selectedItem = self.itemsTab.items[self.selItemId]
-	local preserveInvalid = selectedItem and self.mercenarySlotName ~= nil
-	if preserveInvalid and self.selIndex == 1 then
-		t_insert(self.items, selectedItem.id)
-		t_insert(self.list, colorCodes.NEGATIVE..selectedItem.name)
-		self.selIndex = #self.list
-	end
-	if not preserveInvalid and (not self.selItemId or not selectedItem or not self.itemsTab:IsItemValidForSlot(selectedItem, self.slotName, self.itemsTab:GetVisibleItemSet())) then
+	if not self.selItemId or not selectedItem then
 		self:SetSelItemId(0, self.itemsTab:GetVisibleItemSet())
+	elseif not self.itemsTab:IsItemValidForSlot(selectedItem, self.slotName, self.itemsTab:GetVisibleItemSet()) then
+		local alreadyListed = false
+		for _, itemId in ipairs(self.items) do
+			if itemId == self.selItemId then
+				alreadyListed = true
+				break
+			end
+		end
+		if not alreadyListed then
+			t_insert(self.items, self.selItemId)
+			t_insert(self.list, colorCodes.NEGATIVE..selectedItem.name)
+			self.selIndex = #self.list
+		end
 	end
 
 	-- Update Abyssal Sockets

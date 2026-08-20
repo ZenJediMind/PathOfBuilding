@@ -18,7 +18,7 @@ describe("CompareTab", function()
 		local item = new("Item"):Item("Rarity: Normal\nCrude Bow")
 		item.id = 999903
 		build.itemsTab.items[item.id] = item
-		mercenaryItemSet[MercenaryTools.itemSlotName("Weapon 1")].selItemId = item.id
+		mercenaryItemSet["Weapon 1"].selItemId = item.id
 		build.calcsTab.input.actor = "MERCENARY"
 		build.configTab.input.enemyLevel = 83
 		build.configTab:BuildModList()
@@ -100,8 +100,8 @@ describe("CompareTab", function()
 		local quiver = new("Item"):Item("Rarity: Normal\nSerrated Arrow Quiver")
 		build.itemsTab:AddItem(item, true)
 		build.itemsTab:AddItem(quiver, true)
-		primaryMercenarySet[MercenaryTools.itemSlotName("Weapon 1")].selItemId = item.id
-		primaryMercenarySet[MercenaryTools.itemSlotName("Weapon 2")].selItemId = quiver.id
+		primaryMercenarySet["Weapon 1"].selItemId = item.id
+		primaryMercenarySet["Weapon 2"].selItemId = quiver.id
 
 		build.configTab.input.enemyLevel = 83
 		build.configTab:BuildModList()
@@ -120,7 +120,7 @@ describe("CompareTab", function()
 		playerWeapon.selItemId = 0
 		compareTab:CopyCompareItemToPrimary("Weapon 1", entry, true)
 
-		local copiedItemId = primaryMercenarySet[MercenaryTools.itemSlotName("Weapon 1")].selItemId
+		local copiedItemId = primaryMercenarySet["Weapon 1"].selItemId
 		assert.is_true(copiedItemId > 0)
 		assert.are.equal("Crude Bow", build.itemsTab.items[copiedItemId].name)
 		assert.are.equal(0, playerWeapon.selItemId)

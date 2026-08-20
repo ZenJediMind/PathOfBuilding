@@ -56,7 +56,7 @@ describe("Light Radius integration", function()
 		itemsTab:AddItem(mercenaryRing, true)
 		itemsTab.activeItemSet["Ring 1"].selItemId = playerRing.id
 		local mercenaryItemSet = assert(build.mercenaryTab:GetItemSet(true))
-		mercenaryItemSet[MercenaryTools.itemSlotName("Ring 1")].selItemId = mercenaryRing.id
+		mercenaryItemSet["Ring 1"].selItemId = mercenaryRing.id
 		return mercenaryItemSet
 	end
 
@@ -112,12 +112,17 @@ describe("Light Radius integration", function()
 		queryGenerator:StartQuery(slot, tradeOptions({ { stat = stat.stat, weightMult = 1 } }))
 		queryGenerator.calcContext.co = nil
 
+		local function calculationOverride(item)
+			return {
+				itemSetId = queryGenerator.calcContext.itemSetId,
+				comparisonActor = MercenaryTools.comparisonActorForSlot(slot.slotName, queryGenerator.calcContext.itemSetId, build.itemsTab),
+				repSlotName = slot.slotName,
+				repItem = item,
+			}
+		end
 		local baseOutput = assert(queryGenerator.calcContext.baseOutput)
 		assert.are.near(expectedBaseLightRadius, baseOutput.LightRadiusMod, 10 ^ -9)
-		local blankOutput = queryGenerator.calcContext.calcFunc({
-			repSlotName = slot.slotName,
-			repItem = queryGenerator.calcContext.testItem,
-		})
+		local blankOutput = queryGenerator.calcContext.calcFunc(calculationOverride(queryGenerator.calcContext.testItem))
 		assert.are.near(expectedBaseLightRadius, blankOutput.LightRadiusMod, 10 ^ -9)
 
 		local lightRadiusMod = findRingLightRadiusMod(queryGenerator)
@@ -128,10 +133,7 @@ describe("Light Radius integration", function()
 		local generatedWeight = queryGenerator.modWeights[1]
 		assert.are.equal("explicit.stat_1263695895", generatedWeight.tradeModId)
 		assert.is_false(generatedWeight.invert)
-		local weightedOutput = queryGenerator.calcContext.calcFunc({
-			repSlotName = slot.slotName,
-			repItem = queryGenerator.calcContext.testItem,
-		})
+		local weightedOutput = queryGenerator.calcContext.calcFunc(calculationOverride(queryGenerator.calcContext.testItem))
 		local modValue = tonumber(queryGenerator.calcContext.testItem.explicitModLines[1].line:match("^(%d+)%% increased Light Radius$"))
 		assert.is_number(modValue)
 		local expectedWeight = (
@@ -173,7 +175,7 @@ Paua Ring
 --------
 100% increased Light Radius]])
 		build.itemsTab:AddItem(lightRadiusRing, true)
-		mercenaryItemSet[MercenaryTools.itemSlotName("Ring 1")].selItemId = lightRadiusRing.id
+		mercenaryItemSet["Ring 1"].selItemId = lightRadiusRing.id
 
 		local env = calculate()
 		assert.are.equal(baselinePlayerLightRadiusInc, env.player.modDB:Sum("INC", nil, "LightRadius"))
@@ -188,6 +190,7 @@ Paua Ring
 		build.configTab.input.customMods = "100% increased Light Radius"
 		local env = calculate()
 		generateLightRadiusQuery("Ring 1", env.player.output.LightRadiusMod)
-		generateLightRadiusQuery("Mercenary Ring 1", env.mercenary.output.LightRadiusMod)
+		build.itemsTab:SetViewItemSet(assert(build.mercenaryTab:GetItemSet(true)).id)
+		generateLightRadiusQuery("Ring 1", env.mercenary.output.LightRadiusMod)
 	end)
 end)

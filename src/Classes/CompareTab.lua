@@ -15,6 +15,7 @@ local calcsHelpers = require("Classes.CompareCalcsHelpers")
 local buildListHelpers = require("Modules.BuildListHelpers")
 local itemSlotHelper = require("Modules.ItemSlotHelper")
 local configVisibility = require("Modules.ConfigVisibility")
+local MercenaryTools = require("Modules.MercenaryTools")
 
 -- Node IDs below this value are normal passive tree nodes; IDs at or above are cluster jewel nodes
 local CLUSTER_NODE_OFFSET = 65536
@@ -25,7 +26,8 @@ local function getComparisonItemSet(itemsTab)
 end
 
 local function isMercenaryComparisonSet(itemsTab)
-	return itemsTab and itemsTab:IsMercenaryItemSet(itemsTab:GetVisibleItemSet())
+	local mercenaryTab = itemsTab and itemsTab.build and itemsTab.build.mercenaryTab
+	return mercenaryTab and itemsTab.viewItemSetId == mercenaryTab.itemSetId and itemsTab.viewItemSetId ~= itemsTab.activeItemSetId
 end
 
 local function getComparisonSlotName(itemsTab, slotName)
@@ -56,16 +58,7 @@ end
 
 local function getComparisonItemSetOrderList(itemsTab)
 	if not itemsTab then return { } end
-	if itemsTab:IsMercenaryView() then
-		local orderList = { }
-		for _, itemSetId in ipairs(itemsTab.itemSetOrderList) do
-			if itemsTab:IsMercenaryItemSet(itemsTab.itemSets[itemSetId]) then
-				t_insert(orderList, itemSetId)
-			end
-		end
-		return orderList
-	end
-	return itemsTab:GetPlayerItemSetOrderList()
+	return itemsTab.itemSetOrderList
 end
 
 local function getComparisonItemSetId(itemsTab)
@@ -2668,7 +2661,11 @@ function CompareTabClass:ComparePowerBuilder(compareEntry, powerStat, categories
 	local useFullDPS = powerStat.stat == "FullDPS"
 
 	-- Get calculator for primary build
-	local calcFunc, calcBase = self.calcs.getMiscCalculator(self.primaryBuild)
+	local calcFunc, calcBase, actorOutputs = self.calcs.getMiscCalculator(self.primaryBuild)
+	local itemCalcBase = calcBase
+	if isMercenaryComparisonSet(self.primaryBuild.itemsTab) and MercenaryTools.mercenaryOutputAvailable(actorOutputs and actorOutputs.MERCENARY) then
+		itemCalcBase = actorOutputs.MERCENARY
+	end
 
 	-- Find display stat for formatting
 	local displayStat = nil
@@ -2917,8 +2914,8 @@ function CompareTabClass:ComparePowerBuilder(compareEntry, powerStat, categories
 				end
 
 
-				local output = calcFunc({ repSlotName = primaryItemSetSlotName(slotName), repItem = newItem }, useFullDPS)
-				local impact = self.primaryBuild.calcsTab:CalculatePowerStat(powerStat, output, calcBase)
+				local output = calcFunc(MercenaryTools.itemCalculationOverride(self.primaryBuild.itemsTab.viewItemSetId, primaryItemSetSlotName(slotName), newItem, self.primaryBuild.itemsTab), useFullDPS)
+				local impact = self.primaryBuild.calcsTab:CalculatePowerStat(powerStat, output, itemCalcBase)
 				local impactStr, impactVal, combinedImpactStr, impactPercent, impactIsZero = formatImpact(impact)
 
 				-- restore abyss jewel state
@@ -3000,14 +2997,14 @@ function CompareTabClass:ComparePowerBuilder(compareEntry, powerStat, categories
 
 				if jEntry.pNodeAllocated then
 					-- Socket is allocated in primary build, test directly in that socket
-					local output = calcFunc({ repSlotName = jEntry.cSlotName, repItem = newItem }, useFullDPS)
+					local output = calcFunc(MercenaryTools.itemCalculationOverride(self.primaryBuild.itemsTab.viewItemSetId, jEntry.cSlotName, newItem, self.primaryBuild.itemsTab), useFullDPS)
 					bestImpactVal = self.primaryBuild.calcsTab:CalculatePowerStat(powerStat, output, calcBase)
 				else
 					-- Socket is NOT allocated in primary build; try the jewel in every
 					-- jewel socket on the primary build's tree, temporarily allocating
 					-- unallocated sockets via addNodes so CalcSetup doesn't skip them
 					for _, socketInfo in ipairs(primaryJewelSockets) do
-						local override = { repSlotName = socketInfo.slotName, repItem = newItem }
+						local override = MercenaryTools.itemCalculationOverride(self.primaryBuild.itemsTab.viewItemSetId, socketInfo.slotName, newItem, self.primaryBuild.itemsTab)
 						if not socketInfo.allocated then
 							override.addNodes = { [socketInfo.node] = true }
 						end
@@ -4139,18 +4136,19 @@ function CompareTabClass:DrawItems(vp, compareEntry, inputEvents)
 	if not main.popups[1] and hoverEquipItem and hoverEquipSlotName and not hoverItem then
 		self.itemTooltip:Clear()
 		self.itemTooltip.maxWidth = maxTooltipWidth
-		local calcFunc, calcBase = self.calcs.getMiscCalculator(self.primaryBuild)
+		local calcFunc, calcBase, actorOutputs = self.calcs.getMiscCalculator(self.primaryBuild)
 		if calcFunc then
 			-- Create a fresh item to evaluate
 			local newItem = new("Item"):Item(hoverEquipItem.raw)
 			newItem:NormaliseQuality()
 
 			-- Determine what's currently in the target slot
-			local pSlot = self.primaryBuild.itemsTab.slots[hoverEquipSlotName]
-			local selItem = getActiveItem(self.primaryBuild.itemsTab, hoverEquipSlotName)
+			local itemsTab = self.primaryBuild.itemsTab
+			local pSlot = itemsTab.slots[hoverEquipSlotName]
+			local selItem = getActiveItem(itemsTab, hoverEquipSlotName)
 
 			-- For jewel sockets that aren't allocated, temporarily allocate the node
-			local override = { repSlotName = getComparisonSlotName(self.primaryBuild.itemsTab, hoverEquipSlotName), repItem = newItem }
+			local override = MercenaryTools.itemCalculationOverride(itemsTab.viewItemSetId, getComparisonSlotName(itemsTab, hoverEquipSlotName), newItem, itemsTab)
 			if pSlot and pSlot.nodeId then
 				local pSpec = self.primaryBuild.spec
 				if pSpec and pSpec.allocNodes and not pSpec.allocNodes[pSlot.nodeId] then
@@ -4169,7 +4167,11 @@ function CompareTabClass:DrawItems(vp, compareEntry, inputEvents)
 			else
 				header = string.format("^7Equipping this item in %s will give you:", slotLabel)
 			end
-			local count = self.primaryBuild:AddStatComparesToTooltip(self.itemTooltip, calcBase, output, header)
+			local compareBase = calcBase
+			if isMercenaryComparisonSet(itemsTab) and MercenaryTools.mercenaryOutputAvailable(actorOutputs and actorOutputs.MERCENARY) then
+				compareBase = actorOutputs.MERCENARY
+			end
+			local count = self.primaryBuild:AddStatComparesToTooltip(self.itemTooltip, compareBase, output, header)
 			if count == 0 then
 				self.itemTooltip:AddLine(14, header)
 				self.itemTooltip:AddLine(14, "^7No changes.")

@@ -13,13 +13,13 @@ describe("Mercenary review regressions", function()
 		first.id, second.id = 99101, 99102
 		build.itemsTab.items[first.id] = first
 		build.itemsTab.items[second.id] = second
-		build.itemsTab.slots[MercenaryTools.itemSlotName("Ring 1")]:SetSelItemId(first.id, build.itemsTab:GetVisibleItemSet())
-		build.itemsTab.slots[MercenaryTools.itemSlotName("Ring 2")]:SetSelItemId(second.id, build.itemsTab:GetVisibleItemSet())
+		build.itemsTab.slots["Ring 1"]:SetSelItemId(first.id, build.itemsTab:GetVisibleItemSet())
+		build.itemsTab.slots["Ring 2"]:SetSelItemId(second.id, build.itemsTab:GetVisibleItemSet())
 		local equippedSlot = assert(build.itemsTab:GetEquippedSlotForItem(first))
-		assert.are.equal(MercenaryTools.itemSlotName("Ring 1"), equippedSlot.slotName)
-		assert.are.equal(MercenaryTools.itemSlotName("Ring 1"), build.itemsTab:GetComparisonSlotNameForItem(first))
+		assert.are.equal("Ring 1", equippedSlot.slotName)
+		assert.are.equal("Ring 1", build.itemsTab:GetComparisonSlotNameForItem(first))
 		local unequipped = new("Item"):Item("Rarity: Normal\nIron Hat")
-		assert.are.equal(MercenaryTools.itemSlotName("Helmet"), build.itemsTab:GetComparisonSlotNameForItem(unequipped))
+		assert.are.equal("Helmet", build.itemsTab:GetComparisonSlotNameForItem(unequipped))
 		build.itemsTab.itemOrderList = { first.id, second.id }
 
 		local ok, err = pcall(function() build.itemsTab:SortItemList() end)
@@ -67,8 +67,8 @@ describe("Mercenary review regressions", function()
 		local shield = new("Item"):Item("Rarity: Normal\nTwig Spirit Shield")
 		build.itemsTab:AddItem(mace, true)
 		build.itemsTab:AddItem(shield, true)
-		itemSet[MercenaryTools.itemSlotName("Weapon 1")].selItemId = mace.id
-		itemSet[MercenaryTools.itemSlotName("Weapon 2")].selItemId = shield.id
+		itemSet["Weapon 1"].selItemId = mace.id
+		itemSet["Weapon 2"].selItemId = shield.id
 		build.calcsTab.input.actor = "MERCENARY"
 		build.configTab:BuildModList()
 		build.calcsTab:BuildOutput()

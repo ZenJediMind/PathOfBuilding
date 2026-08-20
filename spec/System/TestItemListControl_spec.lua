@@ -78,13 +78,14 @@ describe("ItemListControl", function()
 		assert.are.same({ 1, 3 }, control.list)
 	end)
 
-	it("uses the visible actor set for the current loadout", function()
+	it("uses the visible item set for the current loadout", function()
 		local control, itemsTab = newItemListControl()
-		local mercenaryItemSet = {
-			owner = "Mercenary",
-			["Mercenary Body Armour"] = { selItemId = 2 },
+		local visibleItemSet = {
+			id = 3,
+			title = "Visible",
+			["Body Armour"] = { selItemId = 2 },
 		}
-		itemsTab.visibleItemSet = mercenaryItemSet
+		itemsTab.visibleItemSet = visibleItemSet
 		itemsTab.build.treeTab.specList[1].jewels = { }
 		control:UpdateLoadoutList()
 		control.controls.loadoutFilter.selIndex = 2

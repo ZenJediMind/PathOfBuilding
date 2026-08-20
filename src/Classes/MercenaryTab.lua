@@ -186,7 +186,7 @@ function MercenaryTabClass:MercenaryTab(build)
 	end)
 	self.controls.itemSetSelect.enableDroppedWidth = true
 	self.controls.itemSetManage = new("ButtonControl"):ButtonControl({ "LEFT", self.controls.itemSetSelect, "RIGHT" }, { 4, 0, 90, 20 }, "Manage...", function()
-		self:OpenMercenaryItemSetManagePopup()
+		self.build.itemsTab:OpenItemSetManagePopup()
 	end)
 
 	self.controls.skillList = new("MercenarySkillListControl"):MercenarySkillListControl({ "TOPLEFT", self.controls.itemSetLabel, "BOTTOMLEFT" }, { 0, 32, 360, 300 }, self)
@@ -453,46 +453,30 @@ end
 
 function MercenaryTabClass:GetMercenaryItemSetList()
 	local itemSetList = { }
-	for _, itemSetId in ipairs(self:GetMercenaryItemSetOrderList()) do
+	for _, itemSetId in ipairs(self.build.itemsTab.itemSetOrderList) do
 		local itemSet = self.build.itemsTab.itemSets[itemSetId]
 		t_insert(itemSetList, {
 			id = itemSetId,
-			label = itemSet.title or "Mercenary Equipment",
+			label = itemSet.title or "Default",
 		})
 	end
 	return itemSetList
 end
 
 function MercenaryTabClass:GetMercenaryItemSetOrderList()
-	local orderList = { }
-	local itemsTab = self.build.itemsTab
-	for _, itemSetId in ipairs(itemsTab.itemSetOrderList) do
-		if itemsTab:IsMercenaryItemSet(itemsTab.itemSets[itemSetId]) then
-			t_insert(orderList, itemSetId)
-		end
-	end
-	return orderList
+	return self.build.itemsTab.itemSetOrderList
 end
 
 function MercenaryTabClass:EnsureItemSet()
 	local itemsTab = self.build.itemsTab
 	if self.itemSetId then
 		local itemSet = itemsTab.itemSets[self.itemSetId]
-		if itemSet and itemsTab:IsMercenaryItemSet(itemSet) then
-			itemSet.owner = "Mercenary"
-			itemSet.title = itemSet.title or "Mercenary Equipment"
+		if itemSet then
 			return itemSet
 		end
 		return
 	end
-	local itemSetList = self:GetMercenaryItemSetList()
-	if #itemSetList == 1 then
-		self.itemSetId = itemSetList[1].id
-		return itemsTab.itemSets[self.itemSetId]
-	elseif #itemSetList > 1 then
-		return
-	end
-	local itemSet = itemsTab:NewItemSet(nil, "Mercenary")
+	local itemSet = itemsTab:NewItemSet()
 	itemSet.title = "Mercenary Equipment"
 	t_insert(itemsTab.itemSetOrderList, itemSet.id)
 	self.itemSetId = itemSet.id
@@ -501,7 +485,7 @@ end
 
 function MercenaryTabClass:GetItemSet(create)
 	local itemSet = self.itemSetId and self.build.itemsTab.itemSets[self.itemSetId]
-	if itemSet and self.build.itemsTab:IsMercenaryItemSet(itemSet) then return itemSet end
+	if itemSet then return itemSet end
 	if self.itemSetId then return end
 	if create == true then return self:EnsureItemSet() end
 end
@@ -509,7 +493,7 @@ end
 function MercenaryTabClass:SetItemSet(itemSetId)
 	local itemsTab = self.build.itemsTab
 	local itemSet = itemsTab.itemSets[itemSetId]
-	if not itemsTab:IsMercenaryItemSet(itemSet) then return false end
+	if not itemSet then return false end
 	self.itemSetId = itemSetId
 	itemsTab:SetViewItemSet(itemSetId)
 	self:Changed()
@@ -779,15 +763,6 @@ function MercenaryTabClass:OpenMercenarySetManagePopup()
 	})
 end
 
-function MercenaryTabClass:OpenMercenaryItemSetManagePopup()
-	main:OpenPopup(370, 290, "Manage Mercenary Equipment Sets", {
-		new("MercenaryItemSetListControl"):MercenaryItemSetListControl(nil, {0, 50, 350, 200}, self),
-		new("ButtonControl"):ButtonControl(nil, {0, 260, 90, 20}, "Done", function()
-			main:ClosePopup()
-		end),
-	})
-end
-
 function MercenaryTabClass:SetSkill(index, skillId)
 	if skillId then
 		local err = MercenaryTools.skillCandidateError(self.profile, self.data, index, skillId)
@@ -928,7 +903,6 @@ function MercenaryTabClass:GetErrors()
 			playerItemSet = itemsTab.activeItemSet,
 			items = itemsTab.items,
 			playerHasFlag = function(flagName) return self:PlayerFlag(flagName) end,
-			mercenarySlots = itemsTab.mercenarySlots,
 			isItemValidForSlot = function(item, slotName, set)
 				return itemsTab:IsItemValidForSlot(item, slotName, set)
 			end,

@@ -257,7 +257,7 @@ Blight 20/0  1
 
 	it("preserves Mercenary equipment and skills when importing a character", function()
 		local itemsTab = build.itemsTab
-		local mercenaryHelmetSlotName = MercenaryTools.itemSlotName("Helmet")
+		local mercenaryHelmetSlotName = "Helmet"
 		build.mercenaryTab.profile.buildId = "MeleeAOEMarauderFireSlam"
 		build.mercenaryTab:Changed()
 		local mercenaryItemSet = build.mercenaryTab:GetItemSet(true)
@@ -304,14 +304,14 @@ Blight 20/0  1
 		build.mercenaryTab.itemSetId = nil
 		local mercenaryHelmet = new("Item"):Item("Rarity: Normal\nIron Hat")
 		itemsTab:AddItem(mercenaryHelmet, true)
-		mercenaryItemSet[MercenaryTools.itemSlotName("Helmet")].selItemId = mercenaryHelmet.id
+		mercenaryItemSet["Helmet"].selItemId = mercenaryHelmet.id
 
 		build.importTab:ImportItemsAndSkills(buildImportPayload({
 			makeImportItem("Iron Hat", "Helm", { }, "test-import-player-helmet-before-mercenary-profile"),
 		}), true, true, true)
 
 		assert.is_not_nil(itemsTab.items[mercenaryHelmet.id])
-		assert.are.equal(mercenaryHelmet.id, mercenaryItemSet[MercenaryTools.itemSlotName("Helmet")].selItemId)
+		assert.are.equal(mercenaryHelmet.id, mercenaryItemSet["Helmet"].selItemId)
 		assert.is_nil(build.mercenaryTab.itemSetId)
 	end)
 end)

@@ -62,11 +62,11 @@ describe("TradeQuery", function()
 			assert.are.equal(0, #tooltip.lines)
 		end)
 
-		it("imports a result into the visible Mercenary slot", function()
-			local visibleItemSet = { ["Mercenary Helmet"] = { selItemId = 0 } }
+		it("imports a result into the visible item set slot", function()
+			local visibleItemSet = { Helmet = { selItemId = 0 } }
 			local currentVisibleItemSet = visibleItemSet
-			local mercenarySlot = {
-				slotName = "Mercenary Helmet",
+			local helmetSlot = {
+				slotName = "Helmet",
 				label = "Helmet",
 				selItemId = 0,
 				IsShown = function() return true end,
@@ -81,24 +81,24 @@ describe("TradeQuery", function()
 			})
 			tq.itemsTab.viewItemSet = visibleItemSet
 			tq.itemsTab.GetVisibleItemSet = function() return currentVisibleItemSet end
-			tq.itemsTab.slots = { [mercenarySlot.slotName] = mercenarySlot }
+			tq.itemsTab.slots = { [helmetSlot.slotName] = helmetSlot }
 			tq.itemsTab.IsItemValidForSlot = function() return true end
 			tq.itemsTab.CreateDisplayItemFromRaw = function(itemsTab) itemsTab.displayItem = { id = 77 } end
 			tq.itemsTab.AddDisplayItem = function() end
 			tq.itemsTab.PopulateSlots = function() end
 			tq.itemsTab.AddUndoState = function() end
 			tq.itemsTab.build = { buildFlag = false }
-			tq.slotTables[1] = { slotName = mercenarySlot.slotName, displayName = "Merc. Helmet" }
+			tq.slotTables[1] = { slotName = helmetSlot.slotName }
 			tq.itemIndexTbl[1] = 1
 
 			buildRow1Dropdown(tq)
-			local nextVisibleItemSet = { ["Mercenary Helmet"] = { selItemId = 0 } }
+			local nextVisibleItemSet = { Helmet = { selItemId = 0 } }
 			currentVisibleItemSet = nextVisibleItemSet
 			tq.controls.importButton1:Click()
 
-			assert.are.equal(77, mercenarySlot.selItemId)
-			assert.are.equal(0, visibleItemSet[mercenarySlot.slotName].selItemId)
-			assert.are.equal(77, nextVisibleItemSet[mercenarySlot.slotName].selItemId)
+			assert.are.equal(77, helmetSlot.selItemId)
+			assert.are.equal(0, visibleItemSet.Helmet.selItemId)
+			assert.are.equal(77, nextVisibleItemSet.Helmet.selItemId)
 		end)
 	end)
 	describe("GetResultEvaluation", function()

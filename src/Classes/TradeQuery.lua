@@ -540,7 +540,6 @@ Highest Weight - Displays the order retrieved from trade]]
 	local visibleSlots = self.itemsTab:GetVisibleItemSlots()
 	local visibleItemSet = self.itemsTab:GetVisibleItemSet()
 	local visibleItemSetId = visibleItemSet and visibleItemSet.id
-	local isMercenaryView = self.itemsTab:IsMercenaryView()
 	local function isSlotShown(slot)
 		if slot.shown == nil then return true end
 		if type(slot.shown) == "function" then
@@ -553,7 +552,6 @@ Highest Weight - Displays the order retrieved from trade]]
 			if not slot.nodeId and not slot.slotName:find("Abyssal") then
 				t_insert(slotTables, {
 					slotName = slot.slotName,
-					displayName = isMercenaryView and "Merc. "..slot.mercenarySlotName or nil,
 					itemSetId = visibleItemSetId,
 				})
 			elseif slot.slotName:find("Abyssal") then
@@ -566,14 +564,12 @@ Highest Weight - Displays the order retrieved from trade]]
 		end
 	end
 	local activeSocketList = { }
-	if not isMercenaryView then
-		for nodeId, slot in pairs(self.itemsTab.sockets) do
-			if not slot.inactive then
-				t_insert(activeSocketList, nodeId)
-			end
+	for nodeId, slot in pairs(self.itemsTab.sockets) do
+		if not slot.inactive then
+			t_insert(activeSocketList, nodeId)
 		end
-		table.sort(activeSocketList)
 	end
+	table.sort(activeSocketList)
 	local activeUniqueJewelSocket
 	for _, nodeId in ipairs(activeSocketList) do
 		if not activeUniqueJewelSocket and not self.itemsTab.build.spec.nodes[nodeId].containJewelSocket then
@@ -835,7 +831,7 @@ function TradeQueryClass:GetResultEvaluation(row_idx, result_index, calcFunc, ba
 	local slotTbl = self.slotTables[row_idx]
 	local jewelNodeId = slotTbl.nodeId or slotTbl.selectedJewelNodeId
 	local slotName = jewelNodeId and "Jewel " .. tostring(jewelNodeId) or slotTbl.fullName or slotTbl.slotName
-	local comparisonActor = MercenaryTools.comparisonActor(slotName)
+	local comparisonActor = MercenaryTools.comparisonActorForSlot(slotName, slotTbl.itemSetId, self.itemsTab)
 	if not calcFunc then -- Always evaluate when calcFunc is given
 		local actorOutputs
 		calcFunc, baseOutput, actorOutputs = self.itemsTab.build.calcsTab:GetMiscCalculator()
@@ -896,12 +892,7 @@ function TradeQueryClass:GetResultEvaluation(row_idx, result_index, calcFunc, ba
 		local slotName = jewelNodeId and "Jewel " .. tostring(jewelNodeId) or slotTbl.selectedSlotName or slotTbl.slotName
 		local item = new("Item"):Item(result.item_string)
 
-		local output = self:ReduceOutput(calcFunc({
-			itemSetId = slotTbl.itemSetId,
-			comparisonActor = comparisonActor,
-			repSlotName = slotName,
-			repItem = item,
-		}))
+		local output = self:ReduceOutput(calcFunc(MercenaryTools.itemCalculationOverride(slotTbl.itemSetId, slotName, item, self.itemsTab)))
 		local weight = self.tradeQueryGenerator.WeightedRatioOutputs(baseOutput, output, self.statSortSelectionList)
 		result.evaluation = {{ output = output, weight = weight }}
 	end

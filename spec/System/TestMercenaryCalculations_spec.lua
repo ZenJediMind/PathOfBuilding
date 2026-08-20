@@ -3,7 +3,7 @@ describe("Permanent Mercenary calculations", function()
 	local configOptions = LoadModule("Modules/ConfigOptions")
 	local configVisibility = LoadModule("Modules/ConfigVisibility")
 	local function equipmentSlot(slotName)
-		return assert(build.mercenaryTab:GetItemSet(true))[MercenaryTools.itemSlotName(slotName)]
+		return assert(build.mercenaryTab:GetItemSet(true))[slotName]
 	end
 
 	local function selectScionLuminary()
@@ -553,7 +553,7 @@ describe("Permanent Mercenary calculations", function()
 	it("uses player, Animate Guardian, and Mercenary equipment simultaneously", function()
 		configure("TrapsMinesShadow", "TrapsMinesShadowLightning", "LightningTrapMercenary")
 		local itemsTab = build.itemsTab
-		local guardianSet = itemsTab:NewItemSet(nil, "Animate Guardian")
+		local guardianSet = itemsTab:NewItemSet()
 		guardianSet.title = "Animate Guardian"
 		table.insert(itemsTab.itemSetOrderList, guardianSet.id)
 		local mercenarySet = assert(build.mercenaryTab:GetItemSet(true))
@@ -566,7 +566,7 @@ describe("Permanent Mercenary calculations", function()
 		itemsTab:AddItem(mercenaryHelmet, true)
 		itemsTab.activeItemSet.Helmet.selItemId = playerHelmet.id
 		guardianSet.Helmet.selItemId = guardianHelmet.id
-		mercenarySet[MercenaryTools.itemSlotName("Helmet")].selItemId = mercenaryHelmet.id
+		mercenarySet["Helmet"].selItemId = mercenaryHelmet.id
 
 		build.skillsTab:PasteSocketGroup("Animate Guardian 20/0  1")
 		local guardianGroup = build.skillsTab.socketGroupList[#build.skillsTab.socketGroupList]
@@ -592,15 +592,15 @@ describe("Permanent Mercenary calculations", function()
 		configure("TrapsMinesShadow", "TrapsMinesShadowLightning", "LightningTrapMercenary")
 		local itemsTab = build.itemsTab
 		local firstSet = assert(build.mercenaryTab:GetItemSet(true))
-		local secondSet = itemsTab:NewItemSet(nil, "Mercenary")
+		local secondSet = itemsTab:NewItemSet()
 		secondSet.title = "Alternate Equipment"
 		table.insert(itemsTab.itemSetOrderList, secondSet.id)
 		local firstHelmet = new("Item"):Item("Rarity: Normal\nLeather Cap")
 		local secondHelmet = new("Item"):Item("Rarity: Normal\nLeather Cap")
 		itemsTab:AddItem(firstHelmet, true)
 		itemsTab:AddItem(secondHelmet, true)
-		firstSet[MercenaryTools.itemSlotName("Helmet")].selItemId = firstHelmet.id
-		secondSet[MercenaryTools.itemSlotName("Helmet")].selItemId = secondHelmet.id
+		firstSet["Helmet"].selItemId = firstHelmet.id
+		secondSet["Helmet"].selItemId = secondHelmet.id
 
 		build.mercenaryTab:SetItemSet(secondSet.id)
 		local env = calculate()
@@ -614,11 +614,11 @@ describe("Permanent Mercenary calculations", function()
 		local mercenarySet = assert(build.mercenaryTab:GetItemSet(true))
 		local currentHelmet = new("Item"):Item("Rarity: Normal\nLeather Cap")
 		itemsTab:AddItem(currentHelmet, true)
-		mercenarySet[MercenaryTools.itemSlotName("Helmet")].selItemId = currentHelmet.id
+		mercenarySet["Helmet"].selItemId = currentHelmet.id
 
 		local tradeQuery = itemsTab.tradeQuery
 		tradeQuery.tradeQueryGenerator = new("TradeQueryGenerator"):TradeQueryGenerator(itemsTab)
-		tradeQuery.slotTables[1] = { slotName = MercenaryTools.itemSlotName("Helmet"), itemSetId = mercenarySet.id }
+		tradeQuery.slotTables[1] = { slotName = "Helmet", itemSetId = mercenarySet.id }
 		tradeQuery.resultTbl[1] = { { item_string = [[Rarity: Rare
 Mercenary's Test
 Leather Cap
@@ -647,13 +647,46 @@ Leather Cap
 		assert.are.equal(calcFunc({ comparisonActor = "MERCENARY" }).Life, actorOutputs.MERCENARY.Life)
 	end)
 
+	it("replaces Mercenary helmet life from a visible-set override without changing the player", function()
+		configure("TrapsMinesShadow", "TrapsMinesShadowLightning", "LightningTrapMercenary")
+		local itemsTab = build.itemsTab
+		local mercSet = assert(build.mercenaryTab:GetItemSet(true))
+		local playerHelmet = new("Item"):Item([[Rarity: Rare
+Player Helmet
+Iron Hat
+--------
++1000 to maximum Life]])
+		local mercHelmet = new("Item"):Item("Rarity: Normal\nLeather Cap")
+		local replacementHelmet = new("Item"):Item([[Rarity: Rare
+Replacement Helmet
+Leather Cap
+--------
++100 to maximum Life]])
+		itemsTab:AddItem(playerHelmet, true)
+		itemsTab:AddItem(mercHelmet, true)
+		itemsTab:AddItem(replacementHelmet, true)
+		itemsTab.activeItemSet.Helmet.selItemId = playerHelmet.id
+		mercSet.Helmet.selItemId = mercHelmet.id
+		calculate()
+		assert(itemsTab:SetViewItemSet(mercSet.id))
+		local calcFunc, _, actorOutputs = build.calcsTab:GetMiscCalculator()
+		local playerReplacement = calcFunc({
+			repSlotName = "Helmet",
+			repItem = replacementHelmet,
+		})
+		local mercReplacement = calcFunc(itemsTab:ItemCalculationOverride("Helmet", replacementHelmet))
+		assert.is_true(playerReplacement.Life < actorOutputs.PLAYER.Life)
+		assert.is_true(mercReplacement.Life > actorOutputs.MERCENARY.Life)
+		assert.are_not.equal(playerReplacement.Life, mercReplacement.Life)
+	end)
+
 	it("uses the selected Animate Guardian set for trade stat replacements", function()
 		configure("TrapsMinesShadow", "TrapsMinesShadowLightning", "LightningTrapMercenary")
 		local itemsTab = build.itemsTab
-		local configuredGuardianSet = itemsTab:NewItemSet(nil, "Animate Guardian")
+		local configuredGuardianSet = itemsTab:NewItemSet()
 		configuredGuardianSet.title = "Configured Guardian"
 		table.insert(itemsTab.itemSetOrderList, configuredGuardianSet.id)
-		local selectedGuardianSet = itemsTab:NewItemSet(nil, "Animate Guardian")
+		local selectedGuardianSet = itemsTab:NewItemSet()
 		selectedGuardianSet.title = "Trader Guardian"
 		table.insert(itemsTab.itemSetOrderList, selectedGuardianSet.id)
 

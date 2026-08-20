@@ -48,8 +48,8 @@ describe("Calcs source-skill flag visibility", function()
 		local shield = new("Item"):Item("Rarity: Normal\nTwig Spirit Shield")
 		build.itemsTab:AddItem(mace, true)
 		build.itemsTab:AddItem(shield, true)
-		itemSet[MercenaryTools.itemSlotName("Weapon 1")].selItemId = mace.id
-		itemSet[MercenaryTools.itemSlotName("Weapon 2")].selItemId = shield.id
+		itemSet["Weapon 1"].selItemId = mace.id
+		itemSet["Weapon 2"].selItemId = shield.id
 		build.mercenaryTab:Changed()
 		build.configTab.input.enemyLevel = 83
 		build.configTab:BuildModList()

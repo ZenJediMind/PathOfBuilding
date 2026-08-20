@@ -758,15 +758,16 @@ function calcs.buildActiveSkillModList(env, activeSkill)
 			end
 			if activeGrantedEffect.minionHasItemSet then
 				local overrideItemSet = env.override.itemSetId and env.build.itemsTab.itemSets[env.override.itemSetId]
-				if overrideItemSet and env.build.itemsTab:IsAnimateGuardianItemSet(overrideItemSet) then
+				local mercenaryItemSetId = env.build.mercenaryTab and env.build.mercenaryTab.itemSetId
+				if overrideItemSet and env.override.itemSetId ~= env.build.itemsTab.activeItemSetId and env.override.itemSetId ~= mercenaryItemSetId then
 					minion.itemSet = overrideItemSet
 				elseif env.mode == "CALCS" and activeSkill == env.player.mainSkill then
-					if not env.build.itemsTab.itemSets[activeEffect.srcInstance.skillMinionItemSetCalcs] or env.build.itemsTab:IsMercenaryItemSet(env.build.itemsTab.itemSets[activeEffect.srcInstance.skillMinionItemSetCalcs]) then
+					if not env.build.itemsTab.itemSets[activeEffect.srcInstance.skillMinionItemSetCalcs] then
 						activeEffect.srcInstance.skillMinionItemSetCalcs = env.build.itemsTab:GetMinionItemSetOrderList()[1]
 					end
 					minion.itemSet = env.build.itemsTab.itemSets[activeEffect.srcInstance.skillMinionItemSetCalcs]
 				else
-					if not env.build.itemsTab.itemSets[activeEffect.srcInstance.skillMinionItemSet] or env.build.itemsTab:IsMercenaryItemSet(env.build.itemsTab.itemSets[activeEffect.srcInstance.skillMinionItemSet]) then
+					if not env.build.itemsTab.itemSets[activeEffect.srcInstance.skillMinionItemSet] then
 						activeEffect.srcInstance.skillMinionItemSet = env.build.itemsTab:GetMinionItemSetOrderList()[1]
 					end
 					minion.itemSet = env.build.itemsTab.itemSets[activeEffect.srcInstance.skillMinionItemSet]

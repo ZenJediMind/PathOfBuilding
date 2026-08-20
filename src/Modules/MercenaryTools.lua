@@ -14,6 +14,45 @@ function MercenaryTools.comparisonActor(slotName)
 	return MercenaryTools.baseItemSlotName(slotName) and "MERCENARY" or "PLAYER"
 end
 
+function MercenaryTools.comparisonActorForItemSet(itemSetId, itemsTab)
+	local mercenaryTab = itemsTab and itemsTab.build and itemsTab.build.mercenaryTab
+	if itemSetId and mercenaryTab and itemSetId == mercenaryTab.itemSetId and itemSetId ~= itemsTab.activeItemSetId then
+		return "MERCENARY"
+	end
+	return "PLAYER"
+end
+
+function MercenaryTools.comparisonActorForSlot(slotName, itemSetId, itemsTab)
+	if MercenaryTools.baseItemSlotName(slotName) then
+		return "MERCENARY"
+	end
+	return MercenaryTools.comparisonActorForItemSet(itemSetId, itemsTab)
+end
+
+function MercenaryTools.itemCalculationOverride(itemSetId, slotName, item, itemsTab)
+	local isTreeJewel = type(slotName) == "string" and slotName:match("^Jewel ") ~= nil
+	return {
+		itemSetId = (not isTreeJewel) and itemSetId or nil,
+		comparisonActor = isTreeJewel and "PLAYER" or MercenaryTools.comparisonActorForSlot(slotName, itemSetId, itemsTab),
+		repSlotName = slotName,
+		repItem = item,
+	}
+end
+
+function MercenaryTools.overrideReplacesMercenarySlot(override, slotName, mercenaryItemSetId)
+	if not override or not override.repSlotName then
+		return false
+	end
+	local overrideBase = MercenaryTools.baseItemSlotName(override.repSlotName) or override.repSlotName
+	if overrideBase ~= slotName then
+		return false
+	end
+	if override.comparisonActor == "MERCENARY" or MercenaryTools.baseItemSlotName(override.repSlotName) then
+		return true
+	end
+	return override.itemSetId ~= nil and override.itemSetId == mercenaryItemSetId
+end
+
 function MercenaryTools.comparisonBaseOutput(playerOutput, actorOutputs, slotName)
 	if MercenaryTools.comparisonActor(slotName) == "PLAYER" then
 		return playerOutput
@@ -588,7 +627,7 @@ function MercenaryTools.validateEquippedItem(item, slotName, context)
 	end
 	local parentSlot, abyssalSocketIndex = slotName:match("^(.-) Abyssal Socket (%d+)$")
 	if parentSlot then
-		local parentSetSlot = context.itemSet[MercenaryTools.itemSlotName(parentSlot)]
+		local parentSetSlot = context.itemSet[parentSlot]
 		local parentItem = context.items[parentSetSlot and parentSetSlot.selItemId]
 		if not parentItem or (parentItem.abyssalSocketCount or 0) < tonumber(abyssalSocketIndex) then
 			return false, "parent item does not have this Abyssal Socket"
@@ -644,9 +683,11 @@ function MercenaryTools.validateEquippedItem(item, slotName, context)
 	if #(item.grantedSkills or { }) > 0 then
 		return false, "item-granted skills and triggers cannot be used"
 	end
-	for playerSlotName, playerSlot in pairs(context.playerItemSet) do
-		if type(playerSlot) == "table" and not MercenaryTools.baseItemSlotName(playerSlotName) and playerSlot.selItemId == item.id then
-			return false, "the same physical item is equipped by the player"
+	if context.itemSet ~= context.playerItemSet then
+		for playerSlotName, playerSlot in pairs(context.playerItemSet) do
+			if type(playerSlot) == "table" and playerSlot.selItemId == item.id then
+				return false, "the same physical item is equipped by the player"
+			end
 		end
 	end
 	return true
@@ -656,23 +697,29 @@ function MercenaryTools.equipmentErrors(context)
 	local errors = { }
 	local mercBuild = context.mercenaryData.builds[context.profile.buildId]
 	if mercBuild and mercBuild.weaponConfiguration.offHandRequired then
-		local offHandSlot = context.itemSet[MercenaryTools.itemSlotName("Weapon 2")]
+		local offHandSlot = context.itemSet["Weapon 2"]
 		if not context.items[offHandSlot and offHandSlot.selItemId] then
 			table.insert(errors, "Weapon 2: selected build requires a "..table.concat(mercBuild.weaponConfiguration.offHandTypes, " or "))
 		end
 	end
-	for _, slot in ipairs(context.mercenarySlots) do
-		local setSlot = context.itemSet[slot.slotName]
+	local function checkSlot(slotName)
+		local setSlot = context.itemSet[slotName]
 		local item = context.items[setSlot and setSlot.selItemId]
 		if item then
-			if not context.isItemValidForSlot(item, slot.slotName, context.itemSet) then
-				table.insert(errors, slot.mercenarySlotName..": invalid base slot or weapon configuration")
+			if not context.isItemValidForSlot(item, slotName, context.itemSet) then
+				table.insert(errors, slotName..": invalid base slot or weapon configuration")
 			else
-				local valid, reason = MercenaryTools.validateEquippedItem(item, slot.mercenarySlotName, context)
+				local valid, reason = MercenaryTools.validateEquippedItem(item, slotName, context)
 				if not valid then
-					table.insert(errors, slot.mercenarySlotName..": "..reason)
+					table.insert(errors, slotName..": "..reason)
 				end
 			end
+		end
+	end
+	for _, slotName in ipairs(MercenaryTools.equipmentSlots) do
+		checkSlot(slotName)
+		for index = 1, 6 do
+			checkSlot(slotName.." Abyssal Socket "..index)
 		end
 	end
 	return errors

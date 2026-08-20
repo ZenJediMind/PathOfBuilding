@@ -24,7 +24,7 @@ function ItemSetListClass:ItemSetListControl(anchor, rect, itemsTab)
 		self:RenameSet(newSet, true)
 	end)
 	self.controls.copy.enabled = function()
-		return self.selValue ~= nil and not itemsTab:GetItemSetOwner(itemsTab.itemSets[self.selValue])
+		return self.selValue ~= nil
 	end
 	self.controls.delete = new("ButtonControl"):ButtonControl({"LEFT",self.controls.copy,"RIGHT"}, {4, 0, 60, 18}, "Delete", function()
 		self:OnSelDelete(self.selIndex, self.selValue)
@@ -36,7 +36,7 @@ function ItemSetListClass:ItemSetListControl(anchor, rect, itemsTab)
 		self:RenameSet(itemsTab.itemSets[self.selValue])
 	end)
 	self.controls.rename.enabled = function()
-		return self.selValue ~= nil and not itemsTab:GetItemSetOwner(itemsTab.itemSets[self.selValue])
+		return self.selValue ~= nil
 	end
 	self.controls.new = new("ButtonControl"):ButtonControl({"RIGHT",self.controls.rename,"LEFT"}, {-4, 0, 60, 18}, "New", function()
 		local newSet = itemsTab:NewItemSet()
@@ -50,16 +50,7 @@ function ItemSetListClass:CanDeleteItemSet(itemSetId)
 	if not itemSet or self.itemsTab:IsItemSetReferenced(itemSetId) then
 		return false
 	end
-	if not self.itemsTab:IsPlayerItemSet(itemSet) then
-		return #self.list > 1
-	end
-	local playerItemSetCount = 0
-	for _, candidateId in ipairs(self.list) do
-		if self.itemsTab:IsPlayerItemSet(self.itemsTab.itemSets[candidateId]) then
-			playerItemSetCount = playerItemSetCount + 1
-		end
-	end
-	return playerItemSetCount > 1
+	return #self.list > 1
 end
 
 function ItemSetListClass:RenameSet(itemSet, addOnName)
@@ -93,8 +84,7 @@ end
 function ItemSetListClass:GetRowValue(column, index, itemSetId)
 	local itemSet = self.itemsTab.itemSets[itemSetId]
 	if column == 1 then
-		local owner = self.itemsTab:GetItemSetOwner(itemSet)
-		local title = itemSet.title or (owner == "Mercenary" and "Mercenary Equipment") or (owner == "Animate Guardian" and "Animate Guardian") or "Default"
+		local title = itemSet.title or "Default"
 		return title .. (itemSetId == self.itemsTab.viewItemSetId and "  ^9(Visible)" or "") .. (itemSetId == self.itemsTab.activeItemSetId and "  ^9(Current player)" or "")
 	end
 end
@@ -106,7 +96,6 @@ function ItemSetListClass:AddValueTooltip(tooltip, index, itemSetId)
 end
 
 function ItemSetListClass:GetDragValue(index, itemSetId)
-	if self.itemsTab:GetItemSetOwner(self.itemsTab.itemSets[itemSetId]) then return nil end
 	return "ItemList", self.itemsTab.itemSets[itemSetId]
 end
 
@@ -138,8 +127,8 @@ function ItemSetListClass:OnOrderChange()
 end
 
 function ItemSetListClass:OnSelClick(index, itemSetId, doubleClick)
-	if doubleClick and itemSetId ~= self.itemsTab.viewItemSetId then
-		self.itemsTab:SetViewItemSet(itemSetId)
+	if doubleClick and itemSetId ~= self.itemsTab.activeItemSetId then
+		self.itemsTab:SetActiveItemSet(itemSetId)
 		self.itemsTab:AddUndoState()
 	end
 end
@@ -153,23 +142,7 @@ function ItemSetListClass:OnSelDelete(index, itemSetId)
 			self.selIndex = nil
 			self.selValue = nil
 			if itemSetId == self.itemsTab.activeItemSetId then
-				local replacementItemSetId
-				for candidateIndex = index, #self.list do
-					local candidateItemSetId = self.list[candidateIndex]
-					if self.itemsTab:IsPlayerItemSet(self.itemsTab.itemSets[candidateItemSetId]) then
-						replacementItemSetId = candidateItemSetId
-						break
-					end
-				end
-				if not replacementItemSetId then
-					for candidateIndex = index - 1, 1, -1 do
-						local candidateItemSetId = self.list[candidateIndex]
-						if self.itemsTab:IsPlayerItemSet(self.itemsTab.itemSets[candidateItemSetId]) then
-							replacementItemSetId = candidateItemSetId
-							break
-						end
-					end
-				end
+				local replacementItemSetId = self.list[m_max(1, index)] or self.list[index - 1]
 				self.itemsTab:SetActiveItemSet(replacementItemSetId)
 			elseif itemSetId == self.itemsTab.viewItemSetId then
 				self.itemsTab:SetViewItemSet(self.list[m_max(1, index - 1)])
@@ -182,7 +155,7 @@ end
 
 function ItemSetListClass:OnSelKeyDown(index, itemSetId, key)
 	local itemSet = self.itemsTab.itemSets[itemSetId]
-	if key == "F2" and not self.itemsTab:GetItemSetOwner(itemSet) then
+	if key == "F2" then
 		self:RenameSet(itemSet)
 	end
 end

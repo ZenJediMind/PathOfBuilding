@@ -34,7 +34,7 @@ describe("Mercenary tools", function()
 		assert.is_true(not tools.mercenaryOutputAvailable({ ActorUnavailableMessage = "missing" }))
 	end)
 
-	it("uses Mercenary output when the actor is present", function()
+	it("uses the Mercenary output when the actor is present", function()
 		local playerOutput = { CombinedDPS = 100 }
 		local mercenaryOutput = { CombinedDPS = 50 }
 		assert.are.equal(mercenaryOutput, tools.comparisonBaseOutput(playerOutput, {
@@ -42,6 +42,53 @@ describe("Mercenary tools", function()
 			MERCENARY = mercenaryOutput,
 		}, "Mercenary Helmet"))
 		assert.is_true(tools.mercenaryOutputAvailable(mercenaryOutput))
+	end)
+
+	it("treats a dedicated Mercenary item set as the Mercenary comparison actor", function()
+		assert.are.equal("MERCENARY", tools.comparisonActorForItemSet(2, {
+			activeItemSetId = 1,
+			build = { mercenaryTab = { itemSetId = 2 } },
+		}))
+		assert.are.equal("PLAYER", tools.comparisonActorForItemSet(1, {
+			activeItemSetId = 1,
+			build = { mercenaryTab = { itemSetId = 1 } },
+		}))
+		assert.are.equal("PLAYER", tools.comparisonActorForItemSet(3, {
+			activeItemSetId = 1,
+			build = { mercenaryTab = { itemSetId = 2 } },
+		}))
+		assert.are.equal("MERCENARY", tools.comparisonActorForSlot("Helmet", 2, {
+			activeItemSetId = 1,
+			build = { mercenaryTab = { itemSetId = 2 } },
+		}))
+		assert.are.equal("MERCENARY", tools.comparisonActorForSlot("Mercenary Helmet", 1, {
+			activeItemSetId = 1,
+			build = { mercenaryTab = { itemSetId = 2 } },
+		}))
+	end)
+
+	it("builds a comparison override for a viewed item set", function()
+		local itemsTab = {
+			activeItemSetId = 1,
+			build = { mercenaryTab = { itemSetId = 2 } },
+		}
+		local item = { name = "hat" }
+		local override = tools.itemCalculationOverride(2, "Helmet", item, itemsTab)
+		assert.are.equal(2, override.itemSetId)
+		assert.are.equal("MERCENARY", override.comparisonActor)
+		assert.are.equal("Helmet", override.repSlotName)
+		assert.are.equal(item, override.repItem)
+	end)
+
+	it("keeps tree jewel comparisons on the player", function()
+		local itemsTab = {
+			activeItemSetId = 1,
+			build = { mercenaryTab = { itemSetId = 2 } },
+		}
+		local override = tools.itemCalculationOverride(2, "Jewel 12345", { name = "jewel" }, itemsTab)
+		assert.is_nil(override.itemSetId)
+		assert.are.equal("PLAYER", override.comparisonActor)
+		assert.are.equal("Jewel 12345", override.repSlotName)
 	end)
 
 	it("groups numbered class variants for the picker", function()

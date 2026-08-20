@@ -220,7 +220,7 @@ function calcs.initMercenary(env)
 	local itemsTab = env.build.itemsTab
 	local itemSet = tab:GetItemSet(false)
 	local selectedItemSet = env.override.itemSetId and itemsTab.itemSets[env.override.itemSetId]
-	if selectedItemSet and itemsTab:IsMercenaryItemSet(selectedItemSet) then
+	if selectedItemSet and tab.itemSetId == selectedItemSet.id then
 		itemSet = selectedItemSet
 	end
 	if not itemSet then
@@ -234,7 +234,6 @@ function calcs.initMercenary(env)
 		playerItemSet = itemsTab.activeItemSet,
 		items = itemsTab.items,
 		playerHasFlag = function(flagName) return env.modDB:Flag(nil, flagName) end,
-		mercenarySlots = itemsTab.mercenarySlots,
 		isItemValidForSlot = function(item, slotName, set)
 			return itemsTab:IsItemValidForSlot(item, slotName, set)
 		end,
@@ -293,20 +292,19 @@ function calcs.initMercenary(env)
 	end
 
 	for _, slotName in ipairs(MercenaryTools.equipmentSlots) do
-		local itemSlotName = MercenaryTools.itemSlotName(slotName)
-		local slot = env.build.itemsTab.slots[itemSlotName]
+		local slot = env.build.itemsTab.slots[slotName]
 		local item
-		if env.override.repSlotName == itemSlotName then
+		if MercenaryTools.overrideReplacesMercenarySlot(env.override, slotName, tab.itemSetId) then
 			item = env.override.repItem
 		else
-			item = itemSet and itemSet[itemSlotName] and env.build.itemsTab.items[itemSet[itemSlotName].selItemId]
+			item = itemSet and itemSet[slotName] and env.build.itemsTab.items[itemSet[slotName].selItemId]
 		end
 		if item then addMercenaryItem(env, mercenary, item, slotName, slot and slot.slotNum or 1) end
 		for abyssalSocketIndex = 1, 6 do
 			local abyssalSlotName = slotName.." Abyssal Socket "..abyssalSocketIndex
-			local abyssalItemSlotName = MercenaryTools.itemSlotName(abyssalSlotName)
-			local abyssalSetSlot = itemSet and itemSet[abyssalItemSlotName]
-			local abyssalJewel = env.override.repSlotName == abyssalItemSlotName and env.override.repItem or abyssalSetSlot and env.build.itemsTab.items[abyssalSetSlot.selItemId]
+			local abyssalSetSlot = itemSet and itemSet[abyssalSlotName]
+			local abyssalJewel = MercenaryTools.overrideReplacesMercenarySlot(env.override, abyssalSlotName, tab.itemSetId) and env.override.repItem
+				or abyssalSetSlot and env.build.itemsTab.items[abyssalSetSlot.selItemId]
 			if abyssalJewel then addMercenaryItem(env, mercenary, abyssalJewel, abyssalSlotName, abyssalSocketIndex) end
 		end
 	end
@@ -906,13 +904,7 @@ function calcs.initEnv(build, mode, override, specEnv)
 		error("Unknown item set id: "..tostring(override.itemSetId))
 	end
 	local overrideItemSet = override.itemSetId and build.itemsTab.itemSets[override.itemSetId]
-	local replacesPlayerItem = override.itemSetId == nil
-	if override.itemSetId then
-		replacesPlayerItem = false
-		if overrideItemSet then
-			replacesPlayerItem = build.itemsTab:IsPlayerItemSet(overrideItemSet)
-		end
-	end
+	local replacesPlayerItem = override.itemSetId == nil or override.itemSetId == build.itemsTab.activeItemSetId
 	local modDB = nil
 	local enemyDB = nil
 	local classStats = nil

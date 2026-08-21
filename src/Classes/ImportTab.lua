@@ -1346,70 +1346,32 @@ local function isAnimateGuardianGem(gem)
 	return name == "Animate Guardian"
 end
 
-local function collectAnimateGuardianItemSetIds(skillsTab)
-	local itemSetIds = { }
-	for _, socketGroup in ipairs(skillsTab.socketGroupList) do
-		for _, gem in ipairs(socketGroup.gemList) do
-			if isAnimateGuardianGem(gem) then
-				if gem.skillMinionItemSet then
-					t_insert(itemSetIds, gem.skillMinionItemSet)
-				end
-				if gem.skillMinionItemSetCalcs then
-					t_insert(itemSetIds, gem.skillMinionItemSetCalcs)
-				end
-			end
-		end
-	end
-	return itemSetIds
-end
+local GUARD_ITEM_SET = "Animate Guardian"
 
-function ImportTabClass:GetOrCreateGuardianItemSet(preferredItemSetIds)
+function ImportTabClass:GetOrCreateGuardianItemSet()
 	local itemsTab = self.build.itemsTab
 	local activeItemSetId = itemsTab.activeItemSetId
-	local function usableItemSet(itemSet)
-		return itemSet and itemSet.id ~= activeItemSetId
-	end
-	for _, itemSetId in ipairs(preferredItemSetIds or { }) do
-		local itemSet = itemsTab.itemSets[itemSetId]
-		if usableItemSet(itemSet) then
-			return itemSet
-		end
-	end
-	for _, socketGroup in ipairs(self.build.skillsTab.socketGroupList) do
-		for _, gem in ipairs(socketGroup.gemList) do
-			if isAnimateGuardianGem(gem) then
-				for _, suffix in ipairs({ "", "Calcs" }) do
-					local current = gem["skillMinionItemSet"..suffix]
-					local currentSet = current and itemsTab.itemSets[current]
-					if usableItemSet(currentSet) then
-						return currentSet
-					end
-				end
-			end
-		end
-	end
 	for _, itemSetId in ipairs(itemsTab.itemSetOrderList) do
 		local itemSet = itemsTab.itemSets[itemSetId]
-		if usableItemSet(itemSet) and itemSet.title == "Animate Guardian" then
+		if itemSet and itemSet.title == GUARD_ITEM_SET and itemSet.id ~= activeItemSetId then
 			return itemSet
 		end
 	end
 	local itemSet = itemsTab:NewItemSet()
-	itemSet.title = "Animate Guardian"
+	itemSet.title = GUARD_ITEM_SET
 	t_insert(itemsTab.itemSetOrderList, itemSet.id)
 	return itemSet
 end
 
 function ImportTabClass:AssignGuardianItemSet(itemSetId)
 	local itemsTab = self.build.itemsTab
-	local activeItemSetId = itemsTab.activeItemSetId
 	for _, socketGroup in ipairs(self.build.skillsTab.socketGroupList) do
 		for _, gem in ipairs(socketGroup.gemList) do
 			if isAnimateGuardianGem(gem) then
 				for _, suffix in ipairs({ "", "Calcs" }) do
 					local current = gem["skillMinionItemSet"..suffix]
 					local currentSet = current and itemsTab.itemSets[current]
-					if not current or current == activeItemSetId or (currentSet and currentSet.title == "Animate Guardian") then
+					if not current or (currentSet and currentSet.title == GUARD_ITEM_SET) then
 						gem["skillMinionItemSet"..suffix] = itemSetId
 					end
 				end
@@ -1458,7 +1420,6 @@ function ImportTabClass:ImportItemsAndSkills(charData, clearItems, clearSkills, 
 	local mainSkillEmpty = #self.build.skillsTab.socketGroupList == 0
 	local skillOrder
 	local preservedSocketGroupStateByKey
-	local guardianItemSetIds = collectAnimateGuardianItemSetIds(self.build.skillsTab)
 	if clearSkills then
 		skillOrder = { }
 		preservedSocketGroupStateByKey = { }
@@ -1485,7 +1446,7 @@ function ImportTabClass:ImportItemsAndSkills(charData, clearItems, clearSkills, 
 	end
 	local guardianSetId
 	if charData.guardian and charData.guardian[1] then
-		local guardianSet = self:GetOrCreateGuardianItemSet(guardianItemSetIds)
+		local guardianSet = self:GetOrCreateGuardianItemSet()
 		guardianSetId = guardianSet.id
 		for _, itemData in ipairs(charData.guardian) do
 			self:ImportItem(itemData, nil, ignoreWeaponSwap, guardianSet.id)

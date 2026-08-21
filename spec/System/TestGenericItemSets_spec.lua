@@ -21,6 +21,16 @@ describe("Generic item sets for player, Animate Guardian, and Mercenary", functi
 		end
 	end
 
+	local function findCanonicalGuardianItemSet()
+		local itemsTab = build.itemsTab
+		for _, itemSetId in ipairs(itemsTab.itemSetOrderList) do
+			local itemSet = itemsTab.itemSets[itemSetId]
+			if itemSet.title == "Animate Guardian" and itemSet.id ~= itemsTab.activeItemSetId then
+				return itemSet
+			end
+		end
+	end
+
 	local function makeImportItem(typeLine, inventoryId, itemId)
 		return {
 			id = itemId or "guardian-helm-1",
@@ -248,9 +258,10 @@ describe("Generic item sets for player, Animate Guardian, and Mercenary", functi
 
 		assert.are.equal(playerHelmet.id, itemsTab.activeItemSet.Helmet.selItemId)
 		gem = assert(findGuardianGem())
-		assert.are_not.equal(itemsTab.activeItemSetId, gem.skillMinionItemSet)
-		local guardianSet = itemsTab.itemSets[gem.skillMinionItemSet]
-		assert.is_not_nil(guardianSet)
+		assert.are.equal(itemsTab.activeItemSetId, gem.skillMinionItemSet)
+		assert.are.equal(itemsTab.activeItemSetId, gem.skillMinionItemSetCalcs)
+		local guardianSet = assert(findCanonicalGuardianItemSet())
+		assert.are_not.equal(itemsTab.activeItemSetId, guardianSet.id)
 		local importedHelmet = itemsTab.items[guardianSet.Helmet.selItemId]
 		assert.is_not_nil(importedHelmet)
 		assert.are.equal("fresh-guardian-helm", importedHelmet.uniqueID)
@@ -268,8 +279,11 @@ describe("Generic item sets for player, Animate Guardian, and Mercenary", functi
 		}, false, false, true)
 
 		assert.are.equal(setCountAfterFirst, #itemsTab.itemSetOrderList)
+		assert.are.equal(playerHelmet.id, itemsTab.activeItemSet.Helmet.selItemId)
 		gem = assert(findGuardianGem())
-		assert.are.equal(guardianSet.id, gem.skillMinionItemSet)
+		assert.are.equal(itemsTab.activeItemSetId, gem.skillMinionItemSet)
+		assert.are.equal(itemsTab.activeItemSetId, gem.skillMinionItemSetCalcs)
+		assert.are.equal(guardianSet.id, findCanonicalGuardianItemSet().id)
 		assert.are.equal("second-guardian-helm", itemsTab.items[guardianSet.Helmet.selItemId].uniqueID)
 	end)
 
@@ -281,12 +295,17 @@ describe("Generic item sets for player, Animate Guardian, and Mercenary", functi
 		local calcsSet = itemsTab:NewItemSet()
 		calcsSet.title = "Calcs AG"
 		table.insert(itemsTab.itemSetOrderList, calcsSet.id)
+		local bossHelmet = new("Item"):Item("Rarity: Normal\nIron Hat")
+		local calcsHelmet = new("Item"):Item("Rarity: Normal\nLeather Cap")
+		itemsTab:AddItem(bossHelmet, true)
+		itemsTab:AddItem(calcsHelmet, true)
+		bossSet.Helmet.selItemId = bossHelmet.id
+		calcsSet.Helmet.selItemId = calcsHelmet.id
 		build.skillsTab:PasteSocketGroup("Animate Guardian 20/0  1")
 		runCallback("OnFrame")
 		local gem = assert(findGuardianGem())
 		gem.skillMinionItemSet = bossSet.id
 		gem.skillMinionItemSetCalcs = calcsSet.id
-		local setCountBefore = #itemsTab.itemSetOrderList
 
 		build.importTab:ImportItemsAndSkills({
 			level = 12,
@@ -301,8 +320,12 @@ describe("Generic item sets for player, Animate Guardian, and Mercenary", functi
 		gem = assert(findGuardianGem())
 		assert.are.equal(bossSet.id, gem.skillMinionItemSet)
 		assert.are.equal(calcsSet.id, gem.skillMinionItemSetCalcs)
-		assert.are.equal(setCountBefore, #itemsTab.itemSetOrderList)
-		assert.are.equal("fresh-guardian-helm", itemsTab.items[bossSet.Helmet.selItemId].uniqueID)
+		assert.are.equal(bossHelmet.id, bossSet.Helmet.selItemId)
+		assert.are.equal(calcsHelmet.id, calcsSet.Helmet.selItemId)
+		local guardianSet = assert(findCanonicalGuardianItemSet())
+		assert.are_not.equal(bossSet.id, guardianSet.id)
+		assert.are_not.equal(calcsSet.id, guardianSet.id)
+		assert.are.equal("fresh-guardian-helm", itemsTab.items[guardianSet.Helmet.selItemId].uniqueID)
 	end)
 
 	it("recognizes an allocated passive jewel socket as equipped", function()

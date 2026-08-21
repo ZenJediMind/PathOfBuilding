@@ -692,6 +692,7 @@ local function doActorMisc(env, actor)
 	---@class Output
 	local output = actor.output
 	local condList = modDB.conditions
+	local configInput = (actor.calcEnv and actor.calcEnv.configInput) or env.configInput
 	output.LootRarity = modDB:Sum("INC", nil, "LootRarity")
 
 	-- Add misc buffs/debuffs
@@ -986,12 +987,12 @@ local function doActorMisc(env, actor)
 			output.InherentRageLossDelay = 2 + modDB:Sum("BASE", nil, "InherentRageLossDelay")
 			output.InherentRageLoss = (not modDB:Flag(nil, "InherentRageLossIsPrevented")) and 10 * (1 + modDB:Sum("INC", nil, "InherentRageLoss") / 100) or 0
 		end
-		if (env.configInput.multiplierManaBurnStacks or 0) > 0 then
+		if (configInput.multiplierManaBurnStacks or 0) > 0 then
 			local maxManaBurn = modDB:Sum("BASE", nil, "MaxManaBurnStacks")
 			if maxManaBurn == 0 then
 				maxManaBurn = 9999
 			end
-			local manaBurnStacks = m_min((env.configInput.multiplierManaBurnStacks or 0), maxManaBurn)
+			local manaBurnStacks = m_min((configInput.multiplierManaBurnStacks or 0), maxManaBurn)
 			modDB:NewMod("Multiplier:ManaBurnStacks", "BASE", manaBurnStacks, "Config")
 			manaBurnStacks = manaBurnStacks + modDB:Sum("BASE", { actor = "player" }, "EffectiveManaBurnStacks")
 			if modDB:Flag(nil, "Condition:WeepingWoundsInsteadOfManaBurn") then
@@ -4439,12 +4440,19 @@ function calcs.perform(env, skipEHP)
 	end
 
 	if env.mercenary and env.mercenary.mainSkill then
+		local savedInput, savedPlaceholder = env.configInput, env.configPlaceholder
+		if env.mercenary.calcEnv and env.mercenary.calcEnv.configInput then
+			env.configInput = env.mercenary.calcEnv.configInput
+			env.configPlaceholder = env.mercenary.calcEnv.configPlaceholder
+		end
 		calcs.defence(env, env.mercenary)
 		if not skipEHP then calcs.buildDefenceEstimations(env, env.mercenary) end
 		calcs.triggers(env.mercenary.calcEnv, env.mercenary)
 		if not calcs.mirages(env.mercenary.calcEnv) then
 			calcs.offence(env, env.mercenary, env.mercenary.mainSkill)
 		end
+		env.configInput = savedInput
+		env.configPlaceholder = savedPlaceholder
 	end
 	if env.mercenaryMinion and env.mercenaryMinion.mainSkill then
 		doActorLifeMana(env.mercenaryMinion)

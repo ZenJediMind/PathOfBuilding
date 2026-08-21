@@ -110,7 +110,7 @@ function ItemsTabClass:ItemsTab(build)
 
 	-- Set selector
 	self.controls.setSelect = new("DropDownControl"):DropDownControl({"TOPLEFT",self,"TOPLEFT"}, {96, 8, 216, 20}, nil, function(index, value)
-		self:SetActiveItemSet(self.itemSetOrderList[index])
+		self:SetViewItemSet(self.itemSetOrderList[index])
 		self:AddUndoState()
 	end)
 	self.controls.setSelect.enableDroppedWidth = true
@@ -123,7 +123,7 @@ function ItemsTabClass:ItemsTab(build)
 			self:AddItemSetTooltip(tooltip, self.itemSets[self.itemSetOrderList[index]])
 		end
 	end
-	self.controls.setLabel = new("LabelControl"):LabelControl({"RIGHT",self.controls.setSelect,"LEFT"}, {-2, 0, 0, 16}, "^7Item set:")
+	self.controls.setLabel = new("LabelControl"):LabelControl({"RIGHT",self.controls.setSelect,"LEFT"}, {-2, 0, 0, 16}, "^7View item set:")
 	self.controls.setManage = new("ButtonControl"):ButtonControl({"LEFT",self.controls.setSelect,"RIGHT"}, {4, 0, 90, 20}, "Manage...", function()
 		self:OpenItemSetManagePopup()
 	end)
@@ -1343,7 +1343,9 @@ function ItemsTabClass:Load(xml, dbFileName)
 	if not self.itemSets[activeItemSetId] then
 		activeItemSetId = self.itemSetOrderList[1]
 	end
+	self.skipConfigItemSetSync = true
 	self:SetActiveItemSet(activeItemSetId)
+	self.skipConfigItemSetSync = false
 	if xml.attrib.showStatDifferences then
 		self.showStatDifferences = xml.attrib.showStatDifferences == "true"
 	end
@@ -1545,7 +1547,7 @@ function ItemsTabClass:Draw(viewPort, inputEvents)
 		local itemSet = self.itemSets[itemSetId]
 		local title = itemSet.title or "Default"
 		t_insert(newItemList, title)
-		if itemSetId == self.activeItemSetId then
+		if itemSetId == self.viewItemSetId then
 			self.controls.setSelect.selIndex = index
 		end
 	end
@@ -1686,6 +1688,9 @@ function ItemsTabClass:SetActiveItemSet(itemSetId)
 	self.activeItemSet = itemSet
 	self.viewItemSetId = itemSetId
 	self.viewItemSet = itemSet
+	if self.build.configTab and not self.skipConfigItemSetSync then
+		self.build.configTab:SyncActorItemSet("player", itemSetId)
+	end
 	self.build.buildFlag = true
 	self:PopulateSlots()
 	self:UpdateSockets()
@@ -5155,6 +5160,9 @@ function ItemsTabClass:RestoreUndoState(state)
 	end
 	self.activeItemSetId = state.activeItemSetId
 	self.activeItemSet = self.itemSets[self.activeItemSetId]
+	if self.build.configTab and not self.skipConfigItemSetSync then
+		self.build.configTab:SyncActorItemSet("player", self.activeItemSetId)
+	end
 	local viewItemSetId = state.viewItemSetId
 	if not self.itemSets[viewItemSetId] then
 		viewItemSetId = self.activeItemSetId

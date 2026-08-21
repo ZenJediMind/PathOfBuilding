@@ -332,8 +332,9 @@ describe("Permanent Mercenary calculations", function()
 		end
 		assert.is_true(configVisibility.isRelevantForBuild(assert(corpseLifeConfig), build))
 
-		build.configTab.input.conditionFocused = true
-		build.configTab.input.detonateDeadCorpseLife = 12345
+		build.configTab:EnsureActorConfig(build.configTab.configSets[build.configTab.activeConfigSetId])
+		build.configTab.configSets[build.configTab.activeConfigSetId].actors.mercenary.input.conditionFocused = true
+		build.configTab.configSets[build.configTab.activeConfigSetId].actors.mercenary.input.detonateDeadCorpseLife = 12345
 		env = calculate()
 		assert.is_true(env.mercenary.modDB:GetCondition("Focused"))
 		assert.are.equal(baseDamage + focusedDamage.value, env.mercenary.modDB:Sum("INC", nil, "Damage"))
@@ -349,7 +350,8 @@ describe("Permanent Mercenary calculations", function()
 		equipmentSlot("Weapon 1").selItemId, equipmentSlot("Weapon 2").selItemId = bow.id, quiver.id
 
 		local baseline = assert(calculate().mercenary.output)
-		build.configTab.input.buffOnslaught = true
+		build.configTab:EnsureActorConfig(build.configTab.configSets[build.configTab.activeConfigSetId])
+		build.configTab.configSets[build.configTab.activeConfigSetId].actors.mercenary.input.buffOnslaught = true
 		local configured = assert(calculate().mercenary)
 
 		assert.is_true(configured.modDB:GetCondition("Onslaught"))
@@ -1080,6 +1082,10 @@ Iron Hat
 		build.itemsTab.activeItemSet["Flask 1"].selItemId = granite.id
 		build.itemsTab.activeItemSet["Flask 1"].active = true
 		build.configTab.input.customMods = "Flasks applied to you have 30% increased Effect"
+		local configSet = build.configTab.configSets[build.configTab.activeConfigSetId]
+		build.configTab:EnsureActorConfig(configSet)
+		configSet.customModsList[1].text = "Flasks applied to you have 30% increased Effect"
+		configSet.actors.mercenary.customModsList[1].text = "Flasks applied to you have 30% increased Effect"
 		build.configTab:BuildModList()
 		local env = calculate()
 		local baseArmour = env.mercenary.modDB:Sum("BASE", nil, "Armour")

@@ -127,8 +127,8 @@ function ItemSetListClass:OnOrderChange()
 end
 
 function ItemSetListClass:OnSelClick(index, itemSetId, doubleClick)
-	if doubleClick and itemSetId ~= self.itemsTab.activeItemSetId then
-		self.itemsTab:SetActiveItemSet(itemSetId)
+	if doubleClick and itemSetId ~= self.itemsTab.viewItemSetId then
+		self.itemsTab:SetViewItemSet(itemSetId)
 		self.itemsTab:AddUndoState()
 	end
 end
@@ -141,11 +141,14 @@ function ItemSetListClass:OnSelDelete(index, itemSetId)
 			self.itemsTab.itemSets[itemSetId] = nil
 			self.selIndex = nil
 			self.selValue = nil
+			local replacementItemSetId = self.list[m_max(1, index)] or self.list[index - 1]
 			if itemSetId == self.itemsTab.activeItemSetId then
-				local replacementItemSetId = self.list[m_max(1, index)] or self.list[index - 1]
 				self.itemsTab:SetActiveItemSet(replacementItemSetId)
 			elseif itemSetId == self.itemsTab.viewItemSetId then
 				self.itemsTab:SetViewItemSet(self.list[m_max(1, index - 1)])
+			end
+			if self.itemsTab.build.configTab then
+				self.itemsTab.build.configTab:RemapItemSetId(itemSetId, replacementItemSetId)
 			end
 			self.itemsTab:AddUndoState()
 			self.itemsTab.build:SyncLoadouts()

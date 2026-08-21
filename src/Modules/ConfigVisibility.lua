@@ -58,11 +58,18 @@ local function anyActiveSkill(mainEnv, predicate)
 end
 
 -- When the option has an input value and one of its implied conditions is currently used, treat gated predicates as passing.
+local function optionValue(configTab, var)
+	if configTab and configTab.GetConfigValue then
+		return configTab:GetConfigValue(var)
+	end
+	local activeSet = configTab and configTab.configSets and configTab.configSets[configTab.activeConfigSetId]
+	return activeSet and activeSet.input and activeSet.input[var]
+end
+
 local function implyCondActive(varData, build)
 	local configTab = build and build.configTab
 	if not configTab then return false end
-	local activeSet = configTab.configSets and configTab.configSets[configTab.activeConfigSetId]
-	if not activeSet or not activeSet.input[varData.var] then return false end
+	if not optionValue(configTab, varData.var) then return false end
 	local mainEnv = build.calcsTab and build.calcsTab.mainEnv
 	if not mainEnv then return false end
 	if varData.implyCondList then
@@ -83,10 +90,6 @@ local function isRelevantForBuild(varData, build)
 	if not mainEnv then return false end
 	local spec = build.spec
 	local configTab = build.configTab
-	local activeInput = configTab and configTab.configSets
-			and configTab.configSets[configTab.activeConfigSetId]
-			and configTab.configSets[configTab.activeConfigSetId].input
-			or {}
 
 	local impliedCache
 	local function implied()
@@ -117,7 +120,7 @@ local function isRelevantForBuild(varData, build)
 		end) then return false end
 	end
 	if varData.ifOption then
-		if not anyIfValue(varData.ifOption, function(opt) return activeInput[opt] end) then return false end
+		if not anyIfValue(varData.ifOption, function(opt) return optionValue(configTab, opt) end) then return false end
 	end
 	if varData.ifCondTrue then
 		if not anyIfValue(varData.ifCondTrue, function(opt)

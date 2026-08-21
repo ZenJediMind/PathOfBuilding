@@ -101,7 +101,7 @@ describe("Mercenary equipment validation", function()
 			end
 		end
 		assert.is_not_nil(firstSocket)
-		assert.are.equal("^7Item set:", itemsTab.controls.setLabel.label)
+		assert.are.equal("^7View item set:", itemsTab.controls.setLabel.label)
 	end)
 
 	it("views dedicated Mercenary equipment without displacing player equipment", function()
@@ -223,13 +223,14 @@ describe("Mercenary equipment validation", function()
 			end
 		end
 		assert.is_not_nil(newSetId)
+		manager:OnSelClick(isValueInArray(manager.list, newSetId), newSetId, true)
+		assert.are.equal(newSetId, itemsTab.viewItemSetId)
+		assert.are.equal(playerSetId, itemsTab.activeItemSetId)
 		assert(tab:SetItemSet(newSetId))
 		assert.are.equal(newSetId, tab.itemSetId)
 		assert.are.equal(newSetId, itemsTab.viewItemSetId)
 		assert.are.equal(playerSetId, itemsTab.activeItemSetId)
 		assert.matches("%(Visible%)", manager:GetRowValue(1, isValueInArray(manager.list, newSetId), newSetId))
-		manager:OnSelClick(isValueInArray(manager.list, newSetId), newSetId, true)
-		assert.are.equal(newSetId, itemsTab.activeItemSetId)
 	end)
 
 	it("views Animate Guardian and Mercenary gear alongside the active player set", function()

@@ -480,6 +480,9 @@ function MercenaryTabClass:EnsureItemSet()
 	itemSet.title = "Mercenary Equipment"
 	t_insert(itemsTab.itemSetOrderList, itemSet.id)
 	self.itemSetId = itemSet.id
+	if self.build.configTab then
+		self.build.configTab:SyncActorItemSet("mercenary", itemSet.id)
+	end
 	return itemSet
 end
 
@@ -496,6 +499,9 @@ function MercenaryTabClass:SetItemSet(itemSetId)
 	if not itemSet then return false end
 	self.itemSetId = itemSetId
 	itemsTab:SetViewItemSet(itemSetId)
+	if self.build.configTab and not self.skipConfigItemSetSync then
+		self.build.configTab:SyncActorItemSet("mercenary", itemSetId)
+	end
 	self:Changed()
 	return true
 end

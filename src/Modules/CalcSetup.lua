@@ -259,7 +259,9 @@ function calcs.initMercenary(env)
 	mercenary.modDB.actor = mercenary
 	mercenary.modDB.multipliers.Level = mercenary.level
 	calcs.initModDB(env, mercenary.modDB)
-	mercenary.modDB:AddList(env.build.configTab.modList)
+	if env.build.configTab.mercenaryModList then
+		mercenary.modDB:AddList(env.build.configTab.mercenaryModList)
+	end
 	local baseStats = env.data.mercenaries.baseStats
 	mercenary.modDB:NewMod("Life", "BASE", baseStats.lifePerLevel * mercenary.level, "Base")
 	mercenary.modDB:NewMod("Mana", "BASE", env.data.monsterConstants.base_maximum_mana + baseStats.manaPerLevel * mercenary.level, "Base")
@@ -347,6 +349,11 @@ function calcs.initMercenary(env)
 	-- branches of `CalcPerform` rely on: `mercenaryEnv.player` is the Mercenary, and
 	-- `env.player` is always the character.
 	local mercenaryEnv = setmetatable({ modDB = mercenary.modDB, player = mercenary }, { __index = env })
+	if env.build.configTab.GetActorConfigInput then
+		local mercInput, mercPlaceholder = env.build.configTab:GetActorConfigInput("mercenary")
+		mercenaryEnv.configInput = mercInput
+		mercenaryEnv.configPlaceholder = mercPlaceholder
+	end
 	mercenary.calcEnv = mercenaryEnv
 	local function addActiveSkill(selectedSkill, grantedEffect, supports, isPrimary, sourceItem)
 		local skillPart = isPrimary and selectedSkill.skillPart or env.data.mercenaryStatData.defaultSkillParts[grantedEffect.id] or 1

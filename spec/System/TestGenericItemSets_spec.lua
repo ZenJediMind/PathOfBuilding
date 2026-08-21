@@ -49,7 +49,7 @@ describe("Generic item sets for player, Animate Guardian, and Mercenary", functi
 		newBuild()
 	end)
 
-	it("makes the Items dropdown wear any selected item set", function()
+	it("makes the Items dropdown view a set without wearing it", function()
 		local itemsTab = build.itemsTab
 		local secondSet = itemsTab:NewItemSet()
 		secondSet.title = "Alternate"
@@ -58,6 +58,7 @@ describe("Generic item sets for player, Animate Guardian, and Mercenary", functi
 		local otherHelmet = new("Item"):Item("Rarity: Normal\nLeather Cap")
 		itemsTab:AddItem(playerHelmet, true)
 		itemsTab:AddItem(otherHelmet, true)
+		local playerSetId = itemsTab.activeItemSetId
 		itemsTab.activeItemSet.Helmet.selItemId = playerHelmet.id
 		secondSet.Helmet.selItemId = otherHelmet.id
 		itemsTab:PopulateSlots()
@@ -65,9 +66,10 @@ describe("Generic item sets for player, Animate Guardian, and Mercenary", functi
 		itemsTab.controls.setSelect.selIndex = 2
 		itemsTab.controls.setSelect.selFunc(2, secondSet.title)
 
-		assert.are.equal(secondSet.id, itemsTab.activeItemSetId)
+		assert.are.equal(playerSetId, itemsTab.activeItemSetId)
 		assert.are.equal(secondSet.id, itemsTab.viewItemSetId)
 		assert.are.equal(otherHelmet.id, itemsTab.slots.Helmet.selItemId)
+		assert.are.equal(playerSetId, build.configTab.configSets[build.configTab.activeConfigSetId].actors.player.itemSetId)
 	end)
 
 	it("can view another set without changing the player's worn set", function()
@@ -88,7 +90,7 @@ describe("Generic item sets for player, Animate Guardian, and Mercenary", functi
 		assert.are.equal(otherHelmet.id, itemsTab.slots.Helmet.selItemId)
 	end)
 
-	it("keeps the Items dropdown on the worn set while inspecting another set", function()
+	it("keeps the Items dropdown on the viewed set", function()
 		local itemsTab = build.itemsTab
 		local secondSet = itemsTab:NewItemSet()
 		secondSet.title = "Inspected"
@@ -98,7 +100,8 @@ describe("Generic item sets for player, Animate Guardian, and Mercenary", functi
 
 		itemsTab:Draw({ x = 0, y = 0, width = 1920, height = 1080 }, { })
 
-		assert.are.equal(1, itemsTab.controls.setSelect.selIndex)
+		assert.are.equal(2, itemsTab.controls.setSelect.selIndex)
+		assert.are.equal(secondSet.id, itemsTab.viewItemSetId)
 		assert.are.equal(itemsTab.itemSetOrderList[1], itemsTab.activeItemSetId)
 	end)
 

@@ -341,6 +341,8 @@ function buildMode:Init(dbFileName, buildName, buildXML, convertBuild, importLin
 				local configSet = self.configTab:NewConfigSet(#self.configTab.configSets + 1)
 				t_insert(self.configTab.configSetOrderList, configSet.id)
 				configSet.title = loadout
+				self.configTab:EnsureActorConfig(configSet)
+				configSet.actors.player.itemSetId = itemSet.id
 
 				self:SyncLoadouts()
 				self.modFlag = true
@@ -406,14 +408,16 @@ function buildMode:Init(dbFileName, buildName, buildXML, convertBuild, importLin
 		if newSpecId ~= self.treeTab.activeSpec then
 			self.treeTab:SetActiveSpec(newSpecId)
 		end
+		if newConfigId ~= self.configTab.activeConfigSetId then
+			self.configTab:SetActiveConfigSet(newConfigId, nil, { player = false })
+		end
 		if newItemId ~= self.itemsTab.activeItemSetId then
 			self.itemsTab:SetActiveItemSet(newItemId)
+		else
+			self.configTab:SyncActorItemSet("player", newItemId)
 		end
 		if newSkillId ~= self.skillsTab.activeSkillSetId then
 			self.skillsTab:SetActiveSkillSet(newSkillId)
-		end
-		if newConfigId ~= self.configTab.activeConfigSetId then
-			self.configTab:SetActiveConfigSet(newConfigId)
 		end
 
 		self.controls.buildLoadouts:SelByValue(value)

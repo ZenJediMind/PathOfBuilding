@@ -116,17 +116,22 @@ function ItemSlotClass:Populate()
 	if not self.selItemId or not selectedItem then
 		self:SetSelItemId(0, self.itemsTab:GetVisibleItemSet())
 	elseif not self.itemsTab:IsItemValidForSlot(selectedItem, self.slotName, self.itemsTab:GetVisibleItemSet()) then
-		local alreadyListed = false
-		for _, itemId in ipairs(self.items) do
-			if itemId == self.selItemId then
-				alreadyListed = true
-				break
+		local inspectingOtherSet = self.itemsTab.viewItemSetId and self.itemsTab.viewItemSetId ~= self.itemsTab.activeItemSetId
+		if inspectingOtherSet then
+			local alreadyListed = false
+			for _, itemId in ipairs(self.items) do
+				if itemId == self.selItemId then
+					alreadyListed = true
+					break
+				end
 			end
-		end
-		if not alreadyListed then
-			t_insert(self.items, self.selItemId)
-			t_insert(self.list, colorCodes.NEGATIVE..selectedItem.name)
-			self.selIndex = #self.list
+			if not alreadyListed then
+				t_insert(self.items, self.selItemId)
+				t_insert(self.list, colorCodes.NEGATIVE..selectedItem.name)
+				self.selIndex = #self.list
+			end
+		else
+			self:SetSelItemId(0, self.itemsTab:GetVisibleItemSet())
 		end
 	end
 

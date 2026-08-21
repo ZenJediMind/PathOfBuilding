@@ -1401,11 +1401,18 @@ function ImportTabClass:GetOrCreateGuardianItemSet(preferredItemSetIds)
 end
 
 function ImportTabClass:AssignGuardianItemSet(itemSetId)
+	local itemsTab = self.build.itemsTab
+	local activeItemSetId = itemsTab.activeItemSetId
 	for _, socketGroup in ipairs(self.build.skillsTab.socketGroupList) do
 		for _, gem in ipairs(socketGroup.gemList) do
 			if isAnimateGuardianGem(gem) then
-				gem.skillMinionItemSet = itemSetId
-				gem.skillMinionItemSetCalcs = itemSetId
+				for _, suffix in ipairs({ "", "Calcs" }) do
+					local current = gem["skillMinionItemSet"..suffix]
+					local currentSet = current and itemsTab.itemSets[current]
+					if not current or current == activeItemSetId or (currentSet and currentSet.title == "Animate Guardian") then
+						gem["skillMinionItemSet"..suffix] = itemSetId
+					end
+				end
 			end
 		end
 	end

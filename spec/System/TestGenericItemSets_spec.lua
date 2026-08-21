@@ -155,6 +155,26 @@ describe("Generic item sets for player, Animate Guardian, and Mercenary", functi
 		assert.matches(colorCodes.NEGATIVE, listed, nil, true)
 	end)
 
+	it("clears an invalid offhand when the player's worn set selects a two-hander", function()
+		local itemsTab = build.itemsTab
+		local wand = new("Item"):Item("Rarity: Normal\nDriftwood Wand")
+		local shield = new("Item"):Item("Rarity: Normal\nGoathide Buckler")
+		local staff = new("Item"):Item("Rarity: Normal\nGnarled Branch")
+		itemsTab:AddItem(wand, true)
+		itemsTab:AddItem(shield, true)
+		itemsTab:AddItem(staff, true)
+		itemsTab.activeItemSet["Weapon 1"].selItemId = wand.id
+		itemsTab.activeItemSet["Weapon 2"].selItemId = shield.id
+		itemsTab:PopulateSlots()
+		assert.are.equal(itemsTab.activeItemSetId, itemsTab.viewItemSetId)
+
+		itemsTab.slots["Weapon 1"]:SetSelItemId(staff.id, itemsTab:GetVisibleItemSet())
+		itemsTab:PopulateSlots()
+
+		assert.are.equal(0, itemsTab.activeItemSet["Weapon 2"].selItemId)
+		assert.are.equal(0, itemsTab.slots["Weapon 2"].selItemId)
+	end)
+
 	it("lets Mercenary and Animate Guardian use any item set", function()
 		selectScionLuminary()
 		local itemsTab = build.itemsTab
@@ -251,6 +271,38 @@ describe("Generic item sets for player, Animate Guardian, and Mercenary", functi
 		gem = assert(findGuardianGem())
 		assert.are.equal(guardianSet.id, gem.skillMinionItemSet)
 		assert.are.equal("second-guardian-helm", itemsTab.items[guardianSet.Helmet.selItemId].uniqueID)
+	end)
+
+	it("preserves custom Animate Guardian item-set references on reimport", function()
+		local itemsTab = build.itemsTab
+		local bossSet = itemsTab:NewItemSet()
+		bossSet.title = "Boss AG"
+		table.insert(itemsTab.itemSetOrderList, bossSet.id)
+		local calcsSet = itemsTab:NewItemSet()
+		calcsSet.title = "Calcs AG"
+		table.insert(itemsTab.itemSetOrderList, calcsSet.id)
+		build.skillsTab:PasteSocketGroup("Animate Guardian 20/0  1")
+		runCallback("OnFrame")
+		local gem = assert(findGuardianGem())
+		gem.skillMinionItemSet = bossSet.id
+		gem.skillMinionItemSetCalcs = calcsSet.id
+		local setCountBefore = #itemsTab.itemSetOrderList
+
+		build.importTab:ImportItemsAndSkills({
+			level = 12,
+			equipment = {
+				makeImportItem("Driftwood Wand", "Weapon", "player-weapon-1"),
+			},
+			guardian = {
+				makeImportItem("Leather Cap", "Helm", "fresh-guardian-helm"),
+			},
+		}, false, false, true)
+
+		gem = assert(findGuardianGem())
+		assert.are.equal(bossSet.id, gem.skillMinionItemSet)
+		assert.are.equal(calcsSet.id, gem.skillMinionItemSetCalcs)
+		assert.are.equal(setCountBefore, #itemsTab.itemSetOrderList)
+		assert.are.equal("fresh-guardian-helm", itemsTab.items[bossSet.Helmet.selItemId].uniqueID)
 	end)
 
 	it("recognizes an allocated passive jewel socket as equipped", function()

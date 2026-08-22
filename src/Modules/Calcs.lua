@@ -654,6 +654,18 @@ function calcs.buildOutput(build, mode)
 		env.enemyPerStatsUsed = { }
 		env.tagTypesUsed = { }
 		env.modsUsed = { }
+		env.actorUsage = {
+			player = { conditions = { }, multipliers = { }, mods = { }, perStats = { } },
+			mercenary = { conditions = { }, multipliers = { }, mods = { }, perStats = { } },
+		}
+		local function actorUsageFor(actor)
+			if actor == env.mercenary then
+				return env.actorUsage.mercenary
+			end
+			if actor == env.player then
+				return env.actorUsage.player
+			end
+		end
 		local function addTo(out, var, mod)
 			-- Do not count Base mods as mods being actually used as they are only used as descriptors for mods
 			if mod.source == "Base" then
@@ -684,6 +696,10 @@ function calcs.buildOutput(build, mode)
 		end
 		local function addModTags(actor, mod)
 			addTo(env.modsUsed, mod.name, mod)
+			local usage = actorUsageFor(actor)
+			if usage then
+				addTo(usage.mods, mod.name, mod)
+			end
 			
 			-- Imply enemy conditionals based on damage type
 			-- Needed to preemptively show config options for elemental ailments
@@ -702,6 +718,9 @@ function calcs.buildOutput(build, mode)
 				elseif tag.type == "Condition" then
 					if actor == env.player or actor == env.mercenary then
 						addVarTag(env.conditionsUsed, tag, mod)
+						if usage then
+							addVarTag(usage.conditions, tag, mod)
+						end
 					else
 						addVarTag(env.minionConditionsUsed, tag, mod)
 					end
@@ -715,6 +734,9 @@ function calcs.buildOutput(build, mode)
 					if not tag.actor then
 						if actor == env.player or actor == env.mercenary then
 							addVarTag(env.multipliersUsed, tag, mod)
+							if usage then
+								addVarTag(usage.multipliers, tag, mod)
+							end
 						end
 					elseif tag.actor == "enemy" then
 						addVarTag(env.enemyMultipliersUsed, tag, mod)
@@ -723,6 +745,9 @@ function calcs.buildOutput(build, mode)
 					if not tag.actor then
 						if actor == env.player or actor == env.mercenary then
 							addStatTag(env.perStatsUsed, tag, mod)
+							if usage then
+								addStatTag(usage.perStats, tag, mod)
+							end
 						end
 					elseif tag.actor == "enemy" then
 						addStatTag(env.enemyPerStatsUsed, tag, mod)
@@ -748,6 +773,10 @@ function calcs.buildOutput(build, mode)
 				end
 				for _, mod in ipairs(activeSkill.skillModList) do
 					addTo(env.modsUsed, mod.name, mod)
+					local usage = actorUsageFor(actor)
+					if usage then
+						addTo(usage.mods, mod.name, mod)
+					end
 					for _, tag in ipairs(mod) do
 						addTo(env.tagTypesUsed, tag.type, mod)
 					end

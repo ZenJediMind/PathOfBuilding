@@ -3247,13 +3247,22 @@ function calcs.perform(env, skipEHP)
 		for _, activeSkill in ipairs(mercenary.activeSkillList) do
 			local skillModList = activeSkill.skillModList
 			local skillCfg = activeSkill.skillCfg
+			if skillModList:Flag(nil, "Condition:CanWither") or (activeSkill.minion and env.mercenaryMinion and env.mercenaryMinion.modDB:Flag(nil, "Condition:CanWither")) then
+				local effect = activeSkill.minion and m_floor(6 * (1 + mercenary.modDB:Sum("INC", nil, "MinionWitherEffect") / 100)) or m_floor(6 * (1 + mercenary.modDB:Sum("INC", nil, "WitherEffect") / 100))
+				-- Withered is one enemy debuff. Store on the player MAX so doActorMisc applies ChaosDamageTaken once.
+				env.modDB:NewMod("WitherEffectStack", "MAX", effect)
+			end
 			if env.modDB:Flag(nil, "MercenaryTauntsOnHit") and activeSkill.skillFlags.hit then
 				enemyDB.conditions.Taunted = true
 				enemyDB.conditions.TauntedByMercenary = true
 				mercenaryTauntedEnemy = true
 			end
 			for _, buff in ipairs(activeSkill.buffList) do
-				if buff.type == "GlobalDB" then
+				if buff.cond and not skillModList:GetCondition(buff.cond, skillCfg) then
+					-- Nothing!
+				elseif buff.enemyCond and not enemyDB:GetCondition(buff.enemyCond) then
+					-- Also nothing :/
+				elseif buff.type == "GlobalDB" then
 					mercenary.modDB:AddList(buff.modList)
 				elseif buff.type == "Buff" and env.mode_buffs and not skillModList:Flag(skillCfg, "DisableBuff") then
 					if not buff.applyNotPlayer then

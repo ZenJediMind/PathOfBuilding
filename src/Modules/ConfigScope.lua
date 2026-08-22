@@ -14,8 +14,9 @@ local PLAYER_VARS = {
 	ignoreJewelLimits = true,
 }
 
+-- Sections that remain player-only even when Config is viewing the Mercenary.
+-- Skill Options are actor-scoped; keep this table for genuinely player-only sections.
 local PLAYER_SECTIONS = {
-	["Skill Options"] = true,
 }
 
 local SHARED_SECTIONS = {
@@ -25,6 +26,66 @@ local SHARED_SECTIONS = {
 
 local scopeByVar = { }
 local indexed = false
+
+-- Classify apply() functions that mutate the enemy list as shared encounter state.
+-- This is based on the apply body, not variable naming.
+local function applyWritesToEnemy(varData)
+	if not varData.apply then
+		return false
+	end
+	local wrote = false
+	local dummyControl = {
+		SetPlaceholder = function() end,
+		SetText = function() end,
+		SelByValue = function() end,
+	}
+	local dummyModList = {
+		NewMod = function() end,
+		AddMod = function() end,
+		AddList = function() end,
+	}
+	setmetatable(dummyModList, {
+		__index = function()
+			return function() end
+		end,
+	})
+	local dummyEnemy = {
+		NewMod = function()
+			wrote = true
+		end,
+		AddMod = function()
+			wrote = true
+		end,
+		AddList = function()
+			wrote = true
+		end,
+	}
+	setmetatable(dummyEnemy, {
+		__index = function()
+			return function() end
+		end,
+	})
+	local dummyBuild = {
+		configTab = {
+			input = { },
+			varControls = setmetatable({ }, {
+				__index = function()
+					return dummyControl
+				end,
+			}),
+		},
+	}
+	pcall(varData.apply, true, dummyModList, dummyEnemy, dummyBuild)
+	if wrote then
+		return true
+	end
+	pcall(varData.apply, 1, dummyModList, dummyEnemy, dummyBuild)
+	if wrote then
+		return true
+	end
+	pcall(varData.apply, "Fire", dummyModList, dummyEnemy, dummyBuild)
+	return wrote
+end
 
 local function inferScope(varData, sectionScope)
 	if varData.scope then
@@ -46,6 +107,9 @@ local function inferScope(varData, sectionScope)
 		or var:match("^multiplierMap") or var == "multiplierSextant" or var == "PvpScaling"
 		or var:match("OnEnemy") or var == "ShockStacks" or var == "ScorchStacks"
 	then
+		return "shared"
+	end
+	if applyWritesToEnemy(varData) then
 		return "shared"
 	end
 	return sectionScope or "actor"

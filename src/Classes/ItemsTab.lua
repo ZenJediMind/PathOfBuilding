@@ -235,42 +235,14 @@ function ItemsTabClass:ItemsTab(build)
 	end
 	self.controls.slotHeader = new("LabelControl"):LabelControl({"BOTTOMLEFT",self.slotAnchor,"TOPLEFT"}, {0, -4, 0, 16}, "^7Equipped items:")
 	self.controls.weaponSwap1 = new("ButtonControl"):ButtonControl({"BOTTOMRIGHT",self.slotAnchor,"TOPRIGHT"}, {-20, -2, 18, 18}, "I", function()
-		local visibleItemSet = self:GetVisibleItemSet()
-		if visibleItemSet.useSecondWeaponSet then
-			visibleItemSet.useSecondWeaponSet = false
-			self:AddUndoState()
-			self.build.buildFlag = true
-			local mainSocketGroup = self.build.skillsTab.socketGroupList[self.build.mainSocketGroup]
-			if mainSocketGroup and mainSocketGroup.slot and self.slots[mainSocketGroup.slot].weaponSet == 2 then
-				for index, socketGroup in ipairs(self.build.skillsTab.socketGroupList) do
-					if socketGroup.slot and self.slots[socketGroup.slot].weaponSet == 1 then
-						self.build.mainSocketGroup = index
-						break
-					end
-				end
-			end
-		end
+		self:SetVisibleWeaponSet(false)
 	end)
 	self.controls.weaponSwap1.overSizeText = 3
 	self.controls.weaponSwap1.locked = function()
 		return not self:GetVisibleItemSet().useSecondWeaponSet
 	end
 	self.controls.weaponSwap2 = new("ButtonControl"):ButtonControl({"BOTTOMRIGHT",self.slotAnchor,"TOPRIGHT"}, {0, -2, 18, 18}, "II", function()
-		local visibleItemSet = self:GetVisibleItemSet()
-		if not visibleItemSet.useSecondWeaponSet then
-			visibleItemSet.useSecondWeaponSet = true
-			self:AddUndoState()
-			self.build.buildFlag = true
-			local mainSocketGroup = self.build.skillsTab.socketGroupList[self.build.mainSocketGroup]
-			if mainSocketGroup and mainSocketGroup.slot and self.slots[mainSocketGroup.slot].weaponSet == 1 then
-				for index, socketGroup in ipairs(self.build.skillsTab.socketGroupList) do
-					if socketGroup.slot and self.slots[socketGroup.slot].weaponSet == 2 then
-						self.build.mainSocketGroup = index
-						break
-					end
-				end
-			end
-		end
+		self:SetVisibleWeaponSet(true)
 	end)
 	self.controls.weaponSwap2.overSizeText = 3
 	self.controls.weaponSwap2.locked = function()
@@ -1612,6 +1584,38 @@ function ItemsTabClass:GetVisibleItemSet()
 	return self.viewItemSet
 end
 
+-- Changes weapon set I/II on the currently viewed item set.
+-- The player's selected main skill only follows this change when that set is actually equipped.
+function ItemsTabClass:SetVisibleWeaponSet(useSecond)
+	local visibleItemSet = self:GetVisibleItemSet()
+	if not visibleItemSet then
+		return
+	end
+	local wantSecond = useSecond and true or false
+	if (visibleItemSet.useSecondWeaponSet and true or false) == wantSecond then
+		return
+	end
+	visibleItemSet.useSecondWeaponSet = wantSecond
+	self:AddUndoState()
+	self.build.buildFlag = true
+	if visibleItemSet ~= self.activeItemSet then
+		return
+	end
+	local fromSet = useSecond and 1 or 2
+	local toSet = useSecond and 2 or 1
+	local mainSocketGroup = self.build.skillsTab.socketGroupList[self.build.mainSocketGroup]
+	local fromSlot = mainSocketGroup and mainSocketGroup.slot and self.slots[mainSocketGroup.slot]
+	if fromSlot and fromSlot.weaponSet == fromSet then
+		for index, socketGroup in ipairs(self.build.skillsTab.socketGroupList) do
+			local toSlot = socketGroup.slot and self.slots[socketGroup.slot]
+			if toSlot and toSlot.weaponSet == toSet then
+				self.build.mainSocketGroup = index
+				break
+			end
+		end
+	end
+end
+
 function ItemsTabClass:GetVisibleItemSlots()
 	return self.orderedSlots
 end
@@ -1679,15 +1683,18 @@ function ItemsTabClass:SetViewItemSet(itemSetId)
 end
 
 -- Changes the active player item set. Missing IDs are rejected.
-function ItemsTabClass:SetActiveItemSet(itemSetId)
+-- Pass changeView == false to equip without switching the Items tab's viewed set.
+function ItemsTabClass:SetActiveItemSet(itemSetId, changeView)
 	local itemSet = self.itemSets[itemSetId]
 	if not itemSet then
 		return false
 	end
 	self.activeItemSetId = itemSetId
 	self.activeItemSet = itemSet
-	self.viewItemSetId = itemSetId
-	self.viewItemSet = itemSet
+	if changeView ~= false then
+		self.viewItemSetId = itemSetId
+		self.viewItemSet = itemSet
+	end
 	if self.build.configTab and not self.skipConfigItemSetSync then
 		self.build.configTab:SyncActorItemSet("player", itemSetId)
 	end
@@ -2616,7 +2623,8 @@ function ItemsTabClass:AddModComparisonTooltip(tooltip, mod, replaceImplicits)
 	self.build:AddStatComparesToTooltip(tooltip, outputBase, outputNew, "\nAdding this mod will give: ")
 end
 
--- Returns the first slot in which the given item is equipped
+-- Returns the first slot in which the given item is equipped.
+-- Actively worn equipment returns (slot) with no item set; other sets return (slot, itemSet).
 function ItemsTabClass:GetEquippedSlotForItem(item)
 	for _, slot in ipairs(self.orderedSlots) do
 		if not slot.inactive then
@@ -2625,7 +2633,17 @@ function ItemsTabClass:GetEquippedSlotForItem(item)
 					return slot
 				end
 			else
-				for _, itemSetId in ipairs(self.itemSetOrderList) do
+				local activeSlot = self.activeItemSet and self.activeItemSet[slot.slotName]
+				if activeSlot and activeSlot.selItemId == item.id then
+					return slot
+				end
+			end
+		end
+	end
+	for _, slot in ipairs(self.orderedSlots) do
+		if not slot.inactive and not slot.nodeId then
+			for _, itemSetId in ipairs(self.itemSetOrderList) do
+				if itemSetId ~= self.activeItemSetId then
 					local itemSet = self.itemSets[itemSetId]
 					local itemSlot = itemSet and itemSet[slot.slotName]
 					if itemSlot and itemSlot.selItemId == item.id then

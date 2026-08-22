@@ -59,6 +59,18 @@ describe("Permanent Mercenary calculations", function()
 		end
 	end
 
+	local function configureSkill(skillId, fields)
+		for buildId, mercBuild in pairs(build.data.mercenaries.builds) do
+			for _, id in ipairs(mercBuild.skillIds or { }) do
+				if id == skillId then
+					configure(mercBuild.classId, buildId, skillId, fields)
+					return
+				end
+			end
+		end
+		error("no Mercenary build exports "..skillId)
+	end
+
 	local function calculate(enemyLevel)
 		build.configTab.input.enemyLevel = enemyLevel or 83
 		build.configTab:BuildModList()
@@ -323,6 +335,9 @@ describe("Permanent Mercenary calculations", function()
 			if mod.source == focusedDamage.source then focusedConditionSource = mod.source end
 		end
 		assert.are.equal(focusedDamage.source, focusedConditionSource)
+		assert.is_false(build.configTab.varControls.conditionFocused.shown())
+		assert.is_false(build.configTab.varControls.detonateDeadCorpseLife.shown())
+		build.configTab:SetViewActor("mercenary")
 		assert.is_true(build.configTab.varControls.conditionFocused.shown())
 		assert.is_true(build.configTab.varControls.detonateDeadCorpseLife.shown())
 
@@ -330,7 +345,8 @@ describe("Permanent Mercenary calculations", function()
 		for _, varData in ipairs(configOptions) do
 			if varData.var == "detonateDeadCorpseLife" then corpseLifeConfig = varData break end
 		end
-		assert.is_true(configVisibility.isRelevantForBuild(assert(corpseLifeConfig), build))
+		assert.is_false(configVisibility.isRelevantForBuild(assert(corpseLifeConfig), build, "player"))
+		assert.is_true(configVisibility.isRelevantForBuild(corpseLifeConfig, build, "mercenary"))
 
 		build.configTab:EnsureActorConfig(build.configTab.configSets[build.configTab.activeConfigSetId])
 		build.configTab.configSets[build.configTab.activeConfigSetId].actors.mercenary.input.conditionFocused = true
@@ -339,6 +355,113 @@ describe("Permanent Mercenary calculations", function()
 		assert.is_true(env.mercenary.modDB:GetCondition("Focused"))
 		assert.are.equal(baseDamage + focusedDamage.value, env.mercenary.modDB:Sum("INC", nil, "Damage"))
 		assert.are.equal(12345, env.mercenary.mainSkill.skillData.corpseLife)
+	end)
+
+	it("applies Vigilant Strike's default cooldown bypass to the Mercenary", function()
+		configureSkill("VigilantStrikeMercenary")
+		local mace = new("Item"):Item("Rarity: Normal\nDriftwood Club")
+		mace.id = 9041
+		build.itemsTab.items[mace.id] = mace
+		equipmentSlot("Weapon 1").selItemId = mace.id
+		local configSet = build.configTab.configSets[build.configTab.activeConfigSetId]
+		build.configTab:EnsureActorConfig(configSet)
+		local bypassed = assert(calculate().mercenary)
+		configSet.actors.mercenary.input.VigilantStrikeBypassCD = false
+		local onCooldown = assert(calculate().mercenary)
+		assert.is_true(bypassed.output.Speed > onCooldown.output.Speed)
+		build.configTab:SetViewActor("mercenary")
+		assert.is_true(build.configTab.varControls.VigilantStrikeBypassCD.shown())
+		build.configTab:SetViewActor("player")
+		assert.is_false(build.configTab.varControls.VigilantStrikeBypassCD.shown())
+	end)
+
+	it("applies Toxic Rain pod overlap to the Mercenary", function()
+		configureSkill("ToxicRainMercenary")
+		local bow = new("Item"):Item("Rarity: Normal\nCrude Bow")
+		local quiver = new("Item"):Item("Rarity: Normal\nSerrated Arrow Quiver")
+		bow.id, quiver.id = 9042, 9043
+		build.itemsTab.items[bow.id], build.itemsTab.items[quiver.id] = bow, quiver
+		equipmentSlot("Weapon 1").selItemId, equipmentSlot("Weapon 2").selItemId = bow.id, quiver.id
+		local baseline = assert(calculate().mercenary)
+		local configSet = build.configTab.configSets[build.configTab.activeConfigSetId]
+		build.configTab:EnsureActorConfig(configSet)
+		configSet.actors.mercenary.input.toxicRainPodOverlap = 5
+		local overlapped = assert(calculate().mercenary)
+		assert.are.equal(5, overlapped.mainSkill.skillData.podOverlapMultiplier)
+		assert.is_true(overlapped.output.CombinedDPS > baseline.output.CombinedDPS)
+		build.configTab:SetViewActor("mercenary")
+		assert.is_true(build.configTab.varControls.toxicRainPodOverlap.shown())
+	end)
+
+	it("applies Flame Wall projectile added fire to Mercenary Kinetic Blast of Clustering", function()
+		configureSkill("KineticBlastAltMercenary")
+		local wand = new("Item"):Item("Rarity: Normal\nDriftwood Wand")
+		local shield = new("Item"):Item("Rarity: Normal\nTwig Spirit Shield")
+		wand.id, shield.id = 9060, 9061
+		build.itemsTab.items[wand.id], build.itemsTab.items[shield.id] = wand, shield
+		equipmentSlot("Weapon 1").selItemId, equipmentSlot("Weapon 2").selItemId = wand.id, shield.id
+		local profile = build.mercenaryTab.profile
+		table.insert(profile.skills, { id = "FlameWallMercenary", enabled = true, count = 1, supports = { } })
+		build.mercenaryTab:Changed()
+		local baseline = assert(calculate().mercenary)
+		local configSet = build.configTab.configSets[build.configTab.activeConfigSetId]
+		build.configTab:EnsureActorConfig(configSet)
+		configSet.actors.mercenary.input.flameWallAddedDamage = true
+		local flamed = assert(calculate())
+		local fireCfg = { flags = ModFlag.Projectile }
+		assert.is_true(flamed.mercenary.modDB:GetCondition("FlameWallAddedDamage"))
+		assert.is_true(flamed.mercenary.modDB:Sum("BASE", fireCfg, "FireMin") > baseline.modDB:Sum("BASE", fireCfg, "FireMin"))
+		assert.is_true(flamed.mercenary.output.CombinedDPS > baseline.output.CombinedDPS)
+		build.configTab:SetViewActor("mercenary")
+		assert.is_true(build.configTab.varControls.flameWallAddedDamage.shown())
+	end)
+
+	it("applies Mercenary Withered stacks to the shared enemy", function()
+		configureSkill("WitherTotemMercenary")
+		local staff = new("Item"):Item("Rarity: Normal\nGnarled Branch")
+		staff.id = 9044
+		build.itemsTab.items[staff.id] = staff
+		equipmentSlot("Weapon 1").selItemId = staff.id
+		local profile = build.mercenaryTab.profile
+		table.insert(profile.skills, { id = "EssenceDrainAltMercenary", enabled = true, includeInFullDPS = true, count = 1, supports = { } })
+		build.mercenaryTab:Changed()
+		assert(calculate())
+		assert.is_true(build.configTab.varControls.multiplierWitheredStackCount.shown())
+		profile.mainSkillId = "EssenceDrainAltMercenary"
+		build.mercenaryTab:Changed()
+		local baseline = assert(calculate())
+		local baselineDot = baseline.mercenary.output.TotalDot or 0
+		build.configTab.input.multiplierWitheredStackCount = 15
+		local withered = assert(calculate())
+		local witherMods = 0
+		for _, mod in ipairs(build.configTab.enemyModList) do
+			if mod.name == "Multiplier:WitheredStack" then
+				witherMods = witherMods + 1
+				assert.are.equal(15, mod.value)
+			end
+		end
+		assert.are.equal(1, witherMods)
+		assert.is_not_nil(withered.enemy.modDB.mods["Multiplier:WitheredStack"])
+		assert.is_true(withered.enemy.modDB:Sum("INC", nil, "ChaosDamageTaken") > 0)
+		assert.is_true((withered.mercenary.output.TotalDot or 0) > baselineDot)
+	end)
+
+	it("applies Withered chaos taken once when both actors can wither", function()
+		configureSkill("WitherTotemMercenary")
+		local staff = new("Item"):Item("Rarity: Normal\nGnarled Branch")
+		staff.id = 9045
+		build.itemsTab.items[staff.id] = staff
+		equipmentSlot("Weapon 1").selItemId = staff.id
+		build.skillsTab:PasteSocketGroup("Wither 20/0  1")
+		build.configTab.input.multiplierWitheredStackCount = 15
+		local env = assert(calculate())
+		local witheredSources = 0
+		for _, mod in ipairs(env.enemy.modDB.mods["ChaosDamageTaken"] or { }) do
+			if mod.source == "Withered" then
+				witheredSources = witheredSources + 1
+			end
+		end
+		assert.are.equal(1, witheredSources)
 	end)
 
 	it("applies the configured Onslaught buff to Mercenary attack DPS", function()

@@ -493,12 +493,14 @@ function MercenaryTabClass:GetItemSet(create)
 	if create == true then return self:EnsureItemSet() end
 end
 
-function MercenaryTabClass:SetItemSet(itemSetId)
+function MercenaryTabClass:SetItemSet(itemSetId, changeView)
 	local itemsTab = self.build.itemsTab
 	local itemSet = itemsTab.itemSets[itemSetId]
 	if not itemSet then return false end
 	self.itemSetId = itemSetId
-	itemsTab:SetViewItemSet(itemSetId)
+	if changeView ~= false then
+		itemsTab:SetViewItemSet(itemSetId)
+	end
 	if self.build.configTab and not self.skipConfigItemSetSync then
 		self.build.configTab:SyncActorItemSet("mercenary", itemSetId)
 	end

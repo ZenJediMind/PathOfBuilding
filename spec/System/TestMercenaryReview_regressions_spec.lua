@@ -124,4 +124,80 @@ describe("Mercenary review regressions", function()
 		assert.is_true(calculated, calculationError)
 		assert.matches("Invalid skill for selected build", table.concat(build.calcsTab.mainEnv.mercenaryCalculationErrors, "\n"))
 	end)
+
+	it("does not change the player's main skill when swapping weapons on a viewed inactive set", function()
+		newBuild()
+		local itemsTab = build.itemsTab
+		build.skillsTab:PasteSocketGroup("Slot: Weapon 1\nHeavy Strike 20/0  1\n")
+		build.skillsTab:PasteSocketGroup("Slot: Weapon 1 Swap\nCleave 20/0  1\n")
+		build.mainSocketGroup = 1
+		local inactiveSet = itemsTab:NewItemSet()
+		inactiveSet.title = "Inactive"
+		table.insert(itemsTab.itemSetOrderList, inactiveSet.id)
+		assert(itemsTab:SetViewItemSet(inactiveSet.id))
+		assert.is_not_true(inactiveSet.useSecondWeaponSet)
+
+		itemsTab.controls.weaponSwap2.onClick()
+
+		assert.is_true(inactiveSet.useSecondWeaponSet)
+		assert.is_not_true(itemsTab.activeItemSet.useSecondWeaponSet)
+		assert.are.equal(1, build.mainSocketGroup)
+	end)
+
+	it("still migrates the main skill when the player swaps weapons on the active set", function()
+		newBuild()
+		local itemsTab = build.itemsTab
+		build.skillsTab:PasteSocketGroup("Slot: Weapon 1\nHeavy Strike 20/0  1\n")
+		build.skillsTab:PasteSocketGroup("Slot: Weapon 1 Swap\nCleave 20/0  1\n")
+		build.mainSocketGroup = 1
+		assert.are.equal(itemsTab.activeItemSetId, itemsTab.viewItemSetId)
+
+		itemsTab.controls.weaponSwap2.onClick()
+
+		assert.is_true(itemsTab.activeItemSet.useSecondWeaponSet)
+		assert.are.equal(2, build.mainSocketGroup)
+	end)
+
+	it("treats actively equipped items as equipped rather than merely used in a set", function()
+		newBuild()
+		local itemsTab = build.itemsTab
+		local equipped = new("Item"):Item("Rarity: Normal\nIron Hat")
+		local other = new("Item"):Item("Rarity: Normal\nLeather Cap")
+		itemsTab:AddItem(equipped, true)
+		itemsTab:AddItem(other, true)
+		itemsTab.activeItemSet.Helmet.selItemId = equipped.id
+		local mapping = itemsTab:NewItemSet()
+		mapping.title = "Mapping"
+		table.insert(itemsTab.itemSetOrderList, mapping.id)
+		mapping.Helmet.selItemId = other.id
+		itemsTab:PopulateSlots()
+
+		local equippedSlot, equippedSet = itemsTab:GetEquippedSlotForItem(equipped)
+		assert.are.equal("Helmet", equippedSlot.slotName)
+		assert.is_nil(equippedSet)
+		local otherSlot, otherSet = itemsTab:GetEquippedSlotForItem(other)
+		assert.are.equal("Helmet", otherSlot.slotName)
+		assert.are.equal(mapping, otherSet)
+
+		mapping.Helmet.selItemId = equipped.id
+		local duplicateSlot, duplicateSet = itemsTab:GetEquippedSlotForItem(equipped)
+		assert.are.equal(equippedSlot, duplicateSlot)
+		assert.is_nil(duplicateSet)
+
+		assert(itemsTab:SetViewItemSet(mapping.id))
+		local viewedSlot, viewedSet = itemsTab:GetEquippedSlotForItem(equipped)
+		assert.is_nil(viewedSet)
+		assert.are.equal(equippedSlot, viewedSlot)
+
+		mapping.Helmet.selItemId = other.id
+		local equippedRow = itemsTab.controls.itemList:GetRowValue(1, 1, equipped.id)
+		local otherRow = itemsTab.controls.itemList:GetRowValue(1, 1, other.id)
+		assert.does_not_match("Used in", equippedRow)
+		assert.matches("Used in 'Mapping'", otherRow)
+
+		mapping["Weapon 1"].selItemId = equipped.id
+		local crossSlot, crossSet = itemsTab:GetEquippedSlotForItem(equipped)
+		assert.are.equal("Helmet", crossSlot.slotName)
+		assert.is_nil(crossSet)
+	end)
 end)

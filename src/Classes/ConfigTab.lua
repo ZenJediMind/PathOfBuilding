@@ -438,7 +438,7 @@ function ConfigTabClass:ConfigTab(build)
 					if implyCond(varData) then
 						return true
 					end
-					return self.build.calcsTab.mainEnv.conditionsUsed[ifOption]
+					return configVisibility.usedForVar(self.build.calcsTab.mainEnv, "conditionsUsed", varData, self:GetViewActor())[ifOption]
 				end))
 				t_insert(tooltipFuncs, listOrSingleIfTooltip(varData.ifCond, function(ifOption)
 					if not launch.devModeAlt then
@@ -503,7 +503,7 @@ function ConfigTabClass:ConfigTab(build)
 				t_insert(shownFuncs, listOrSingleIfOption(varData.ifCondTrue, function(ifOption)
 					return configVisibility.anyPrimaryActor(self.build.calcsTab.mainEnv, function(actor)
 						return actor.modDB.conditions[ifOption]
-					end)
+					end, configVisibility.actorKeysForVar(varData, self:GetViewActor()))
 				end))
 				t_insert(tooltipFuncs, listOrSingleIfTooltip(varData.ifCondTrue, function(ifOption)
 					if not launch.devModeAlt then
@@ -518,7 +518,7 @@ function ConfigTabClass:ConfigTab(build)
 					if implyCond(varData) then
 						return true
 					end
-					return self.build.calcsTab.mainEnv.multipliersUsed[ifOption]
+					return configVisibility.usedForVar(self.build.calcsTab.mainEnv, "multipliersUsed", varData, self:GetViewActor())[ifOption]
 				end))
 				t_insert(tooltipFuncs, listOrSingleIfTooltip(varData.ifMult, function(ifOption)
 					if not launch.devModeAlt then
@@ -562,7 +562,7 @@ function ConfigTabClass:ConfigTab(build)
 					if implyCond(varData) then
 						return true
 					end
-					return self.build.calcsTab.mainEnv.perStatsUsed[ifOption] or self.build.calcsTab.mainEnv.enemyMultipliersUsed[ifOption]
+					return configVisibility.usedForVar(self.build.calcsTab.mainEnv, "perStatsUsed", varData, self:GetViewActor())[ifOption] or self.build.calcsTab.mainEnv.enemyMultipliersUsed[ifOption]
 				end))
 				t_insert(tooltipFuncs, listOrSingleIfTooltip(varData.ifStat, function(ifOption)
 					if not launch.devModeAlt then
@@ -633,7 +633,7 @@ function ConfigTabClass:ConfigTab(build)
 					return configVisibility.anyMainSkill(self.build.calcsTab.mainEnv, function(mainSkill)
 						-- Check both the skill mods for flags and flags that are set via calcPerform
 						return mainSkill.skillFlags[ifOption] or mainSkill.skillModList:Flag(nil, ifOption)
-					end)
+					end, configVisibility.actorKeysForVar(varData, self:GetViewActor()))
 				end))
 			end
 			if varData.ifMod then
@@ -641,7 +641,7 @@ function ConfigTabClass:ConfigTab(build)
 					if implyCond(varData) then
 						return true
 					end
-					return self.build.calcsTab.mainEnv.modsUsed[ifOption]
+					return configVisibility.usedForVar(self.build.calcsTab.mainEnv, "modsUsed", varData, self:GetViewActor())[ifOption]
 				end))
 				t_insert(tooltipFuncs, listOrSingleIfTooltip(varData.ifMod, function(ifOption)
 					if not launch.devModeAlt then
@@ -659,36 +659,24 @@ function ConfigTabClass:ConfigTab(build)
 				end))
 			end
 			if varData.ifSkill then
-				if varData.includeTransfigured then
-					t_insert(shownFuncs, listOrSingleIfOption(varData.ifSkill, function(ifOption)
-						if not calcLib.getGameIdFromGemName(ifOption, true) then
-							return false
-						end
-						for skill,_ in pairs(self.build.calcsTab.mainEnv.skillsUsed) do
-							if calcLib.isGemIdSame(skill, ifOption, true) then
-								return true
-							end
-						end
-						return false
-					end))
-				else
-					t_insert(shownFuncs, listOrSingleIfOption(varData.ifSkill, function(ifOption)
-						return self.build.calcsTab.mainEnv.skillsUsed[ifOption]
-					end))
-				end
+				t_insert(shownFuncs, listOrSingleIfOption(varData.ifSkill, function(ifOption)
+					return configVisibility.anyPrimaryActor(self.build.calcsTab.mainEnv, function(actor)
+						return configVisibility.actorUsesSkill(actor, ifOption, varData.includeTransfigured)
+					end, configVisibility.actorKeysForVar(varData, self:GetViewActor()))
+				end))
 			end
 			if varData.ifSkillFlag then
 				t_insert(shownFuncs, listOrSingleIfOption(varData.ifSkillFlag, function(ifOption)
 					return configVisibility.anyActiveSkill(self.build.calcsTab.mainEnv, function(activeSkill)
 						return activeSkill.skillFlags[ifOption]
-					end)
+					end, configVisibility.actorKeysForVar(varData, self:GetViewActor()))
 				end))
 			end
 			if varData.ifSkillData then
 				t_insert(shownFuncs, listOrSingleIfOption(varData.ifSkillData, function(ifOption)
 					return configVisibility.anyActiveSkill(self.build.calcsTab.mainEnv, function(activeSkill)
 						return activeSkill.skillData[ifOption]
-					end)
+					end, configVisibility.actorKeysForVar(varData, self:GetViewActor()))
 				end))
 			end
 
@@ -742,6 +730,9 @@ function ConfigTabClass:ConfigTab(build)
 			if not varData.hideIfInvalid then
 				control.shown = function()
 					if not searchMatch(varData) then
+						return false
+					end
+					if ConfigScope.forVarData(varData) == "player" and self:GetViewActor() == "mercenary" then
 						return false
 					end
 					local shown = type(innerShown) == "boolean" and innerShown or innerShown()
@@ -1530,7 +1521,7 @@ function ConfigTabClass:ApplyActorItemSets(opts)
 	local mercenaryItemSetId = configSet.actors.mercenary and configSet.actors.mercenary.itemSetId
 	if opts.mercenary ~= false and mercenaryTab and mercenaryItemSetId and itemsTab and itemsTab.itemSets[mercenaryItemSetId] then
 		mercenaryTab.skipConfigItemSetSync = true
-		mercenaryTab:SetItemSet(mercenaryItemSetId)
+		mercenaryTab:SetItemSet(mercenaryItemSetId, false)
 		mercenaryTab.skipConfigItemSetSync = false
 	end
 end
@@ -1567,6 +1558,7 @@ function ConfigTabClass:BuildModList()
 			applyConfigVar(varData, mercenary.input, mercenary.placeholder, mercenaryModList, mercenaryEnemyMods, self.build)
 		end
 	end
+	enemyModList:AddList(mercenaryEnemyMods)
 
 	applyCustomMods(configSet.customModsList, playerModList, input.customMods)
 	applyCustomMods(mercenary.customModsList, mercenaryModList)

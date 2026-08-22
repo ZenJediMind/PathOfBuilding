@@ -32,29 +32,88 @@ local function anyIfValue(ifOption, predicate)
 	return predicate(ifOption) and true or false
 end
 
+local ConfigScope = require("Modules/ConfigScope")
+
+local ACTOR_USED_FIELD = {
+	conditionsUsed = "conditions",
+	multipliersUsed = "multipliers",
+	modsUsed = "mods",
+	perStatsUsed = "perStats",
+}
+
+local function usedForVar(mainEnv, envKey, varData, viewActor)
+	if not mainEnv then
+		return { }
+	end
+	local field = ACTOR_USED_FIELD[envKey]
+	if field then
+		local scope = ConfigScope.forVarData(varData)
+		if scope == "actor" or scope == "player" then
+			local actorKey = (scope == "actor" and viewActor == "mercenary") and "mercenary" or "player"
+			local usage = mainEnv.actorUsage and mainEnv.actorUsage[actorKey]
+			if usage then
+				return usage[field] or { }
+			end
+		end
+	end
+	return mainEnv[envKey] or { }
+end
+
 local PRIMARY_ACTOR_KEYS = { "player", "mercenary" }
 
-local function anyPrimaryActor(mainEnv, predicate)
-	for _, actorKey in ipairs(PRIMARY_ACTOR_KEYS) do
+local function actorKeysForVar(varData, viewActor)
+	local scope = ConfigScope.forVarData(varData)
+	if scope == "shared" then
+		return PRIMARY_ACTOR_KEYS
+	end
+	if scope == "player" or viewActor ~= "mercenary" then
+		return { "player" }
+	end
+	return { "mercenary" }
+end
+
+local function anyPrimaryActor(mainEnv, predicate, actorKeys)
+	for _, actorKey in ipairs(actorKeys or PRIMARY_ACTOR_KEYS) do
 		local actor = mainEnv and mainEnv[actorKey]
 		if actor and predicate(actor) then return true end
 	end
 	return false
 end
 
-local function anyMainSkill(mainEnv, predicate)
+local function anyMainSkill(mainEnv, predicate, actorKeys)
 	return anyPrimaryActor(mainEnv, function(actor)
 		return actor.mainSkill and predicate(actor.mainSkill)
-	end)
+	end, actorKeys)
 end
 
-local function anyActiveSkill(mainEnv, predicate)
+local function anyActiveSkill(mainEnv, predicate, actorKeys)
 	return anyPrimaryActor(mainEnv, function(actor)
 		for _, activeSkill in ipairs(actor.activeSkillList or { }) do
 			if predicate(activeSkill) then return true end
 		end
 		return false
-	end)
+	end, actorKeys)
+end
+
+local function actorUsesSkill(actor, ifOption, includeTransfigured)
+	if not actor then
+		return false
+	end
+	for _, activeSkill in ipairs(actor.activeSkillList or { }) do
+		for _, skillEffect in ipairs(activeSkill.effectList or { }) do
+			local name = skillEffect.grantedEffect and skillEffect.grantedEffect.name
+			if name then
+				if includeTransfigured then
+					if calcLib.getGameIdFromGemName(ifOption, true) and calcLib.isGemIdSame(name, ifOption, true) then
+						return true
+					end
+				elseif name == ifOption then
+					return true
+				end
+			end
+		end
+	end
+	return false
 end
 
 -- When the option has an input value and one of its implied conditions is currently used, treat gated predicates as passing.
@@ -83,13 +142,15 @@ local function implyCondActive(varData, build)
 		or false
 end
 
--- True if every `ifX` predicate on `varData` currently passes for `build`
-local function isRelevantForBuild(varData, build)
+-- True if every `ifX` predicate on `varData` currently passes for `build`.
+-- Actor-scoped options are evaluated for `viewActor`; shared options scan every primary actor.
+local function isRelevantForBuild(varData, build, viewActor)
 	if not build then return false end
 	local mainEnv = build.calcsTab and build.calcsTab.mainEnv
 	if not mainEnv then return false end
 	local spec = build.spec
 	local configTab = build.configTab
+	local actorKeys = actorKeysForVar(varData, viewActor or "player")
 
 	local impliedCache
 	local function implied()
@@ -102,7 +163,7 @@ local function isRelevantForBuild(varData, build)
 	for _, p in ipairs(SIMPLE_PREDICATES) do
 		local ifVal = varData[p.key]
 		if ifVal then
-			local envTable = mainEnv[p.env] or {}
+			local envTable = usedForVar(mainEnv, p.env, varData, viewActor or "player")
 			if not anyIfValue(ifVal, function(opt)
 				return envTable[opt] or (p.canImply and implied())
 			end) then return false end
@@ -124,38 +185,31 @@ local function isRelevantForBuild(varData, build)
 	end
 	if varData.ifCondTrue then
 		if not anyIfValue(varData.ifCondTrue, function(opt)
-			return anyPrimaryActor(mainEnv, function(actor) return actor.modDB.conditions[opt] end)
+			return anyPrimaryActor(mainEnv, function(actor) return actor.modDB.conditions[opt] end, actorKeys)
 		end) then return false end
 	end
 	if varData.ifStat then
 		if not anyIfValue(varData.ifStat, function(opt)
-			return mainEnv.perStatsUsed[opt] or mainEnv.enemyMultipliersUsed[opt] or implied()
+			return usedForVar(mainEnv, "perStatsUsed", varData, viewActor or "player")[opt] or mainEnv.enemyMultipliersUsed[opt] or implied()
 		end) then return false end
 	end
 	if varData.ifFlag then
 		if not anyIfValue(varData.ifFlag, function(opt)
 			return anyMainSkill(mainEnv, function(mainSkill)
 				return mainSkill.skillFlags[opt] or mainSkill.skillModList:Flag(nil, opt)
-			end)
+			end, actorKeys)
 		end) then return false end
 	end
 	if varData.ifSkill then
-		local skillsUsed = mainEnv.skillsUsed or {}
-		if varData.includeTransfigured then
-			if not anyIfValue(varData.ifSkill, function(opt)
-				if not calcLib.getGameIdFromGemName(opt, true) then return false end
-				for skill, _ in pairs(skillsUsed) do
-					if calcLib.isGemIdSame(skill, opt, true) then return true end
-				end
-				return false
-			end) then return false end
-		else
-			if not anyIfValue(varData.ifSkill, function(opt) return skillsUsed[opt] end) then return false end
-		end
+		if not anyIfValue(varData.ifSkill, function(opt)
+			return anyPrimaryActor(mainEnv, function(actor)
+				return actorUsesSkill(actor, opt, varData.includeTransfigured)
+			end, actorKeys)
+		end) then return false end
 	end
 	if varData.ifSkillFlag or varData.ifSkillData then
 		local function anySkillHas(field, opt)
-			return anyActiveSkill(mainEnv, function(activeSkill) return activeSkill[field][opt] end)
+			return anyActiveSkill(mainEnv, function(activeSkill) return activeSkill[field][opt] end, actorKeys)
 		end
 		if varData.ifSkillFlag and not anyIfValue(varData.ifSkillFlag, function(opt) return anySkillHas("skillFlags", opt) end) then return false end
 		if varData.ifSkillData and not anyIfValue(varData.ifSkillData, function(opt) return anySkillHas("skillData", opt) end) then return false end
@@ -178,9 +232,12 @@ local function isShowAllExcluded(varData)
 end
 
 return {
+	actorKeysForVar = actorKeysForVar,
 	anyPrimaryActor = anyPrimaryActor,
 	anyMainSkill = anyMainSkill,
 	anyActiveSkill = anyActiveSkill,
+	actorUsesSkill = actorUsesSkill,
 	isRelevantForBuild = isRelevantForBuild,
 	isShowAllExcluded = isShowAllExcluded,
+	usedForVar = usedForVar,
 }

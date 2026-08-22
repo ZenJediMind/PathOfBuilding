@@ -134,12 +134,26 @@ describe("Player and mercenary configuration", function()
 		configTab:SetActiveConfigSet(bossing.id)
 		assert.are.equal(altPlayer.id, itemsTab.activeItemSetId)
 		assert.are.equal(altMerc.id, build.mercenaryTab.itemSetId)
+		assert.are.equal(altPlayer.id, itemsTab.viewItemSetId)
 		assert.are.equal(originalPlayerId, mapping.actors.player.itemSetId)
 		assert.are.equal(originalMercId, mapping.actors.mercenary.itemSetId)
 
 		configTab:SetActiveConfigSet(mapping.id)
 		assert.are.equal(originalPlayerId, itemsTab.activeItemSetId)
 		assert.are.equal(originalMercId, build.mercenaryTab.itemSetId)
+		assert.are.equal(originalPlayerId, itemsTab.viewItemSetId)
+	end)
+
+	it("does not switch the Items view to Mercenary gear when applying actor item sets", function()
+		local itemsTab = build.itemsTab
+		local configTab = build.configTab
+		local playerSetId = itemsTab.activeItemSetId
+		local mercSetId = build.mercenaryTab.itemSetId
+		assert.are.equal(playerSetId, itemsTab.viewItemSetId)
+		configTab:ApplyActorItemSets()
+		assert.are.equal(playerSetId, itemsTab.activeItemSetId)
+		assert.are.equal(mercSetId, build.mercenaryTab.itemSetId)
+		assert.are.equal(playerSetId, itemsTab.viewItemSetId)
 	end)
 
 	it("writes actor-scoped options to the viewed actor", function()
@@ -377,6 +391,34 @@ describe("Player and mercenary configuration", function()
 			end
 		end
 		assert.are.equal(1, shockMods)
+	end)
+
+	it("classifies skill options as actor-scoped and enemy wither stacks as shared", function()
+		local ConfigScope = require("Modules/ConfigScope")
+		assert.are.equal("actor", ConfigScope.forVar("VigilantStrikeBypassCD"))
+		assert.are.equal("actor", ConfigScope.forVar("toxicRainPodOverlap"))
+		assert.are.equal("actor", ConfigScope.forVar("detonateDeadCorpseLife"))
+		assert.are.equal("shared", ConfigScope.forVar("multiplierWitheredStackCount"))
+		assert.are.equal("player", ConfigScope.forVar("resistancePenalty"))
+		assert.are.equal("player", ConfigScope.forVar("pantheonMajorGod"))
+		assert.are.equal("player", ConfigScope.forVar("pantheonMinorGod"))
+		assert.are.equal("player", ConfigScope.forVar("bandit"))
+	end)
+
+	it("hides player-only pantheon options when viewing the Mercenary", function()
+		local configTab = build.configTab
+		configTab:SetConfigValue("pantheonMajorGod", "TheBrineKing")
+		configTab:SetConfigValue("pantheonMinorGod", "Gruthkul")
+		configTab:SetConfigValue("bandit", "Alira")
+		configTab:SetViewActor("player")
+		assert.is_true(configTab.varControls.pantheonMajorGod.shown())
+		assert.is_true(configTab.varControls.pantheonMinorGod.shown())
+		assert.is_true(configTab.varControls.bandit.shown())
+		configTab:SetViewActor("mercenary")
+		assert.is_false(configTab.varControls.pantheonMajorGod.shown())
+		assert.is_false(configTab.varControls.pantheonMinorGod.shown())
+		assert.is_false(configTab.varControls.bandit.shown())
+		assert.is_false(configTab.varControls.resistancePenalty.shown())
 	end)
 
 	it("clears invalid stored item-set ids without changing valid live gear", function()

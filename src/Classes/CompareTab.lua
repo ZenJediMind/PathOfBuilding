@@ -2272,7 +2272,9 @@ function CompareTabClass:LayoutConfigView(contentVP, compareEntry)
 				else
 					local varData = ctrlInfo.varData
 					local relevant = configVisibility.isRelevantForBuild(varData, self.primaryBuild)
+							or configVisibility.isRelevantForBuild(varData, self.primaryBuild, "mercenary")
 							or configVisibility.isRelevantForBuild(varData, compareEntry)
+							or configVisibility.isRelevantForBuild(varData, compareEntry, "mercenary")
 					if relevant or (self.configToggle and not configVisibility.isShowAllExcluded(varData)) then
 						t_insert(commons, ctrlInfo)
 					end

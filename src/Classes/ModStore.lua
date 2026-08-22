@@ -55,9 +55,22 @@ local function getActor(self, actorType)
 	end
 end
 
+local function sourceOwnedDB(self, tag)
+	if not ConfigScope.isSourceOwnedEnemyTag(tag) then
+		return nil
+	end
+	if tag.sourceActor and tag.sourceActor.enemySourceDB then
+		return tag.sourceActor.enemySourceDB
+	end
+	return self.actor and self.actor.enemySourceDB
+end
+
 local function actorModDB(self, actorType, tag)
-	if actorType == "enemy" and ConfigScope.isSourceOwnedEnemyTag(tag) then
-		return self.actor and self.actor.enemySourceDB
+	if actorType == "enemy" then
+		local sourceDB = sourceOwnedDB(self, tag)
+		if sourceDB then
+			return sourceDB
+		end
 	end
 	local actor = getActor(self, actorType)
 	return actor and actor.modDB
@@ -377,7 +390,7 @@ function ModStoreClass:EvalMod(mod, cfg, globalLimits)
 	local GetCondition = self.GetCondition
 	for _, tag in ipairs(mod) do
 		if tag.type == "Multiplier" then
-			local target = self
+			local target = sourceOwnedDB(self, tag) or self
 			local limitTarget = self
 
 			-- Allow limiting a self multiplier on a parent multiplier (eg. Agony Crawler on player virulence)
@@ -454,7 +467,7 @@ function ModStoreClass:EvalMod(mod, cfg, globalLimits)
 				end
 			end
 		elseif tag.type == "MultiplierThreshold" then
-			local target = self
+			local target = sourceOwnedDB(self, tag) or self
 			local thresholdTarget = self
 			if tag.thresholdActor then
 				thresholdTarget = actorModDB(self, tag.thresholdActor, tag)
@@ -637,7 +650,8 @@ function ModStoreClass:EvalMod(mod, cfg, globalLimits)
 			value = m_min(value, tag.limit or self:GetMultiplier(tag.limitVar, cfg))
 		elseif tag.type == "Condition" then
 			local match = false
-			local allOneH = ((self.actor.weaponData1 and self.actor.weaponData1.countsAsAll1H) and self.actor.weaponData1) or ((self.actor.weaponData2 and self.actor.weaponData2.countsAsAll1H) and self.actor.weaponData2)
+			local condStore = sourceOwnedDB(self, tag) or self
+			local allOneH = ((condStore.actor.weaponData1 and condStore.actor.weaponData1.countsAsAll1H) and condStore.actor.weaponData1) or ((condStore.actor.weaponData2 and condStore.actor.weaponData2.countsAsAll1H) and condStore.actor.weaponData2)
 			if tag.varList then
 				for _, var in pairs(tag.varList) do
 					if tag.neg and allOneH and allOneH["Added"..var] ~= nil then
@@ -646,7 +660,7 @@ function ModStoreClass:EvalMod(mod, cfg, globalLimits)
 						if not allOneH["Added"..var] then
 							return
 						end
-					elseif GetCondition(self, var, cfg) or (cfg and cfg.skillCond and cfg.skillCond[var]) then
+					elseif GetCondition(condStore, var, cfg) or (cfg and cfg.skillCond and cfg.skillCond[var]) then
 						match = true
 						break
 					end
@@ -657,7 +671,7 @@ function ModStoreClass:EvalMod(mod, cfg, globalLimits)
 						return
 					end
 				else
-					match = GetCondition(self, tag.var, cfg) or (cfg and cfg.skillCond and cfg.skillCond[tag.var])
+					match = GetCondition(condStore, tag.var, cfg) or (cfg and cfg.skillCond and cfg.skillCond[tag.var])
 				end
 			end
 			if tag.neg then

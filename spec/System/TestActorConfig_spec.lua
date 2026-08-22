@@ -798,4 +798,86 @@ describe("Player and mercenary configuration", function()
 		assert.is_true(env.mercenary.enemySourceDB:GetCondition("HitByFireDamage"))
 		assert.is_not_true(env.player.enemySourceDB:GetCondition("HitByFireDamage"))
 	end)
+
+	local curseByYouMod = "Enemies you Curse take 20% increased Damage"
+
+	it("applies enemies-you-curse damage taken from an enabled curse without checking cursed", function()
+		local configSet = build.configTab.configSets[build.configTab.activeConfigSetId]
+		build.configTab:EnsureActorConfig(configSet)
+		configSet.customModsList[1].text = curseByYouMod
+		local baseline = enemyDamageTaken(calculate())
+		assert.is_not_true(configSet.input.conditionEnemyCursed)
+		build.skillsTab:PasteSocketGroup("Despair 20/0  1")
+		local env = calculate()
+		assert.is_true(env.enemy.modDB.conditions.Cursed)
+		assert.are.equal(20, enemyDamageTaken(env) - baseline)
+	end)
+
+	it("does not let a Mercenary curse activate the player's enemies-you-curse damage taken", function()
+		local configSet = build.configTab.configSets[build.configTab.activeConfigSetId]
+		build.configTab:EnsureActorConfig(configSet)
+		configSet.customModsList[1].text = curseByYouMod
+		local baseline = enemyDamageTaken(calculate())
+		local profile = build.mercenaryTab.profile
+		profile.classId = "ChaosMinionWitch"
+		profile.buildId = "ChaosMinionWitchDot"
+		profile.mainSkillId = "BaneMercenary"
+		profile.skills = {
+			{ id = "BaneMercenary", enabled = true, supports = { } },
+			{ id = "TemporalChainsMercenary", enabled = true, count = 1, supports = { } },
+		}
+		build.mercenaryTab:Changed()
+		build.mercenaryTab:GetItemSet(true)
+		local env = calculate()
+		assert.is_not_nil(env.mercenary, table.concat(env.mercenaryCalculationErrors or { }, "\n"))
+		assert.is_true(env.enemy.modDB.conditions.Cursed)
+		assert.are.equal(baseline, enemyDamageTaken(env))
+	end)
+
+	it("applies the Mercenary's enemies-you-curse damage taken from the Mercenary's own curse", function()
+		local configSet = build.configTab.configSets[build.configTab.activeConfigSetId]
+		build.configTab:EnsureActorConfig(configSet)
+		local profile = build.mercenaryTab.profile
+		profile.classId = "ChaosMinionWitch"
+		profile.buildId = "ChaosMinionWitchDot"
+		profile.mainSkillId = "BaneMercenary"
+		profile.skills = {
+			{ id = "BaneMercenary", enabled = true, supports = { } },
+			{ id = "TemporalChainsMercenary", enabled = true, count = 1, supports = { } },
+		}
+		build.mercenaryTab:Changed()
+		build.mercenaryTab:GetItemSet(true)
+		local baseline = enemyDamageTaken(calculate())
+		configSet.actors.mercenary.customModsList[1].text = curseByYouMod
+		local env = calculate()
+		assert.is_not_nil(env.mercenary, table.concat(env.mercenaryCalculationErrors or { }, "\n"))
+		assert.is_true(env.enemy.modDB.conditions.Cursed)
+		assert.are.equal(20, enemyDamageTaken(env) - baseline)
+	end)
+
+	it("applies player EE from a calculated fire hit without HitBy config", function()
+		allocate("Elemental Equilibrium")
+		build.skillsTab:PasteSocketGroup("Fireball 20/0  1")
+		local env = calculate()
+		assert.is_true(env.player.enemySourceDB:GetCondition("HitByFireDamage"))
+		assert.is_not_true(env.player.enemySourceDB:GetCondition("HitByColdDamage"))
+		assert.is_not_true(env.mercenary.enemySourceDB:GetCondition("HitByFireDamage"))
+		assert.is_true(env.enemyDB:Flag(nil, "Condition:HasColdExposure") or env.enemy.modDB.conditions.HasColdExposure)
+		assert.is_true(env.enemyDB:Flag(nil, "Condition:HasLightningExposure") or env.enemy.modDB.conditions.HasLightningExposure)
+		assert.is_not_true(env.enemyDB:Flag(nil, "Condition:HasFireExposure") or env.enemy.modDB.conditions.HasFireExposure)
+	end)
+
+	it("drives player and Mercenary EE only from each actor's own calculated hit elements", function()
+		allocate("Elemental Equilibrium")
+		build.skillsTab:PasteSocketGroup("Arc 20/0  1")
+		local configSet = build.configTab.configSets[build.configTab.activeConfigSetId]
+		build.configTab:EnsureActorConfig(configSet)
+		configSet.actors.mercenary.customModsList[1].text = "Hits that deal Elemental Damage remove Exposure to those Elements and inflict Exposure to other Elements Exposure inflicted this way applies -25% to Resistances"
+		local env = calculate()
+		assert.is_not_nil(env.mercenary, table.concat(env.mercenaryCalculationErrors or { }, "\n"))
+		assert.is_true(env.player.enemySourceDB:GetCondition("HitByLightningDamage"))
+		assert.is_not_true(env.player.enemySourceDB:GetCondition("HitByFireDamage"))
+		assert.is_true(env.mercenary.enemySourceDB:GetCondition("HitByFireDamage"))
+		assert.is_not_true(env.mercenary.enemySourceDB:GetCondition("HitByLightningDamage"))
+	end)
 end)

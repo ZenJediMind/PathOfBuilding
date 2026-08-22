@@ -670,19 +670,6 @@ local function determineCursePriority(curseName, activeSkill)
 	return basePriority + socketPriority + slotPriority + sourcePriority
 end
 
-local function evalSourceOwnedTag(sourceDB, mod, value, tag)
-	tag = copyTable(tag, true)
-	tag.actor = nil
-	return sourceDB:EvalMod({
-		name = mod.name,
-		type = mod.type,
-		value = value,
-		flags = mod.flags or 0,
-		keywordFlags = mod.keywordFlags or 0,
-		tag,
-	})
-end
-
 local function bindSourceOwnedEnemyMod(mod, actor)
 	if not mod then
 		return nil
@@ -697,65 +684,27 @@ local function bindSourceOwnedEnemyMod(mod, actor)
 	if not hasSource then
 		return mod
 	end
-	local sourceDB = actor and actor.enemySourceDB
-	if not sourceDB then
+	if not (actor and actor.enemySourceDB) then
 		return nil
 	end
 	local bound = copyTable(mod, true)
-	for i = #bound, 1, -1 do
-		bound[i] = nil
-	end
-	local value = mod.value
-	for _, tag in ipairs(mod) do
-		if not ConfigScope.isSourceOwnedEnemyTag(tag) then
-			t_insert(bound, tag)
-		elseif not tag.sourceOwned and tag.type == "Condition" and tag.varList then
-			local kept = { }
-			local sourceMatched = false
-			local hasSourceVar = false
-			for _, var in ipairs(tag.varList) do
-				if ConfigScope.isSourceOwnedEnemyVar(var) then
-					hasSourceVar = true
-					if sourceDB:GetCondition(var) then
-						sourceMatched = true
-					end
-				else
-					t_insert(kept, var)
-				end
-			end
-			if hasSourceVar and #kept > 0 then
-				if tag.neg then
-					if sourceMatched then
-						return nil
-					end
-					t_insert(bound, { type = "Condition", varList = kept, neg = true })
-				elseif sourceMatched then
-					-- OR list already matched from this actor's source state
-				else
-					t_insert(bound, { type = "Condition", varList = kept })
-				end
-			else
-				local baked = evalSourceOwnedTag(sourceDB, mod, value, tag)
-				if baked == nil then
-					return nil
-				end
-				value = baked
-			end
-		else
-			local baked = evalSourceOwnedTag(sourceDB, mod, value, tag)
-			if baked == nil then
-				return nil
-			end
-			value = baked
+	for i, tag in ipairs(bound) do
+		if ConfigScope.isSourceOwnedEnemyTag(tag) then
+			bound[i] = copyTable(tag, true)
+			bound[i].sourceActor = actor
 		end
 	end
-	bound.value = value
 	return bound
 end
 
 local function actorHasChilledByHitsFlag(actor, flagName)
-	return actor and actor.modDB:Flag(nil, flagName)
-		and actor.enemySourceDB and actor.enemySourceDB:GetCondition("ChilledByYourHits")
+	if not (actor and actor.modDB:Flag(nil, flagName) and actor.enemySourceDB) then
+		return false
+	end
+	-- Player overlays copy shared Chilled from config; that is the same
+	-- back-compat as Ignited-by-you honouring the ignited checkbox.
+	return actor.enemySourceDB:GetCondition("ChilledByYourHits")
+		or actor.enemySourceDB:GetCondition("Chilled")
 end
 
 local function anyActorHasChilledByHitsFlag(env, flagName)
@@ -3005,6 +2954,7 @@ function calcs.perform(env, skipEHP)
 							curse.minionBuffModList:ScaleAddList(temp, (1 + buffInc / 100) * buffMore)
 						end
 					end
+					curse.sourceActor = env.player
 					t_insert(curses, curse)
 				end
 			elseif buff.type == "Link" then
@@ -3272,6 +3222,7 @@ function calcs.perform(env, skipEHP)
 							local more = skillModList:More(skillCfg, "CurseEffect") * enemyDB:More(nil, "CurseEffectOnSelf")
 							curse.modList = new("ModList"):ModList()
 							curse.modList:ScaleAddList(buff.modList, (1 + inc / 100) * more)
+							curse.sourceActor = env.minion
 							t_insert(minionCurses, curse)
 						end
 					elseif buff.type == "Debuff" or buff.type == "AuraDebuff" then
@@ -3480,6 +3431,7 @@ function calcs.perform(env, skipEHP)
 							curse.mercenaryMinionBuffModList:ScaleAddList(temp, calcLib.mod(env.mercenaryMinion.modDB, nil, "BuffEffectOnSelf"))
 						end
 					end
+					curse.sourceActor = mercenary
 					t_insert(mercenaryCurses, curse)
 					if partyTabEnableExportBuffs then
 						buffExports.Curse[buff.name] = { isMark = mark, effectMult = (1 + inc / 100) * skillModList:More(skillCfg, "CurseEffect"), modList = buff.modList }
@@ -3587,6 +3539,7 @@ function calcs.perform(env, skipEHP)
 						curse.mercenaryMinionBuffModList = new("ModList"):ModList()
 						curse.mercenaryMinionBuffModList:ScaleAddList(temp, calcLib.mod(env.mercenaryMinion.modDB, nil, "BuffEffectOnSelf"))
 					end
+					curse.sourceActor = env.mercenaryMinion
 					t_insert(mercenaryMinionCurses, curse)
 					if partyTabEnableExportBuffs then
 						buffExports.Curse[buff.name] = { isMark = mark, effectMult = (1 + inc / 100) * skillModList:More(skillCfg, "CurseEffect"), modList = buff.modList }
@@ -3819,6 +3772,10 @@ function calcs.perform(env, skipEHP)
 						name = grantedEffect.name,
 						fromPlayer = (dest == curses),
 						priority = determineCursePriority(grantedEffect.name),
+						sourceActor = dest == curses and env.player
+							or dest == minionCurses and env.minion
+							or dest == mercenaryCurses and env.mercenary
+							or dest == mercenaryMinionCurses and env.mercenaryMinion,
 					}
 					curse.modList = new("ModList"):ModList()
 					curse.modList:ScaleAddList(curseModList, (1 + enemyDB:Sum("INC", nil, "CurseEffectOnSelf") / 100) * enemyDB:More(nil, "CurseEffectOnSelf"))
@@ -4014,6 +3971,9 @@ function calcs.perform(env, skipEHP)
 	if env.mercenary then env.mercenary.modDB.multipliers.CurseOnEnemy = #curseSlots end
 	for _, slot in ipairs(curseSlots) do
 		enemyDB.conditions["Cursed"] = true
+		if slot.sourceActor and slot.sourceActor.enemySourceDB then
+			slot.sourceActor.enemySourceDB.conditions.Cursed = true
+		end
 		if slot.isMark then
 			enemyDB.conditions["Marked"] = true
 		end
@@ -4347,37 +4307,38 @@ function calcs.perform(env, skipEHP)
 		return actor and actor.modDB:Flag(nil, "ElementalEquilibrium")
 			and actor.enemySourceDB and actor.enemySourceDB:GetCondition(cond)
 	end
-	-- Apply exposures
-	for _, element in ipairs({"Fire", "Cold", "Lightning"}) do
-		-- Elemental Equilibrium pre-3.16 does not remove Exposure effects.
-		-- Each actor with EE only removes exposure for elements that actor hit.
-		if tonumber(major) <= 3 and tonumber(minor) <= 15
-			or not (actorHidesExposure(env.player, "HitBy"..element.."Damage")
-				or actorHidesExposure(env.mercenary, "HitBy"..element.."Damage")) then
-			local min = math.huge
-			local source = ""
-			for _, mod in ipairs(enemyDB:Tabulate("BASE", nil, element.."Exposure")) do
-				if mod.value < min then
-					min = mod.value
-					source = mod.mod.source
+	local function applyElementalExposures()
+		for _, element in ipairs({"Fire", "Cold", "Lightning"}) do
+			if enemyDB:Flag(nil, "Condition:Has"..element.."Exposure") then
+				-- Already converted this calculation (config HitBy applies before offence).
+			elseif tonumber(major) <= 3 and tonumber(minor) <= 15
+				or not (actorHidesExposure(env.player, "HitBy"..element.."Damage")
+					or actorHidesExposure(env.mercenary, "HitBy"..element.."Damage")) then
+				local min = math.huge
+				local source = ""
+				for _, mod in ipairs(enemyDB:Tabulate("BASE", nil, element.."Exposure")) do
+					if mod.value < min then
+						min = mod.value
+						source = mod.mod.source
+					end
 				end
-			end
-			if min ~= math.huge then
-				-- Modify the magnitude of all exposures
-				for _, mod in ipairs(modDB:Tabulate("BASE", nil, "ExtraExposure", "Extra"..element.."Exposure")) do
-					min = min + mod.value
+				if min ~= math.huge then
+					for _, mod in ipairs(modDB:Tabulate("BASE", nil, "ExtraExposure", "Extra"..element.."Exposure")) do
+						min = min + mod.value
+					end
+					-- Scale the resulting magnitude by increased effect of Exposure you inflict
+					local exposureEffectInc = modDB:Sum("INC", nil, "ExposureEffect", element.."ExposureEffect")
+					if exposureEffectInc ~= 0 then
+						min = min * (1 + exposureEffectInc / 100)
+					end
+					enemyDB:NewMod("Condition:Has"..element.."Exposure", "FLAG", true, "")
+					enemyDB:NewMod(element.."Resist", "BASE", m_min(min, modDB:Override(nil, "ExposureMin")), source)
+					modDB:NewMod("Condition:AppliedExposureRecently", "FLAG", true, "")
 				end
-				-- Scale the resulting magnitude by increased effect of Exposure you inflict
-				local exposureEffectInc = modDB:Sum("INC", nil, "ExposureEffect", element.."ExposureEffect")
-				if exposureEffectInc ~= 0 then
-					min = min * (1 + exposureEffectInc / 100)
-				end
-				enemyDB:NewMod("Condition:Has"..element.."Exposure", "FLAG", true, "")
-				enemyDB:NewMod(element.."Resist", "BASE", m_min(min, modDB:Override(nil, "ExposureMin")), source)
-				modDB:NewMod("Condition:AppliedExposureRecently", "FLAG", true, "")
 			end
 		end
 	end
+	applyElementalExposures()
 
 	-- Handle consecrated ground effects on enemies
 	if enemyDB:Flag(nil, "Condition:OnConsecratedGround") then
@@ -4570,6 +4531,9 @@ function calcs.perform(env, skipEHP)
 		calcs.triggers(env, env.mercenaryMinion)
 		calcs.offence(env, env.mercenaryMinion, env.mercenaryMinion.mainSkill)
 	end
+
+	-- Hit-by-element conditions for EE are established during offence.
+	applyElementalExposures()
 
 	 -- Export modifiers to enemy conditions and stats for party tab
 	if partyTabEnableExportBuffs then

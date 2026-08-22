@@ -120,6 +120,68 @@ local function mergeWarcryOnRecipient(sourceStore, skillCfg, buff, recipient, de
 	mergeBuff(srcList, destination, buff.name)
 end
 
+local RALLYING_DAMAGE_TYPES = { "Physical", "Lightning", "Cold", "Fire", "Chaos" }
+
+-- Warcry buff uptime is duration/cooldown unless Max Hit treats the boost as fully active.
+local function calcWarcryUptime(env, enemyDB, actorModDB, sourceStore, skillCfg, activeSkill)
+	if actorModDB:Flag(nil, "Condition:WarcryMaxHit") then
+		return 1
+	end
+	local duration = calcSkillDuration(sourceStore, skillCfg, activeSkill.skillData, env, enemyDB)
+	local cooldownOverride = sourceStore:Override(skillCfg, "CooldownRecovery")
+	local cooldown = cooldownOverride or (activeSkill.skillData.cooldown + sourceStore:Sum("BASE", skillCfg, "CooldownRecovery")) / calcLib.mod(sourceStore, skillCfg, "CooldownRecovery")
+	if not cooldown or cooldown <= 0 then
+		return 1
+	end
+	return m_min(duration / cooldown, 1)
+end
+
+-- Rallying Cry grants nearby allies a portion of the caster's weapon damage.
+-- Minion recipients get the additional minion-effect multiplier; other allies do not.
+local function buildRallyingCryAllyMods(sourceActor, activeSkill, warcryPower)
+	local extraWarcryModList = new("ModList"):ModList()
+	if not activeSkill.activeEffect or activeSkill.activeEffect.grantedEffect.name ~= "Rallying Cry" then
+		return extraWarcryModList, 1
+	end
+	local warcryPowerBonus = m_floor(m_min(warcryPower, 30) / 5)
+	local rallyingWeaponEffect = m_floor(activeSkill.skillModList:Sum("BASE", activeSkill.skillCfg, "RallyingCryAllyDamageBonusPer5Power") * warcryPowerBonus)
+	local minionMultiplier = 1 + (activeSkill.skillModList:Sum("BASE", activeSkill.skillCfg, "RallyingCryMinionDamageBonusMultiplier") or 0)
+	local weapon = sourceActor.weaponData1
+	if weapon then
+		for _, damageType in ipairs(RALLYING_DAMAGE_TYPES) do
+			if weapon[damageType.."Min"] then
+				extraWarcryModList:NewMod(damageType.."Min", "BASE", weapon[damageType.."Min"] * rallyingWeaponEffect / 100, "Rallying Cry", 0, KeywordFlag.Attack, { type = "GlobalEffect", effectType = "Warcry", div = 5, limit = 30 })
+			end
+			if weapon[damageType.."Max"] then
+				extraWarcryModList:NewMod(damageType.."Max", "BASE", weapon[damageType.."Max"] * rallyingWeaponEffect / 100, "Rallying Cry", 0, KeywordFlag.Attack, { type = "GlobalEffect", effectType = "Warcry", div = 5, limit = 30 })
+			end
+		end
+	end
+	return extraWarcryModList, minionMultiplier
+end
+
+local function mergeRallyingCryAllyMods(extraMods, extraScale, sourceStore, skillCfg, recipient, destination, buffName, uptime)
+	if not extraMods then
+		return
+	end
+	local inc = sourceStore:Sum("INC", skillCfg, "BuffEffect") + recipient.modDB:Sum("INC", nil, "BuffEffectOnSelf")
+	local srcList = new("ModList"):ModList()
+	srcList:ScaleAddList(extraMods, (1 + inc / 100) * extraScale * uptime)
+	if not srcList[1] then
+		return
+	end
+	mergeBuff(srcList, destination, buffName)
+end
+
+-- Party export keeps the same-name aura with the highest effect, matching local calc and the Party tab.
+local function exportStrongestAura(buffExports, name, effectMult, modList)
+	local existing = buffExports.Aura[name]
+	if existing and existing.effectMult > effectMult then
+		return
+	end
+	buffExports.Aura[name] = { effectMult = effectMult, modList = modList }
+end
+
 function doActorLifeMana(actor)
 	local modDB = actor.modDB
 	---@class Output
@@ -2617,11 +2679,8 @@ function calcs.perform(env, skipEHP)
 								warcryBuff[1].warcryPowerBonus = m_floor((warcryBuff[1].limit and m_min(warcryPower, warcryBuff[1].limit) or warcryPower) / warcryBuff[1].div)
 							end
 						end
-						local full_duration = calcSkillDuration(modStore, skillCfg, activeSkill.skillData, env, enemyDB)
-						local cooldownOverride = modStore:Override(skillCfg, "CooldownRecovery")
-						local actual_cooldown = cooldownOverride or (activeSkill.skillData.cooldown  + modStore:Sum("BASE", skillCfg, "CooldownRecovery")) / calcLib.mod(modStore, skillCfg, "CooldownRecovery")
-						local uptime = modDB:Flag(nil, "Condition:WarcryMaxHit") and 1 or m_min(full_duration / actual_cooldown, 1)
-						local extraWarcryModList = activeSkill.activeEffect.grantedEffect.name == "Rallying Cry" and new("ModList"):ModList() or {}
+						local uptime = calcWarcryUptime(env, enemyDB, modDB, modStore, skillCfg, activeSkill)
+						local extraWarcryModList, rallyingMinionMultiplier = buildRallyingCryAllyMods(env.player, activeSkill, warcryPower)
 						if not modDB:Flag(nil, "CannotGainWarcryBuffs") then
 							if not buff.applyNotPlayer then
 								activeSkill.buffSkill = true
@@ -2646,32 +2705,20 @@ function calcs.perform(env, skipEHP)
 								local mult = (1 + inc / 100) * more * (warcryBuff[1].warcryPowerBonus or 1) * uptime
 								srcList:ScaleAddList({warcryBuff}, mult)
 							end
-							-- Special handling for the minion side to add the flat damage bonus
-							if activeSkill.activeEffect.grantedEffect.name == "Rallying Cry" then
-								local warcryPowerBonus = m_floor((m_min(warcryPower, 30)) / 5)
-								local rallyingWeaponEffect = m_floor(activeSkill.skillModList:Sum("BASE", env.player.mainSkill.skillCfg, "RallyingCryAllyDamageBonusPer5Power") * warcryPowerBonus)
-								local inc = modStore:Sum("INC", skillCfg, "BuffEffect") + env.minion.modDB:Sum("INC", skillCfg, "BuffEffectOnSelf")
-								local rallyingBonusMoreMultiplier = 1 + (activeSkill.skillModList:Sum("BASE", env.player.mainSkill.skillCfg, "RallyingCryMinionDamageBonusMultiplier") or 0)
-								-- Add all damage types
-								local dmgTypeList = {"Physical", "Lightning", "Cold", "Fire", "Chaos"}
-								for _, damageType in ipairs(dmgTypeList) do
-									if env.player.weaponData1[damageType.."Min"] then
-										extraWarcryModList:NewMod(damageType.."Min", "BASE", (env.player.weaponData1[damageType.."Min"] * rallyingWeaponEffect / 100), "Rallying Cry", 0, KeywordFlag.Attack, { type = "GlobalEffect", effectType = "Warcry", div = 5, limit = 30 })
-									end
-									if env.player.weaponData1[damageType.."Max"] then
-										extraWarcryModList:NewMod(damageType.."Max", "BASE", (env.player.weaponData1[damageType.."Max"] * rallyingWeaponEffect / 100), "Rallying Cry", 0, KeywordFlag.Attack, { type = "GlobalEffect", effectType = "Warcry", div = 5, limit = 30 })
-									end
-								end
-								srcList:ScaleAddList(extraWarcryModList, (1 + inc / 100) * rallyingBonusMoreMultiplier * uptime)
+							if extraWarcryModList[1] then
+								local rallyingInc = modStore:Sum("INC", skillCfg, "BuffEffect") + env.minion.modDB:Sum("INC", skillCfg, "BuffEffectOnSelf")
+								srcList:ScaleAddList(extraWarcryModList, (1 + rallyingInc / 100) * rallyingMinionMultiplier * uptime)
 							end
 							mergeBuff(srcList, minionBuffs, buff.name)
 						end
 						if env.mercenary then
 							activeSkill.mercenaryBuffSkill = true
 							mergeWarcryOnRecipient(skillModList, skillCfg, buff, env.mercenary, mercenaryBuffs, { "BuffEffect" }, { "BuffEffectOnSelf" }, uptime, warcryName)
+							mergeRallyingCryAllyMods(extraWarcryModList, 1, skillModList, skillCfg, env.mercenary, mercenaryBuffs, buff.name, uptime)
 						end
 						if env.mercenaryMinion then
 							mergeWarcryOnRecipient(skillModList, skillCfg, buff, env.mercenaryMinion, mercenaryMinionBuffs, { "BuffEffect" }, { "BuffEffectOnSelf" }, uptime, warcryName)
+							mergeRallyingCryAllyMods(extraWarcryModList, rallyingMinionMultiplier, skillModList, skillCfg, env.mercenaryMinion, mercenaryMinionBuffs, buff.name, uptime)
 						end
 						if partyTabEnableExportBuffs then
 							local newModList = new("ModList"):ModList()
@@ -2750,7 +2797,7 @@ function calcs.perform(env, skipEHP)
 						if buffExports["Aura"][buff.name] then
 							buffExports["Aura"][buff.name.."_Debuff"] = buffExports["Aura"][buff.name]
 						end
-						buffExports["Aura"][buff.name] = { effectMult = mult, modList = newModList }
+						exportStrongestAura(buffExports, buff.name, mult, newModList)
 						if modDB:Flag(nil, "AurasAffectEnemies") and not activeSkill.skillModList:Flag(skillCfg, "SelfAurasAffectYouAndLinkedTarget") then
 							local newModList = {}
 							local srcList = new("ModList"):ModList()
@@ -3178,7 +3225,7 @@ function calcs.perform(env, skipEHP)
 								if buffExports["Aura"][buff.name] then
 									buffExports["Aura"][buff.name.."_Debuff"] = buffExports["Aura"][buff.name]
 								end
-								buffExports["Aura"][buff.name] = { effectMult = mult, modList = newModList }
+								exportStrongestAura(buffExports, buff.name, mult, newModList)
 								if env.player.mainSkill.skillFlags.totem and not env.player.mainSkill.skillModList.conditions["AffectedBy"..buff.name:gsub(" ","")] then
 									activeMinionSkill.totemBuffSkill = true
 									env.player.mainSkill.skillModList.conditions["AffectedBy"..buff.name:gsub(" ","")] = true
@@ -3363,7 +3410,7 @@ function calcs.perform(env, skipEHP)
 							local exported = new("ModList"):ModList()
 							exported:AddList(buff.modList)
 							exported:AddList(extraAuraModList)
-							buffExports.Aura[buff.name] = { effectMult = calcLib.mod(skillModList, skillCfg, "AuraEffect", "BuffEffect"), modList = exported }
+							exportStrongestAura(buffExports, buff.name, calcLib.mod(skillModList, skillCfg, "AuraEffect", "BuffEffect"), exported)
 						end
 					end
 				elseif buff.type == "Warcry" and env.mode_buffs and not skillModList:Flag(nil, "CannotShareWarcryBuffs") then
@@ -3373,17 +3420,24 @@ function calcs.perform(env, skipEHP)
 							warcryBuff[1].warcryPowerBonus = m_floor((warcryBuff[1].limit and m_min(warcryPower, warcryBuff[1].limit) or warcryPower) / warcryBuff[1].div)
 						end
 					end
-					local duration = calcSkillDuration(skillModList, skillCfg, activeSkill.skillData, env, enemyDB)
-					local cooldown = (activeSkill.skillData.cooldown + skillModList:Sum("BASE", skillCfg, "CooldownRecovery")) / calcLib.mod(skillModList, skillCfg, "CooldownRecovery")
-					local uptime = cooldown > 0 and m_min(duration / cooldown, 1) or 1
+					local uptime = calcWarcryUptime(env, enemyDB, mercenary.modDB, skillModList, skillCfg, activeSkill)
+					local extraWarcryModList, rallyingMinionMultiplier = buildRallyingCryAllyMods(mercenary, activeSkill, warcryPower)
 					mergeWarcryFromSkill(activeSkill, buff, mercenary, mercenaryBuffs, { "BuffEffect", "BuffEffectOnSelf" }, { }, uptime)
 					mergeWarcryFromSkill(activeSkill, buff, env.player, buffs, { "BuffEffect" }, { "BuffEffectOnSelf" }, uptime)
-					if env.minion then mergeWarcryFromSkill(activeSkill, buff, env.minion, minionBuffs, { "BuffEffect" }, { "BuffEffectOnSelf" }, uptime) end
+					mergeRallyingCryAllyMods(extraWarcryModList, 1, skillModList, skillCfg, env.player, buffs, buff.name, uptime)
+					if env.minion then
+						mergeWarcryFromSkill(activeSkill, buff, env.minion, minionBuffs, { "BuffEffect" }, { "BuffEffectOnSelf" }, uptime)
+						mergeRallyingCryAllyMods(extraWarcryModList, rallyingMinionMultiplier, skillModList, skillCfg, env.minion, minionBuffs, buff.name, uptime)
+					end
 					if env.mercenaryMinion then
 						mergeWarcryFromSkill(activeSkill, buff, env.mercenaryMinion, mercenaryMinionBuffs, { "BuffEffect" }, { "BuffEffectOnSelf" }, uptime)
+						mergeRallyingCryAllyMods(extraWarcryModList, rallyingMinionMultiplier, skillModList, skillCfg, env.mercenaryMinion, mercenaryMinionBuffs, buff.name, uptime)
 					end
 					if partyTabEnableExportBuffs then
-						buffExports.Warcry[buff.name] = { effectMult = calcLib.mod(skillModList, skillCfg, "BuffEffect") * uptime, modList = buff.modList }
+						local exported = new("ModList"):ModList()
+						exported:AddList(buff.modList)
+						exported:AddList(extraWarcryModList)
+						buffExports.Warcry[buff.name] = { effectMult = calcLib.mod(skillModList, skillCfg, "BuffEffect") * uptime, modList = exported }
 					end
 				elseif (buff.type == "Debuff" or buff.type == "AuraDebuff") and env.mode_effective then
 					local stackCount = activeSkill.skillData.stackCount or 1
@@ -3482,7 +3536,7 @@ function calcs.perform(env, skipEHP)
 							local exported = new("ModList"):ModList()
 							exported:AddList(buff.modList)
 							exported:AddList(extraAuraModList)
-							buffExports.Aura[buff.name] = { effectMult = calcLib.mod(skillModList, skillCfg, "AuraEffect", "BuffEffect"), modList = exported }
+							exportStrongestAura(buffExports, buff.name, calcLib.mod(skillModList, skillCfg, "AuraEffect", "BuffEffect"), exported)
 						end
 					end
 				elseif buff.type == "Warcry" and env.mode_buffs then
@@ -3492,15 +3546,22 @@ function calcs.perform(env, skipEHP)
 							warcryBuff[1].warcryPowerBonus = m_floor((warcryBuff[1].limit and m_min(warcryPower, warcryBuff[1].limit) or warcryPower) / warcryBuff[1].div)
 						end
 					end
-					local duration = calcSkillDuration(skillModList, skillCfg, activeSkill.skillData, env, enemyDB)
-					local cooldown = (activeSkill.skillData.cooldown + skillModList:Sum("BASE", skillCfg, "CooldownRecovery")) / calcLib.mod(skillModList, skillCfg, "CooldownRecovery")
-					local uptime = cooldown > 0 and m_min(duration / cooldown, 1) or 1
+					local uptime = calcWarcryUptime(env, enemyDB, env.mercenaryMinion.modDB, skillModList, skillCfg, activeSkill)
+					local extraWarcryModList, rallyingMinionMultiplier = buildRallyingCryAllyMods(env.mercenaryMinion, activeSkill, warcryPower)
 					mergeWarcryFromSkill(activeSkill, buff, env.mercenaryMinion, mercenaryMinionBuffs, { "BuffEffect", "BuffEffectOnSelf" }, { }, uptime)
 					mergeWarcryFromSkill(activeSkill, buff, env.player, buffs, { "BuffEffect" }, { "BuffEffectOnSelf" }, uptime)
+					mergeRallyingCryAllyMods(extraWarcryModList, 1, skillModList, skillCfg, env.player, buffs, buff.name, uptime)
 					mergeWarcryFromSkill(activeSkill, buff, mercenary, mercenaryBuffs, { "BuffEffect" }, { "BuffEffectOnSelf" }, uptime)
-					if env.minion then mergeWarcryFromSkill(activeSkill, buff, env.minion, minionBuffs, { "BuffEffect" }, { "BuffEffectOnSelf" }, uptime) end
+					mergeRallyingCryAllyMods(extraWarcryModList, 1, skillModList, skillCfg, mercenary, mercenaryBuffs, buff.name, uptime)
+					if env.minion then
+						mergeWarcryFromSkill(activeSkill, buff, env.minion, minionBuffs, { "BuffEffect" }, { "BuffEffectOnSelf" }, uptime)
+						mergeRallyingCryAllyMods(extraWarcryModList, rallyingMinionMultiplier, skillModList, skillCfg, env.minion, minionBuffs, buff.name, uptime)
+					end
 					if partyTabEnableExportBuffs then
-						buffExports.Warcry[buff.name] = { effectMult = calcLib.mod(skillModList, skillCfg, "BuffEffect") * uptime, modList = buff.modList }
+						local exported = new("ModList"):ModList()
+						exported:AddList(buff.modList)
+						exported:AddList(extraWarcryModList)
+						buffExports.Warcry[buff.name] = { effectMult = calcLib.mod(skillModList, skillCfg, "BuffEffect") * uptime, modList = exported }
 					end
 				elseif (buff.type == "Debuff" or buff.type == "AuraDebuff") and env.mode_effective then
 					local stackCount = activeSkill.skillData.stackCount or 1

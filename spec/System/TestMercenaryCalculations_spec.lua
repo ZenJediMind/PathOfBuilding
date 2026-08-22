@@ -81,6 +81,16 @@ describe("Permanent Mercenary calculations", function()
 		return build.calcsTab.mainEnv
 	end
 
+	local function rallyingWeaponFlat(actor, stat)
+		local total = 0
+		for _, value in ipairs(actor.modDB:Tabulate("BASE", { keywordFlags = KeywordFlag.Attack }, stat)) do
+			if value.mod.source == "Rallying Cry" then
+				total = total + value.value
+			end
+		end
+		return total
+	end
+
 	before_each(function()
 		newBuild()
 		selectScionLuminary()
@@ -1230,6 +1240,65 @@ Iron Hat
 		assert.are.near(10, env.player.modDB:Sum("BASE", nil, "LifeRegenPercent"), 10 ^ -9)
 	end)
 
+	it("applies player Rallying Cry weapon damage to the Mercenary", function()
+		local weapon = new("Item"):Item([[Rarity: Rare
+Rallying Test Sword
+Rusted Sword
+--------
+Adds 500 to 500 Physical Damage]])
+		build.itemsTab:AddItem(weapon, true)
+		build.itemsTab.activeItemSet["Weapon 1"].selItemId = weapon.id
+		build.skillsTab:PasteSocketGroup("Rallying Cry 20/0  1")
+		configure("TrapsMinesShadow", "TrapsMinesShadowLightning", "LightningTrapMercenary")
+		local env = calculate()
+		assert.is_true(rallyingWeaponFlat(env.mercenary, "PhysicalMin") > 0)
+		assert.is_true(rallyingWeaponFlat(env.mercenary, "PhysicalMax") > 0)
+	end)
+
+	it("applies Mercenary Rallying Cry weapon damage to the player", function()
+		configure("MeleeAOEStrikeDuelist", "MeleeAOEStrikeDuelistCyclone", "RallyingCryMercenary")
+		local weapon = new("Item"):Item([[Rarity: Rare
+Rallying Test Greatsword
+Corroded Blade
+--------
+Adds 500 to 500 Physical Damage]])
+		build.itemsTab:AddItem(weapon, true)
+		equipmentSlot("Weapon 1").selItemId = weapon.id
+		local env = calculate()
+		assert.is_true(rallyingWeaponFlat(env.player, "PhysicalMin") > 0)
+		assert.is_true(rallyingWeaponFlat(env.player, "PhysicalMax") > 0)
+		assert.are.equal(0, rallyingWeaponFlat(env.mercenary, "PhysicalMin"))
+	end)
+
+	it("applies Rallying Cry's extra minion effect to Mercenary-created minions", function()
+		local weapon = new("Item"):Item([[Rarity: Rare
+Rallying Test Sword
+Rusted Sword
+--------
+Adds 500 to 500 Physical Damage]])
+		build.itemsTab:AddItem(weapon, true)
+		build.itemsTab.activeItemSet["Weapon 1"].selItemId = weapon.id
+		build.skillsTab:PasteSocketGroup("Rallying Cry 20/0  1")
+		configure("AurasMinionsTemplar", "AurasMinionsTemplarStaff", "HeraldOfPurityMercenary")
+		local env = calculate()
+		local mercenaryFlat = rallyingWeaponFlat(env.mercenary, "PhysicalMin")
+		local minionFlat = rallyingWeaponFlat(env.mercenaryMinion, "PhysicalMin")
+		assert.is_true(mercenaryFlat > 0)
+		assert.is_true(minionFlat > mercenaryFlat)
+		assert.are.near(2, minionFlat / mercenaryFlat, 0.05)
+	end)
+
+	it("treats Mercenary warcries as fully active in Max Hit mode", function()
+		configure("MeleeAOEMarauder", "MeleeAOEMarauderFireSlam", "InfernalCryMercenary")
+		local average = calculate().player.modDB:Sum("BASE", nil, "PhysicalDamageGainAsFire")
+		assert.is_true(average > 0)
+		local configSet = build.configTab.configSets[build.configTab.activeConfigSetId]
+		build.configTab:EnsureActorConfig(configSet)
+		configSet.actors.mercenary.input.warcryMode = "MAX"
+		local maxHit = calculate().player.modDB:Sum("BASE", nil, "PhysicalDamageGainAsFire")
+		assert.is_true(maxHit > average)
+	end)
+
 	it("applies player auras to the Mercenary and keeps only the strongest copy", function()
 		build.skillsTab:PasteSocketGroup("Zealotry 20/0  1")
 		configure("TrapsMinesShadow", "TrapsMinesShadowLightning", "LightningTrapMercenary")
@@ -1293,6 +1362,47 @@ Iron Hat
 		calculate()
 		assert.is_table(build.partyTab.buffExports.Aura.Zealotry)
 		assert.is_true(#build.partyTab.buffExports.Aura.Zealotry.modList > 0)
+	end)
+
+	it("exports the strongest copy of a same-name player and Mercenary aura", function()
+		build.partyTab.enableExportBuffs = true
+		local function exportedEffect()
+			calculate()
+			return assert(build.partyTab.buffExports.Aura.Zealotry).effectMult
+		end
+		build.skillsTab:PasteSocketGroup("Arc 20/0  1")
+		build.skillsTab:PasteSocketGroup("Zealotry 20/0  1")
+		local playerGroup = build.skillsTab.socketGroupList[#build.skillsTab.socketGroupList]
+		build.mainSocketGroup = 1
+		build.configTab.input.customMods = "Zealotry has 200% increased Aura Effect"
+		build.configTab:BuildModList()
+		local playerStrong = exportedEffect()
+		assert.are.near(3, playerStrong, 10 ^ -9)
+
+		configure("TrapsMinesShadow", "TrapsMinesShadowLightning", "ZealotryMercenary")
+		playerGroup.enabled = false
+		local mercDefault = exportedEffect()
+		assert.is_true(playerStrong > mercDefault)
+
+		playerGroup.enabled = true
+		assert.are.near(playerStrong, exportedEffect(), 10 ^ -9)
+
+		build.configTab.input.customMods = "Zealotry has 50% reduced Aura Effect"
+		build.configTab:BuildModList()
+		local configSet = build.configTab.configSets[build.configTab.activeConfigSetId]
+		build.configTab:EnsureActorConfig(configSet)
+		configSet.actors.mercenary.customModsList = { { title = "Default", enabled = true, text = "Zealotry has 200% increased Aura Effect" } }
+		playerGroup.enabled = false
+		local mercStrong = exportedEffect()
+		build.mercenaryTab.profile.skills[1].enabled = false
+		build.mercenaryTab:Changed()
+		playerGroup.enabled = true
+		local playerWeak = exportedEffect()
+		assert.is_true(mercStrong > playerWeak)
+
+		build.mercenaryTab.profile.skills[1].enabled = true
+		build.mercenaryTab:Changed()
+		assert.are.near(mercStrong, exportedEffect(), 10 ^ -9)
 	end)
 
 	it("applies Bestowed Knighthood aura effect and Mercenary taunt mitigation", function()

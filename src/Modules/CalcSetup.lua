@@ -286,7 +286,7 @@ function calcs.initMercenary(env)
 	mercenary.modDB:NewMod("MineThrowCount", "BASE", 1, "Base")
 	mercenary.modDB:NewMod("TrapThrowCount", "BASE", 1, "Base")
 	mercenary.modDB:NewMod("MaximumFortification", "BASE", env.data.characterConstants["base_max_fortification"], "Base")
-	mercenary.modDB:NewMod("Damage", "MORE", env.data.mercenaries.permanentMercenaryDamageMore, "Permanent Mercenary")
+	mercenary.modDB:NewMod("Damage", "MORE", MercenaryTools.permanentDamageMore(mercenary.level, env.data.mercenaries.permanentMercenaryDamageMore), "Permanent Mercenary")
 	addMercenaryMonsterStats(env, mercenary, monster, calculationErrors)
 	addMercenaryPassiveStats(mercenary, mercenaryBuild, calculationErrors)
 	for _, value in ipairs(env.modDB:List(nil, "MercenaryModifier")) do
@@ -911,7 +911,7 @@ function calcs.initEnv(build, mode, override, specEnv)
 		error("Unknown item set id: "..tostring(override.itemSetId))
 	end
 	local overrideItemSet = override.itemSetId and build.itemsTab.itemSets[override.itemSetId]
-	local replacesPlayerItem = override.itemSetId == nil or override.itemSetId == build.itemsTab.activeItemSetId
+	local replacesPlayerItem = MercenaryTools.overrideReplacesPlayerItem(override, build.itemsTab.activeItemSetId)
 	local modDB = nil
 	local enemyDB = nil
 	local classStats = nil

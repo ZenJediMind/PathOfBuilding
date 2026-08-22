@@ -146,7 +146,9 @@ function ConfigTabClass:ConfigTab(build)
 	-- Initialise config sets
 	self.configSets = { }
 	self.configSetOrderList = { 1 }
-	self:NewConfigSet(1)
+	-- ItemsTab and MercenaryTab are created after ConfigTab, so copying "live"
+	-- item sets here would read the previous build's tabs during newBuild().
+	self:NewConfigSet(1, nil, { copyLiveItemSets = false })
 	self:SetActiveConfigSet(1, true)
 
 	self.enemyLevel = 1
@@ -194,9 +196,10 @@ function ConfigTabClass:ConfigTab(build)
 			return
 		end
 		if self:GetViewActor() == "mercenary" and self.build.mercenaryTab then
-			self.build.mercenaryTab:SetItemSet(value.id)
+			-- Equip without taking the Items tab's view/comparison context.
+			self.build.mercenaryTab:SetItemSet(value.id, false)
 		elseif self.build.itemsTab then
-			self.build.itemsTab:SetActiveItemSet(value.id)
+			self.build.itemsTab:SetActiveItemSet(value.id, false)
 			self.build.itemsTab:AddUndoState()
 		end
 		self:AddUndoState()
@@ -241,23 +244,7 @@ function ConfigTabClass:ConfigTab(build)
 	end
 
 	local function implyCond(varData)
-		local mainEnv = self.build.calcsTab.mainEnv
-		if self:GetConfigValue(varData.var) then
-			if varData.implyCondList then
-				for _, implyCond in ipairs(varData.implyCondList) do
-					if (implyCond and mainEnv.conditionsUsed[implyCond]) then
-						return true
-					end
-				end
-			end
-			if (varData.implyCond and mainEnv.conditionsUsed[varData.implyCond]) or
-			   (varData.implyMinionCond and mainEnv.minionConditionsUsed[varData.implyMinionCond]) or
-			   (varData.implyEnemyCond and mainEnv.enemyConditionsUsed[varData.implyEnemyCond]) then
-				return true
-			end
-		end
-
-		return false
+		return configVisibility.implyCondActive(varData, self.build, self:GetViewActor())
 	end
 
 	local function listOrSingleIfOption(ifOption, ifFunc)
@@ -1513,8 +1500,13 @@ function ConfigTabClass:ApplyActorItemSets(opts)
 	local itemsTab = self.build.itemsTab
 	local playerItemSetId = configSet.actors.player and configSet.actors.player.itemSetId
 	if opts.player ~= false and itemsTab and playerItemSetId and itemsTab.itemSets[playerItemSetId] then
+		-- Follow the equipped player set in the Items tab only when that set is
+		-- already what the user is viewing. Otherwise applying config (or undo)
+		-- would yank the view off Mercenary / inactive-set inspection.
+		local changeView = itemsTab.viewItemSetId == itemsTab.activeItemSetId
+			and itemsTab.viewComparisonActor ~= "MERCENARY"
 		itemsTab.skipConfigItemSetSync = true
-		itemsTab:SetActiveItemSet(playerItemSetId)
+		itemsTab:SetActiveItemSet(playerItemSetId, changeView)
 		itemsTab.skipConfigItemSetSync = false
 	end
 	local mercenaryTab = self.build.mercenaryTab
@@ -1720,7 +1712,7 @@ function ConfigTabClass:SetActiveConfigSet(configSetId, init, itemSetOpts)
 	-- Initialize config sets if needed
 	if not self.configSetOrderList[1] then
 		self.configSetOrderList[1] = 1
-		self:NewConfigSet(1)
+		self:NewConfigSet(1, nil, { copyLiveItemSets = false })
 	end
 
 	if not configSetId then

@@ -144,6 +144,13 @@ describe("Player and mercenary configuration", function()
 		assert.are.equal(originalPlayerId, itemsTab.viewItemSetId)
 	end)
 
+	it("does not copy the previous build's Mercenary item set into a new build", function()
+		assert(build.mercenaryTab:SetItemSet(build.itemsTab.activeItemSetId, false))
+		assert.are.equal(build.itemsTab.activeItemSetId, build.mercenaryTab.itemSetId)
+		newBuild()
+		assert.is_nil(build.mercenaryTab.itemSetId)
+	end)
+
 	it("does not switch the Items view to Mercenary gear when applying actor item sets", function()
 		local itemsTab = build.itemsTab
 		local configTab = build.configTab
@@ -154,6 +161,70 @@ describe("Player and mercenary configuration", function()
 		assert.are.equal(playerSetId, itemsTab.activeItemSetId)
 		assert.are.equal(mercSetId, build.mercenaryTab.itemSetId)
 		assert.are.equal(playerSetId, itemsTab.viewItemSetId)
+	end)
+
+	it("does not snap Items view away from Mercenary gear when applying actor item sets", function()
+		local itemsTab = build.itemsTab
+		local mercSet = assert(build.mercenaryTab:GetItemSet(true))
+		assert(itemsTab:SetViewItemSet(mercSet.id, "MERCENARY"))
+		local playerSetId = itemsTab.activeItemSetId
+		build.configTab:ApplyActorItemSets()
+		assert.are.equal(playerSetId, itemsTab.activeItemSetId)
+		assert.are.equal(mercSet.id, itemsTab.viewItemSetId)
+		assert.are.equal("MERCENARY", itemsTab.viewComparisonActor)
+		assert.are.equal(mercSet.id, build.mercenaryTab.itemSetId)
+	end)
+
+	it("does not clear Mercenary comparison when applying config on a shared item set", function()
+		local itemsTab = build.itemsTab
+		local playerSetId = itemsTab.activeItemSetId
+		assert(build.mercenaryTab:SetItemSet(playerSetId, false))
+		assert(itemsTab:SetViewItemSet(playerSetId, "MERCENARY"))
+		build.configTab:ApplyActorItemSets()
+		assert.are.equal(playerSetId, itemsTab.activeItemSetId)
+		assert.are.equal(playerSetId, itemsTab.viewItemSetId)
+		assert.are.equal("MERCENARY", itemsTab.viewComparisonActor)
+		assert.are.equal(playerSetId, build.mercenaryTab.itemSetId)
+	end)
+
+	it("keeps Items on Mercenary gear when switching config sets", function()
+		local itemsTab = build.itemsTab
+		local configTab = build.configTab
+		local mercSet = assert(build.mercenaryTab:GetItemSet(true))
+		assert(itemsTab:SetViewItemSet(mercSet.id, "MERCENARY"))
+		local originalPlayerId = itemsTab.activeItemSetId
+		local mapping = configTab.configSets[configTab.activeConfigSetId]
+		configTab:EnsureActorConfig(mapping)
+		local altPlayer = itemsTab:NewItemSet()
+		altPlayer.title = "Bossing"
+		table.insert(itemsTab.itemSetOrderList, altPlayer.id)
+		local bossing = configTab:NewConfigSet()
+		table.insert(configTab.configSetOrderList, bossing.id)
+		configTab:EnsureActorConfig(bossing)
+		bossing.actors.player.itemSetId = altPlayer.id
+		bossing.actors.mercenary.itemSetId = mercSet.id
+		configTab:SetActiveConfigSet(bossing.id)
+		assert.are.equal(altPlayer.id, itemsTab.activeItemSetId)
+		assert.are.equal(mercSet.id, itemsTab.viewItemSetId)
+		assert.are.equal("MERCENARY", itemsTab.viewComparisonActor)
+		assert.are.equal(originalPlayerId, mapping.actors.player.itemSetId)
+	end)
+
+	it("equips the player from Config without taking Items comparison context", function()
+		local MercenaryTools = require("Modules/MercenaryTools")
+		local itemsTab = build.itemsTab
+		local configTab = build.configTab
+		local playerSetId = itemsTab.activeItemSetId
+		local altPlayer = itemsTab:NewItemSet()
+		altPlayer.title = "Config Wear"
+		table.insert(itemsTab.itemSetOrderList, altPlayer.id)
+		assert(itemsTab:SetViewItemSet(playerSetId, "PLAYER"))
+		configTab:SetViewActor("player")
+		configTab:UpdateActorItemSetSelect()
+		configTab.controls.itemSetSelect.selFunc(nil, { id = altPlayer.id })
+		assert.are.equal(altPlayer.id, itemsTab.activeItemSetId)
+		assert.are.equal(playerSetId, itemsTab.viewItemSetId)
+		assert.are.equal("PLAYER", MercenaryTools.comparisonActorForItemSet(playerSetId, itemsTab))
 	end)
 
 	it("writes actor-scoped options to the viewed actor", function()
@@ -179,6 +250,21 @@ describe("Player and mercenary configuration", function()
 		configTab.controls.itemSetSelect.selFunc(nil, { id = altPlayer.id })
 		assert.are.equal(altPlayer.id, itemsTab.activeItemSetId)
 		assert.are.equal(altPlayer.id, configTab.configSets[configTab.activeConfigSetId].actors.player.itemSetId)
+	end)
+
+	it("equips the Mercenary from Config without taking Items comparison context", function()
+		local MercenaryTools = require("Modules/MercenaryTools")
+		local itemsTab = build.itemsTab
+		local configTab = build.configTab
+		local playerSetId = itemsTab.activeItemSetId
+		local viewItemSetId = itemsTab.viewItemSetId
+		configTab:SetViewActor("mercenary")
+		configTab:UpdateActorItemSetSelect()
+		configTab.controls.itemSetSelect.selFunc(nil, { id = playerSetId })
+		assert.are.equal(playerSetId, build.mercenaryTab.itemSetId)
+		assert.are.equal(viewItemSetId, itemsTab.viewItemSetId)
+		assert.is_nil(itemsTab.viewComparisonActor)
+		assert.are.equal("PLAYER", MercenaryTools.comparisonActorForItemSet(playerSetId, itemsTab))
 	end)
 
 	it("saves mercenary actor config separately from the player", function()

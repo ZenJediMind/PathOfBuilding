@@ -5038,9 +5038,8 @@ local specialModList = {
 	} end,
 	["(%d+)%% of damage from hits is taken from your r?a?i?s?e?d? ?spectres' life before you"] = function(num) return { mod("takenFromSpectresBeforeYou", "BASE", num) } end,
 	-- The damage penalty this node's reminder text describes is not stated on the
-	-- node, so it is applied unconditionally to the Mercenary actor by
-	-- `calcs.initMercenary` rather than sourced from here. See
-	-- `MercenaryStatMap.permanentMercenary`.
+	-- node, so it is applied to the Mercenary actor by `calcs.initMercenary`
+	-- through `MercenaryTools.permanentDamageMore` rather than sourced from here.
 	["you can hire a mercenary permanently"] = { flag("CanHirePermanentMercenary") },
 	["your mercenary and their minions have (%d+)%% increased maximum life"] = function(num) return {
 		mod("MercenaryModifier", "LIST", { mod = mod("Life", "INC", num) }),

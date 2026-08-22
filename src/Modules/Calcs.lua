@@ -741,6 +741,9 @@ function calcs.buildOutput(build, mode)
 						addTo(env.enemyConditionsUsed, tag.var, mod)
 					else
 						addTo(env.conditionsUsed, tag.var, mod)
+						if usage then
+							addTo(usage.conditions, tag.var, mod)
+						end
 					end
 				elseif tag.type == "Multiplier" or tag.type == "MultiplierThreshold" then
 					if not tag.actor then

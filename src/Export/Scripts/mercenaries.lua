@@ -243,6 +243,8 @@ for passive in dat("PassiveSkills"):Rows() do
 			if permanentMercenaryDamageMore ~= nil then
 				error("Permanent Mercenary damage stat is present on more than one passive")
 			end
+			-- This is the maximum MORE penalty. 3.29.1 tapers it in by Mercenary
+			-- level; `MercenaryTools.permanentDamageMore` applies that curve.
 			permanentMercenaryDamageMore = passive["Stat"..index]
 		end
 	end

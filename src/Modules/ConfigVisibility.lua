@@ -118,7 +118,11 @@ local function actorUsesSkill(actor, ifOption, includeTransfigured)
 end
 
 -- When the option has an input value and one of its implied conditions is currently used, treat gated predicates as passing.
-local function optionValue(configTab, var)
+local function optionValue(configTab, var, viewActor)
+	if viewActor and configTab and configTab.GetActorConfigInput then
+		local input = configTab:GetActorConfigInput(viewActor)
+		return input and input[var]
+	end
 	if configTab and configTab.GetConfigValue then
 		return configTab:GetConfigValue(var)
 	end
@@ -126,19 +130,22 @@ local function optionValue(configTab, var)
 	return activeSet and activeSet.input and activeSet.input[var]
 end
 
-local function implyCondActive(varData, build)
+local function implyCondActive(varData, build, viewActor)
 	local configTab = build and build.configTab
 	if not configTab then return false end
-	if not optionValue(configTab, varData.var) then return false end
+	viewActor = viewActor or (configTab.GetViewActor and configTab:GetViewActor()) or "player"
+	if not optionValue(configTab, varData.var, viewActor) then return false end
 	local mainEnv = build.calcsTab and build.calcsTab.mainEnv
 	if not mainEnv then return false end
+	local conditionsUsed = usedForVar(mainEnv, "conditionsUsed", varData, viewActor)
+	local minionConditionsUsed = usedForVar(mainEnv, "minionConditionsUsed", varData, viewActor)
 	if varData.implyCondList then
 		for _, implyCond in ipairs(varData.implyCondList) do
-			if implyCond and mainEnv.conditionsUsed[implyCond] then return true end
+			if implyCond and conditionsUsed[implyCond] then return true end
 		end
 	end
-	return (varData.implyCond and mainEnv.conditionsUsed[varData.implyCond])
-		or (varData.implyMinionCond and mainEnv.minionConditionsUsed[varData.implyMinionCond])
+	return (varData.implyCond and conditionsUsed[varData.implyCond])
+		or (varData.implyMinionCond and minionConditionsUsed[varData.implyMinionCond])
 		or (varData.implyEnemyCond and mainEnv.enemyConditionsUsed[varData.implyEnemyCond])
 		or false
 end
@@ -156,7 +163,7 @@ local function isRelevantForBuild(varData, build, viewActor)
 	local impliedCache
 	local function implied()
 		if impliedCache == nil then
-			impliedCache = implyCondActive(varData, build) or false
+			impliedCache = implyCondActive(varData, build, viewActor or "player") or false
 		end
 		return impliedCache
 	end
@@ -182,7 +189,7 @@ local function isRelevantForBuild(varData, build, viewActor)
 		end) then return false end
 	end
 	if varData.ifOption then
-		if not anyIfValue(varData.ifOption, function(opt) return optionValue(configTab, opt) end) then return false end
+		if not anyIfValue(varData.ifOption, function(opt) return optionValue(configTab, opt, viewActor or "player") end) then return false end
 	end
 	if varData.ifCondTrue then
 		if not anyIfValue(varData.ifCondTrue, function(opt)
@@ -238,6 +245,7 @@ return {
 	anyMainSkill = anyMainSkill,
 	anyActiveSkill = anyActiveSkill,
 	actorUsesSkill = actorUsesSkill,
+	implyCondActive = implyCondActive,
 	isRelevantForBuild = isRelevantForBuild,
 	isShowAllExcluded = isShowAllExcluded,
 	usedForVar = usedForVar,

@@ -26,8 +26,7 @@ local function getComparisonItemSet(itemsTab)
 end
 
 local function isMercenaryComparisonSet(itemsTab)
-	local mercenaryTab = itemsTab and itemsTab.build and itemsTab.build.mercenaryTab
-	return mercenaryTab and itemsTab.viewItemSetId == mercenaryTab.itemSetId and itemsTab.viewItemSetId ~= itemsTab.activeItemSetId
+	return MercenaryTools.comparisonActorForItemSet(itemsTab and itemsTab.viewItemSetId, itemsTab) == "MERCENARY"
 end
 
 local function getComparisonSlotName(itemsTab, slotName)

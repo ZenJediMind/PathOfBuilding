@@ -162,7 +162,7 @@ function MercenaryTabClass:MercenaryTab(build)
 
 	self.controls.editEquipment = new("ButtonControl"):ButtonControl({ "TOPLEFT", self.controls.buildLabel, "BOTTOMLEFT" }, { 0, 14, 150, 20 }, "Edit Equipment", function()
 		local itemSet = self:GetItemSet(true)
-		if itemSet then build.itemsTab:SetViewItemSet(itemSet.id) end
+		if itemSet then build.itemsTab:SetViewItemSet(itemSet.id, "MERCENARY") end
 		build.viewMode = "ITEMS"
 	end)
 	self.controls.reset = new("ButtonControl"):ButtonControl({ "LEFT", self.controls.editEquipment, "RIGHT" }, { 8, 0, 80, 20 }, "Reset", function()
@@ -499,7 +499,7 @@ function MercenaryTabClass:SetItemSet(itemSetId, changeView)
 	if not itemSet then return false end
 	self.itemSetId = itemSetId
 	if changeView ~= false then
-		itemsTab:SetViewItemSet(itemSetId)
+		itemsTab:SetViewItemSet(itemSetId, "MERCENARY")
 	end
 	if self.build.configTab and not self.skipConfigItemSetSync then
 		self.build.configTab:SyncActorItemSet("mercenary", itemSetId)

@@ -67,6 +67,20 @@ describe("Mercenary tools", function()
 		}))
 	end)
 
+	it("uses explicit view comparison actor when the Mercenary shares the active item set", function()
+		local shared = {
+			activeItemSetId = 1,
+			viewItemSetId = 1,
+			viewComparisonActor = "MERCENARY",
+			build = { mercenaryTab = { itemSetId = 1 } },
+		}
+		assert.are.equal("MERCENARY", tools.comparisonActorForItemSet(1, shared))
+		assert.are.equal("MERCENARY", tools.comparisonActorForSlot("Helmet", 1, shared))
+		shared.viewComparisonActor = "PLAYER"
+		assert.are.equal("PLAYER", tools.comparisonActorForItemSet(1, shared))
+		assert.are.equal("PLAYER", tools.comparisonActorForSlot("Helmet", 1, shared))
+	end)
+
 	it("builds a comparison override for a viewed item set", function()
 		local itemsTab = {
 			activeItemSetId = 1,
@@ -89,6 +103,18 @@ describe("Mercenary tools", function()
 		assert.is_nil(override.itemSetId)
 		assert.are.equal("PLAYER", override.comparisonActor)
 		assert.are.equal("Jewel 12345", override.repSlotName)
+	end)
+
+	it("does not replace the other actor's gear when the comparison actor is explicit", function()
+		local playerOverride = { itemSetId = 1, comparisonActor = "PLAYER", repSlotName = "Helmet", repItem = { } }
+		assert.is_true(tools.overrideReplacesPlayerItem(playerOverride, 1))
+		assert.is_false(tools.overrideReplacesMercenarySlot(playerOverride, "Helmet", 1))
+		local mercOverride = { itemSetId = 1, comparisonActor = "MERCENARY", repSlotName = "Helmet", repItem = { } }
+		assert.is_false(tools.overrideReplacesPlayerItem(mercOverride, 1))
+		assert.is_true(tools.overrideReplacesMercenarySlot(mercOverride, "Helmet", 1))
+		local dedicatedMerc = { itemSetId = 2, repSlotName = "Helmet", repItem = { } }
+		assert.is_false(tools.overrideReplacesPlayerItem(dedicatedMerc, 1))
+		assert.is_true(tools.overrideReplacesMercenarySlot(dedicatedMerc, "Helmet", 2))
 	end)
 
 	it("groups numbered class variants for the picker", function()
@@ -242,6 +268,17 @@ Can be used in a personal Map Device alongside a Map to have this previously fou
 		assert.are.equal(60, tools.passiveStatValue(values, 0))
 		assert.are.equal(160, tools.passiveStatValue(values, 120))
 		assert.are.equal(93, tools.passiveStatValue({ 38, 75, 100 }, 80))
+	end)
+
+	it("tapers the permanent Mercenary damage penalty from level 45 to 83", function()
+		local maxMore = -30
+		assert.are.equal(0, tools.permanentDamageMore(1, maxMore))
+		assert.are.equal(0, tools.permanentDamageMore(44, maxMore))
+		assert.are.equal(0, tools.permanentDamageMore(45, maxMore))
+		assert.are.equal(-1, tools.permanentDamageMore(46, maxMore))
+		assert.are.equal(-29, tools.permanentDamageMore(82, maxMore))
+		assert.are.equal(-30, tools.permanentDamageMore(83, maxMore))
+		assert.are.equal(-30, tools.permanentDamageMore(100, maxMore))
 	end)
 
 	it("validates saved profiles without repairing invalid data", function()

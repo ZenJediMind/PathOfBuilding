@@ -137,7 +137,8 @@ describe("Permanent Mercenary calculations", function()
 		assert.are.near(0.2, env.mercenary.modDB:More({ flags = ModFlag.Dot }, "DamageTaken"), 10 ^ -9)
 		-- The permanent-hire Damage penalty belongs to the Mercenary, not to the node
 		-- that allows hiring one, so it applies whatever the character has allocated.
-		assert.are.near(0.7, env.mercenary.modDB:More(nil, "Damage"), 10 ^ -9)
+		local penalty = MercenaryTools.permanentDamageMore(env.mercenary.level, build.data.mercenaries.permanentMercenaryDamageMore)
+		assert.are.near(1 + penalty / 100, env.mercenary.modDB:More(nil, "Damage"), 10 ^ -9)
 		assert.are.near(env.mercenary.output.CombinedDPS * 2, env.mercenary.output.FullDPS, 10 ^ -6)
 		assert.are.near(env.mercenary.output.FullDPS, build.calcsTab.mainOutput.FullDPS, 10 ^ -6)
 		assert.is_table(env.mercenary.output.SkillDPS)
@@ -355,6 +356,68 @@ describe("Permanent Mercenary calculations", function()
 		assert.is_true(env.mercenary.modDB:GetCondition("Focused"))
 		assert.are.equal(baseDamage + focusedDamage.value, env.mercenary.modDB:Sum("INC", nil, "Damage"))
 		assert.are.equal(12345, env.mercenary.mainSkill.skillData.corpseLife)
+	end)
+
+	it("shows Stationary config from ActorCondition on the actor that uses it", function()
+		configure("MeleeAOEMarauder", "MeleeAOEMarauderFireSlam", "InfernalCryMercenary")
+		local stationaryDamage = {
+			name = "Damage", type = "INC", value = 20, source = "Mercenary Stationary Test", flags = 0, keywordFlags = 0,
+			{ type = "ActorCondition", var = "Stationary" },
+		}
+		local helmet = {
+			id = 9051, name = "Mercenary Stationary Test", type = "Helmet", base = { type = "Helmet" }, rarity = "RARE",
+			requirements = { str = 1 }, grantedSkills = { }, modList = { stationaryDamage },
+		}
+		build.itemsTab.items[helmet.id] = helmet
+		equipmentSlot("Helmet").selItemId = helmet.id
+		calculate()
+		assert.is_false(build.configTab.varControls.conditionStationary.shown())
+		build.configTab:SetViewActor("mercenary")
+		assert.is_true(build.configTab.varControls.conditionStationary.shown())
+	end)
+
+	it("does not treat player Leeching Life as valid from Mercenary Leeching mods", function()
+		configure("MeleeAOEMarauder", "MeleeAOEMarauderFireSlam", "InfernalCryMercenary")
+		local leechingDamage = {
+			name = "Damage", type = "INC", value = 20, source = "Mercenary Leech Test", flags = 0, keywordFlags = 0,
+			{ type = "Condition", var = "Leeching" },
+		}
+		local helmet = {
+			id = 9050, name = "Mercenary Leech Test", type = "Helmet", base = { type = "Helmet" }, rarity = "RARE",
+			requirements = { str = 1 }, grantedSkills = { }, modList = { leechingDamage },
+		}
+		build.itemsTab.items[helmet.id] = helmet
+		equipmentSlot("Helmet").selItemId = helmet.id
+
+		local configSet = build.configTab.configSets[build.configTab.activeConfigSetId]
+		build.configTab:EnsureActorConfig(configSet)
+		configSet.input.conditionLeechingLife = true
+		calculate()
+
+		local leechingLifeConfig, leechingConfig
+		for _, varData in ipairs(configOptions) do
+			if varData.var == "conditionLeechingLife" then
+				leechingLifeConfig = varData
+			elseif varData.var == "conditionLeeching" then
+				leechingConfig = varData
+			end
+		end
+		assert.is_false(configVisibility.isRelevantForBuild(assert(leechingLifeConfig), build, "player"))
+		assert.is_false(configVisibility.isRelevantForBuild(assert(leechingConfig), build, "player"))
+		assert.is_true(configVisibility.isRelevantForBuild(leechingConfig, build, "mercenary"))
+
+		configSet.actors.mercenary.input.conditionLeechingLife = true
+		build.configTab:SetViewActor("mercenary")
+		assert.is_false(configVisibility.isRelevantForBuild(leechingLifeConfig, build, "player"))
+		assert.is_true(configVisibility.isRelevantForBuild(leechingLifeConfig, build, "mercenary"))
+
+		build.configTab:SetViewActor("player")
+		assert.is_true(build.configTab.varControls.conditionLeechingLife.shown())
+		local label = build.configTab.varControls.conditionLeechingLife.label
+		if type(label) == "function" then
+			label = label()
+		end
+		assert.matches("%^xDD0022", assert(label))
 	end)
 
 	it("applies Vigilant Strike's default cooldown bypass to the Mercenary", function()
@@ -634,7 +697,38 @@ describe("Permanent Mercenary calculations", function()
 		assert.are.equal(208, mercenary.modDB:Sum("BASE", nil, "Str"))
 		assert.are.equal(21, mercenary.modDB:Sum("BASE", nil, "Dex"))
 		assert.are.equal(21, mercenary.modDB:Sum("BASE", nil, "Int"))
-		assert.are.near(0.7, mercenary.modDB:More(nil, "Damage"), 10 ^ -9)
+		local penalty = MercenaryTools.permanentDamageMore(mercenary.level, build.data.mercenaries.permanentMercenaryDamageMore)
+		assert.are.near(1 + penalty / 100, mercenary.modDB:More(nil, "Damage"), 10 ^ -9)
+	end)
+
+	it("tapers permanent Mercenary and Mercenary-minion damage between levels 45 and 83", function()
+		local function sourceMore(modDB)
+			for _, value in ipairs(modDB:Tabulate("MORE", nil, "Damage")) do
+				if value.mod.source == "Permanent Mercenary" then
+					return value.mod.value
+				end
+			end
+			return 0
+		end
+		local expected = { [44] = 0, [45] = 0, [46] = -1, [82] = -29, [83] = -30 }
+		for _, level in ipairs({ 44, 45, 46, 82, 83 }) do
+			configure("TrapsMinesShadow", "TrapsMinesShadowLightning", "LightningTrapMercenary", {
+				foundAreaLevel = level,
+			})
+			local env = calculate(level)
+			assert.are.equal(level, env.mercenary.level)
+			assert.are.equal(expected[level], sourceMore(env.mercenary.modDB), "skill penalty at "..level)
+			assert.is_true(env.mercenary.output.CombinedDPS > 0)
+		end
+		for _, level in ipairs({ 44, 45, 46, 82, 83 }) do
+			configure("AurasMinionsTemplar", "AurasMinionsTemplarStaff", "HeraldOfPurityMercenary", {
+				foundAreaLevel = level,
+			})
+			local env = calculate(level)
+			assert.is_table(env.mercenaryMinion)
+			assert.are.equal(expected[level], sourceMore(env.mercenaryMinion.modDB), "minion penalty at "..level)
+			assert.is_true(env.mercenaryMinion.output.TotalDPS > 0)
+		end
 	end)
 
 	it("calculates Corrupted Blood from allied-monster damage and hit rate", function()
@@ -653,7 +747,9 @@ describe("Permanent Mercenary calculations", function()
 		assert.is_true(mercenary.mainSkill.skillData.explodeCorpse)
 		assert.are.equal("Fire", mercenary.mainSkill.skillData.corpseExplosionDamageType)
 		assert.are.near(0.08, mercenary.mainSkill.skillData.corpseExplosionLifeMultiplier, 10 ^ -9)
-		assert.are.near(1694.5, mercenary.output.AverageHit, 10 ^ -9)
+		-- Found-area 68 is inside the 3.29.1 taper, so this hit includes -18% more Damage
+		-- rather than the -30% endgame cap.
+		assert.are.near(1984.5, mercenary.output.AverageHit, 10 ^ -9)
 	end)
 
 	it("uses the compared slot actor with separate player and Mercenary equipment", function()
@@ -803,6 +899,60 @@ Leather Cap
 		assert.is_true(playerReplacement.Life < actorOutputs.PLAYER.Life)
 		assert.is_true(mercReplacement.Life > actorOutputs.MERCENARY.Life)
 		assert.are_not.equal(playerReplacement.Life, mercReplacement.Life)
+	end)
+
+	it("replaces only Mercenary helmet life when the shared active set is compared as Mercenary", function()
+		configure("MeleeAOEMarauder", "MeleeAOEMarauderFireSlam", "InfernalCryMercenary")
+		local itemsTab = build.itemsTab
+		local playerSetId = itemsTab.activeItemSetId
+		assert(build.mercenaryTab:SetItemSet(playerSetId, false))
+		local playerHelmet = new("Item"):Item([[Rarity: Rare
+Player Helmet
+Iron Hat
+--------
++100 to maximum Life]])
+		local replacementHelmet = new("Item"):Item([[Rarity: Rare
+Replacement Helmet
+Iron Hat
+--------
++1000 to maximum Life]])
+		itemsTab:AddItem(playerHelmet, true)
+		itemsTab:AddItem(replacementHelmet, true)
+		itemsTab.activeItemSet.Helmet.selItemId = playerHelmet.id
+		calculate()
+		assert(itemsTab:SetViewItemSet(playerSetId, "MERCENARY"))
+		local _, _, actorOutputs = build.calcsTab:GetMiscCalculator()
+		local env = build.calcsTab.calcs.initEnv(build, "CALCULATOR", itemsTab:ItemCalculationOverride("Helmet", replacementHelmet))
+		build.calcsTab.calcs.perform(env)
+		assert.are.equal(actorOutputs.PLAYER.Life, env.player.output.Life)
+		assert.is_true(env.mercenary.output.Life > actorOutputs.MERCENARY.Life)
+	end)
+
+	it("replaces only player helmet life when the shared active set is compared as the player", function()
+		configure("MeleeAOEMarauder", "MeleeAOEMarauderFireSlam", "InfernalCryMercenary")
+		local itemsTab = build.itemsTab
+		local playerSetId = itemsTab.activeItemSetId
+		assert(build.mercenaryTab:SetItemSet(playerSetId, false))
+		local playerHelmet = new("Item"):Item([[Rarity: Rare
+Player Helmet
+Iron Hat
+--------
++100 to maximum Life]])
+		local replacementHelmet = new("Item"):Item([[Rarity: Rare
+Replacement Helmet
+Iron Hat
+--------
++1000 to maximum Life]])
+		itemsTab:AddItem(playerHelmet, true)
+		itemsTab:AddItem(replacementHelmet, true)
+		itemsTab.activeItemSet.Helmet.selItemId = playerHelmet.id
+		calculate()
+		assert(itemsTab:SetViewItemSet(playerSetId, "PLAYER"))
+		local _, _, actorOutputs = build.calcsTab:GetMiscCalculator()
+		local env = build.calcsTab.calcs.initEnv(build, "CALCULATOR", itemsTab:ItemCalculationOverride("Helmet", replacementHelmet))
+		build.calcsTab.calcs.perform(env)
+		assert.is_true(env.player.output.Life > actorOutputs.PLAYER.Life)
+		assert.are.equal(actorOutputs.MERCENARY.Life, env.mercenary.output.Life)
 	end)
 
 	it("uses the selected Animate Guardian set for trade stat replacements", function()

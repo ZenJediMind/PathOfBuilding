@@ -715,8 +715,9 @@ return {
 		ElementalWitchLightningNoble = true,
 		MeleeStrikesMarauderFire = true,
 	},
-	-- Non-DAT behavior the Mercenary actor needs. The permanent damage penalty is
-	-- exported from Noble Blood's PassiveSkills row instead of being copied here.
+	-- Non-DAT behavior the Mercenary actor needs. The permanent damage penalty's
+	-- maximum is exported from Noble Blood's PassiveSkills row; the 3.29.1
+	-- level taper lives in `MercenaryTools.permanentDamageMore`.
 	permanentMercenary = {
 		-- Damage over Time the Mercenary itself takes.
 		damageOverTimeTakenMore = -80,

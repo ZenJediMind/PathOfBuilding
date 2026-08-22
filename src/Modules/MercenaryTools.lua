@@ -15,6 +15,9 @@ function MercenaryTools.comparisonActor(slotName)
 end
 
 function MercenaryTools.comparisonActorForItemSet(itemSetId, itemsTab)
+	if itemSetId and itemsTab and itemSetId == itemsTab.viewItemSetId and itemsTab.viewComparisonActor then
+		return itemsTab.viewComparisonActor
+	end
 	local mercenaryTab = itemsTab and itemsTab.build and itemsTab.build.mercenaryTab
 	if itemSetId and mercenaryTab and itemSetId == mercenaryTab.itemSetId and itemSetId ~= itemsTab.activeItemSetId then
 		return "MERCENARY"
@@ -47,10 +50,23 @@ function MercenaryTools.overrideReplacesMercenarySlot(override, slotName, mercen
 	if overrideBase ~= slotName then
 		return false
 	end
+	if override.comparisonActor == "PLAYER" then
+		return false
+	end
 	if override.comparisonActor == "MERCENARY" or MercenaryTools.baseItemSlotName(override.repSlotName) then
 		return true
 	end
 	return override.itemSetId ~= nil and override.itemSetId == mercenaryItemSetId
+end
+
+function MercenaryTools.overrideReplacesPlayerItem(override, activeItemSetId)
+	if not override then
+		return true
+	end
+	if override.comparisonActor == "MERCENARY" or MercenaryTools.baseItemSlotName(override.repSlotName) then
+		return false
+	end
+	return override.itemSetId == nil or override.itemSetId == activeItemSetId
 end
 
 function MercenaryTools.comparisonBaseOutput(playerOutput, actorOutputs, slotName)
@@ -330,6 +346,30 @@ end
 -- Keep the validated runtime tier policy here until those boundaries are exposed.
 -- Values are truncated because passive mods are integer values.
 MercenaryTools.PASSIVE_STAT_LEVELS = { 24, 68, 84 }
+
+-- Noble Blood's PassiveSkills row exports only the maximum MORE penalty.
+-- 3.29.1 tapers that penalty in; those breakpoints are not a DAT table.
+-- Patch notes: no penalty before level 45, maximum at level 83.
+-- Round-to-nearest integer MORE so the cap is reached at 83, not 82.
+MercenaryTools.PERMANENT_DAMAGE_MORE_START_LEVEL = 45
+MercenaryTools.PERMANENT_DAMAGE_MORE_END_LEVEL = 83
+
+function MercenaryTools.permanentDamageMore(level, maxMore)
+	maxMore = tonumber(maxMore)
+	if maxMore == nil then
+		error("permanent Mercenary damage max is required")
+	end
+	local startLevel = MercenaryTools.PERMANENT_DAMAGE_MORE_START_LEVEL
+	local endLevel = MercenaryTools.PERMANENT_DAMAGE_MORE_END_LEVEL
+	local actorLevel = math.max(1, tonumber(level) or 1)
+	if actorLevel <= startLevel then
+		return 0
+	end
+	if actorLevel >= endLevel then
+		return maxMore
+	end
+	return math.floor(maxMore * (actorLevel - startLevel) / (endLevel - startLevel) + 0.5)
+end
 
 function MercenaryTools.passiveStatValue(values, level)
 	local levels = MercenaryTools.PASSIVE_STAT_LEVELS

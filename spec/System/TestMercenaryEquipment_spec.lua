@@ -1084,4 +1084,41 @@ Note: ~b/o 1 mirror
 		assert.are.equal(afterRefresh + 1, calls)
 		tab.GetErrors = original
 	end)
+
+	it("compares a shared active item set as Mercenary when opened from Edit Equipment", function()
+		selectBuild("MeleeAOEMarauderFireSlam")
+		local itemsTab = build.itemsTab
+		local playerSetId = itemsTab.activeItemSetId
+		assert(tab:SetItemSet(playerSetId, false))
+		tab.controls.editEquipment.onClick()
+		assert.are.equal("ITEMS", build.viewMode)
+		assert.are.equal(playerSetId, itemsTab.viewItemSetId)
+		assert.are.equal("MERCENARY", MercenaryTools.comparisonActorForItemSet(playerSetId, itemsTab))
+		assert.are.equal("MERCENARY", itemsTab:ItemCalculationOverride("Helmet", item()).comparisonActor)
+	end)
+
+	it("compares a shared active item set as the player when opened from Items", function()
+		selectBuild("MeleeAOEMarauderFireSlam")
+		local itemsTab = build.itemsTab
+		local playerSetId = itemsTab.activeItemSetId
+		assert(tab:SetItemSet(playerSetId, false))
+		tab.controls.editEquipment.onClick()
+		assert.are.equal("MERCENARY", MercenaryTools.comparisonActorForItemSet(playerSetId, itemsTab))
+		assert(itemsTab:SetViewItemSet(playerSetId))
+		assert.are.equal("PLAYER", MercenaryTools.comparisonActorForItemSet(playerSetId, itemsTab))
+		assert.are.equal("PLAYER", itemsTab:ItemCalculationOverride("Helmet", item()).comparisonActor)
+	end)
+
+	it("compares a distinct Mercenary item set as Mercenary", function()
+		selectBuild("MeleeAOEMarauderFireSlam")
+		local itemsTab = build.itemsTab
+		local mercSet = itemsTab:NewItemSet()
+		mercSet.title = "Mercenary Equipment"
+		table.insert(itemsTab.itemSetOrderList, mercSet.id)
+		assert(tab:SetItemSet(mercSet.id, false))
+		assert(itemsTab:SetViewItemSet(mercSet.id))
+		assert.are_not.equal(itemsTab.activeItemSetId, mercSet.id)
+		assert.are.equal("MERCENARY", MercenaryTools.comparisonActorForItemSet(mercSet.id, itemsTab))
+		assert.are.equal("MERCENARY", itemsTab:ItemCalculationOverride("Helmet", item()).comparisonActor)
+	end)
 end)

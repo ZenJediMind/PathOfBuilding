@@ -1191,6 +1191,7 @@ function ItemsTabClass:Load(xml, dbFileName)
 	self.activeItemSetId = 0
 	self.viewItemSetId = nil
 	self.viewItemSet = nil
+	self.viewComparisonActor = nil
 	self.itemSets = { }
 	self.itemSetOrderList = { }
 	self.tradeQuery.statSortSelectionList = { }
@@ -1669,13 +1670,18 @@ function ItemsTabClass:ItemCalculationOverride(slotName, item)
 	return MercenaryTools.itemCalculationOverride(self.viewItemSetId, slotName, item, self)
 end
 
-function ItemsTabClass:SetViewItemSet(itemSetId)
+function ItemsTabClass:SetViewItemSet(itemSetId, comparisonActor)
 	local itemSet = self.itemSets[itemSetId]
 	if not itemSet then
 		return false
 	end
 	self.viewItemSetId = itemSet.id
 	self.viewItemSet = itemSet
+	if comparisonActor == "MERCENARY" or comparisonActor == "PLAYER" then
+		self.viewComparisonActor = comparisonActor
+	else
+		self.viewComparisonActor = nil
+	end
 	self.build.buildFlag = true
 	self:PopulateSlots()
 	self:UpdateSockets()
@@ -1694,6 +1700,7 @@ function ItemsTabClass:SetActiveItemSet(itemSetId, changeView)
 	if changeView ~= false then
 		self.viewItemSetId = itemSetId
 		self.viewItemSet = itemSet
+		self.viewComparisonActor = nil
 	end
 	if self.build.configTab and not self.skipConfigItemSetSync then
 		self.build.configTab:SyncActorItemSet("player", itemSetId)
@@ -5151,6 +5158,7 @@ function ItemsTabClass:CreateUndoState()
 	local state = { }
 	state.activeItemSetId = self.activeItemSetId
 	state.viewItemSetId = self.viewItemSetId
+	state.viewComparisonActor = self.viewComparisonActor
 	state.items = { }
 	for k, v in pairs(self.items) do
 		state.items[k] = copyTableSafe(self.items[k], true, true)
@@ -5187,6 +5195,7 @@ function ItemsTabClass:RestoreUndoState(state)
 	end
 	self.viewItemSetId = viewItemSetId
 	self.viewItemSet = self.itemSets[self.viewItemSetId]
+	self.viewComparisonActor = state.viewComparisonActor
 	for slotName, selItemId in pairs(state.slotSelItemId) do
 		local slot = self.slots[slotName]
 		if slot and slot.nodeId then slot:SetSelItemId(selItemId) end

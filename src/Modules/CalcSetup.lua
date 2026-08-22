@@ -242,6 +242,12 @@ function calcs.initMercenary(env)
 		env.mercenaryCalculationErrors = equipmentErrors
 		return
 	end
+	-- Permanent hiring is a Luminary/Noble Blood capability. Keep the
+	-- configured profile for editing, but do not construct an actor that
+	-- would enter the player calculation graph.
+	if not env.modDB:Flag(nil, "CanHirePermanentMercenary") then
+		return
+	end
 	local mercenary = {
 		type = "Mercenary",
 		isMercenary = true,

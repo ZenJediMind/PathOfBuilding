@@ -135,8 +135,8 @@ describe("Permanent Mercenary calculations", function()
 		end
 		assert.are.equal(-90, env.mercenary.modDB:Sum("INC", nil, "DamageTaken"))
 		assert.are.near(0.2, env.mercenary.modDB:More({ flags = ModFlag.Dot }, "DamageTaken"), 10 ^ -9)
-		-- The permanent-hire Damage penalty belongs to the Mercenary, not to the node
-		-- that allows hiring one, so it applies whatever the character has allocated.
+		-- The permanent-hire Damage penalty belongs to the constructed Mercenary
+		-- actor, not to the Noble Blood node that allows hiring one.
 		local penalty = MercenaryTools.permanentDamageMore(env.mercenary.level, build.data.mercenaries.permanentMercenaryDamageMore)
 		assert.are.near(1 + penalty / 100, env.mercenary.modDB:More(nil, "Damage"), 10 ^ -9)
 		assert.are.near(env.mercenary.output.CombinedDPS * 2, env.mercenary.output.FullDPS, 10 ^ -6)
@@ -1541,20 +1541,61 @@ Iron Hat
 		build.characterLevel = 49
 		assert.is_table(calculate(83).mercenary)
 		build.characterLevel = 90
+	end)
 
-		local nobleBlood = assert(build.spec.allocNodes[46479])
+	it("does not apply Mercenary effects to the player without CanHirePermanentMercenary", function()
+		configure("TrapsMinesShadow", "TrapsMinesShadowLightning", "ZealotryMercenary")
+		local hired = calculate()
+		assert.is_true(hired.player.modDB.conditions.AffectedByZealotry)
+
+		local nobleBlood
+		for _, node in pairs(build.spec.allocNodes) do
+			if node.name == "Noble Blood" then nobleBlood = node break end
+		end
+		nobleBlood = assert(nobleBlood, "Noble Blood")
 		build.spec.allocNodes[nobleBlood.id] = nil
 		nobleBlood.alloc = false
-		assert.is_table(calculate(83).mercenary)
+		local unhired = calculate()
+		assert.is_nil(unhired.mercenary)
+		assert.is_not_true(unhired.player.modDB.conditions.AffectedByZealotry)
 		assert.matches("Noble Blood", table.concat(build.mercenaryTab:GetErrors(), "\n"))
 		assert.are.equal("TrapsMinesShadowLightning", build.mercenaryTab.profile.buildId)
 
 		for classId, class in pairs(build.spec.tree.classes) do
 			if class.name == "Marauder" then build.spec:SelectClass(classId) break end
 		end
-		assert.is_table(calculate(83).mercenary)
+		assert.is_nil(calculate().mercenary)
 		assert.matches("Scion's Luminary", table.concat(build.mercenaryTab:GetErrors(), "\n"))
 		assert.are.equal("TrapsMinesShadowLightning", build.mercenaryTab.profile.buildId)
+	end)
+
+	it("equips Eber's Unification without granting Void Gaze", function()
+		configure("ChaosMinionWitch", "ChaosMinionWitchChaosHitNoble", "DarkPactMercenary")
+		allocate("Legendary Helmets")
+		local baselineMana = calculate().mercenary.modDB:Sum("BASE", nil, "Mana")
+		local ebers = new("Item"):Item([[Rarity: Unique
+Eber's Unification
+Hubris Circlet
+Trigger Level 10 Void Gaze when you use a Skill
+150% increased Energy Shield
++80 to maximum Mana
+50% increased Stun and Block Recovery
+Gain 8% of Elemental Damage as Extra Chaos Damage
+]])
+		assert.are.equal("VoidGaze", ebers.grantedSkills[1].skillId)
+		build.itemsTab:AddItem(ebers, true)
+		equipmentSlot("Helmet").selItemId = ebers.id
+		local env = calculate()
+		assert.is_nil(env.mercenaryCalculationErrors and env.mercenaryCalculationErrors[1], table.concat(env.mercenaryCalculationErrors or { }, "\n"))
+		assert.is_table(env.mercenary)
+		assert.are.equal(ebers, env.mercenary.itemList.Helmet)
+		assert.are.equal(baselineMana + 80, env.mercenary.modDB:Sum("BASE", nil, "Mana"))
+		assert.are.equal(8, env.mercenary.modDB:Sum("BASE", nil, "ElementalDamageGainAsChaos"))
+		assert.are.equal(50, env.mercenary.modDB:Sum("INC", nil, "StunRecovery"))
+		assert.are.equal(0, #env.mercenary.modDB:List(nil, "ExtraSkill"))
+		for _, skill in ipairs(env.mercenary.activeSkillList) do
+			assert.are_not.equal("VoidGaze", skill.activeEffect.grantedEffect.id)
+		end
 	end)
 
 	it("applies structural Mercenary supports through their standard support template", function()

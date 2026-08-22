@@ -504,14 +504,17 @@ describe("Mercenary equipment validation", function()
 		assert.is_true(validateEquippedItem(item({ type = "Quiver" }), "Weapon 2"))
 	end)
 
-	it("rejects shared physical item ids and all item-granted skills", function()
+	it("rejects shared physical item ids", function()
 		selectBuild("MeleeAOEMarauderFireSlam")
 		local shared = item({ type = "Helmet", requirements = { str = 1 } })
 		itemSet["Helmet"].selItemId = shared.id
 		assert.is_false(validateEquippedItem(shared, "Helmet"))
+	end)
 
+	it("accepts items that grant skills or triggers", function()
+		selectBuild("MeleeAOEMarauderFireSlam")
 		local grantedAura = item({ type = "Helmet", id = 9002, requirements = { str = 1 }, grantedSkills = { { skillId = "Anger" } } })
-		assert.is_false(validateEquippedItem(grantedAura, "Helmet"))
+		assert.is_true(validateEquippedItem(grantedAura, "Helmet"))
 	end)
 
 	it("detaches Mercenary equipment on reset without deleting the item set", function()

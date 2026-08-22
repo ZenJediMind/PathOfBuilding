@@ -720,9 +720,6 @@ function MercenaryTools.validateEquippedItem(item, slotName, context)
 			return false, item.type.." is not valid in this weapon slot for the selected build"
 		end
 	end
-	if #(item.grantedSkills or { }) > 0 then
-		return false, "item-granted skills and triggers cannot be used"
-	end
 	if context.itemSet ~= context.playerItemSet then
 		for playerSlotName, playerSlot in pairs(context.playerItemSet) do
 			if type(playerSlot) == "table" and playerSlot.selItemId == item.id then

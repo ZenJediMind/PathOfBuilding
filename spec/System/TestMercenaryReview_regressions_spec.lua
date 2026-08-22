@@ -1,6 +1,27 @@
 describe("Mercenary review regressions", function()
 	local MercenaryTools = require("Modules/MercenaryTools")
 
+	local function allocatePermanentHire()
+		for classId, class in pairs(build.spec.tree.classes) do
+			if class.name == "Scion" then build.spec:SelectClass(classId) break end
+		end
+		for ascendClassId, ascendClass in pairs(build.spec.curClass.classes) do
+			if ascendClass.name == "Luminary" then build.spec:SelectAscendClass(ascendClassId) break end
+		end
+		local node
+		for _, candidate in pairs(build.spec.nodes) do
+			if candidate.name == "Noble Blood" and (not node or candidate.id < node.id) then node = candidate end
+		end
+		node = assert(node or build.spec.tree.ascendancyMap["noble blood"], "Noble Blood")
+		node = build.spec.nodes[node.id] or node
+		if node.path then
+			build.spec:AllocNode(node)
+		else
+			node.alloc = true
+			build.spec.allocNodes[node.id] = node
+		end
+	end
+
 	it("sorts items equipped in Mercenary slots", function()
 		newBuild()
 		build.mercenaryTab.profile.buildId = "MeleeAOEMarauderFireSlam"
@@ -55,6 +76,7 @@ describe("Mercenary review regressions", function()
 
 	it("keeps Compare Mercenary controls stateful and context-specific", function()
 		newBuild()
+		allocatePermanentHire()
 		local profile = build.mercenaryTab.profile
 		profile.classId = "AurasMinionsTemplar"
 		profile.buildId = "AurasMinionsTemplarSmite"

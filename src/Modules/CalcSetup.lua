@@ -201,11 +201,23 @@ local function attachEnemySourceDB(env, actor, sourceModList)
 	if not actor then
 		return
 	end
-	local sourceDB = new("ModDB"):ModDB(env.enemyDB)
+	local sourceDB = new("ModDB"):ModDB()
+	sourceDB.actor = actor
 	sourceDB.conditions.Combat = env.mode_combat
 	sourceDB.conditions.Effective = env.mode_effective
 	if sourceModList then
 		sourceDB:AddList(sourceModList)
+	end
+	-- Player "by you" mods that reuse encounter names (Ignited, WitheredStack, ...)
+	-- still honour the shared config checkboxes. Mercenary overlays do not copy
+	-- those predicates, so they cannot claim the player's ailments as their own.
+	if actor == env.player then
+		for _, mod in ipairs(env.build.configTab.enemyModList or { }) do
+			local name = mod.name or ""
+			if name:match("^Condition:") or name:match("^Multiplier:") then
+				sourceDB:AddMod(mod)
+			end
+		end
 	end
 	actor.enemySourceDB = sourceDB
 end

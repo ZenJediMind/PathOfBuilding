@@ -68,6 +68,7 @@ end
 local modParserModule = LoadModule("Modules/ModParser")
 modLib.parseMod = modParserModule.parseMod
 modLib.parseModCache = modParserModule.parseModCache
+modLib.invalidateSourceOwnedParseCache = modParserModule.invalidateSourceOwnedParseCache
 
 function modLib.parseTags(line)
 	if not line or line == "-" then

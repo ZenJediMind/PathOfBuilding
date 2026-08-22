@@ -38,6 +38,9 @@ local SOURCE_OWNED_ENEMY_VARS = {
 	NearLinkedTarget = true,
 	ChampionIntimidate = true,
 	HigherLifePercentThanPlayer = true,
+	HitByFireDamage = true,
+	HitByColdDamage = true,
+	HitByLightningDamage = true,
 }
 
 -- Actor flags that only apply while that actor's hits have chilled the enemy.
@@ -85,7 +88,10 @@ function ConfigScope.isSourceOwnedEnemyTag(tag)
 	if not tag then
 		return false
 	end
-	if tag.type ~= "Condition" and tag.type ~= "Multiplier" and tag.type ~= "MultiplierThreshold" then
+	if tag.sourceOwned then
+		return tag.type == "Condition" or tag.type == "Multiplier" or tag.type == "MultiplierThreshold" or tag.type == "ActorCondition"
+	end
+	if tag.type ~= "Condition" and tag.type ~= "Multiplier" and tag.type ~= "MultiplierThreshold" and tag.type ~= "ActorCondition" then
 		return false
 	end
 	return anySourceOwned(tag.var or tag.varList)
@@ -95,69 +101,15 @@ function ConfigScope.impliesChilledByYourHits(modName)
 	return modName and CHILL_BY_HITS_EFFECT_FLAGS[modName] or false
 end
 
--- Last-resort classifier for unannotated apply() bodies that write to the enemy list.
--- Source-owned vs encounter must not be inferred from this probe; that is explicit/named data.
-local function applyWritesToEnemy(varData)
-	if not varData.apply then
-		return false
-	end
-	local wrote = false
-	local dummyControl = {
-		SetPlaceholder = function() end,
-		SetText = function() end,
-		SelByValue = function() end,
-	}
-	local dummyModList = {
-		NewMod = function() end,
-		AddMod = function() end,
-		AddList = function() end,
-	}
-	setmetatable(dummyModList, {
-		__index = function()
-			return function() end
-		end,
-	})
-	local dummyEnemy = {
-		NewMod = function()
-			wrote = true
-		end,
-		AddMod = function()
-			wrote = true
-		end,
-		AddList = function()
-			wrote = true
-		end,
-	}
-	setmetatable(dummyEnemy, {
-		__index = function()
-			return function() end
-		end,
-	})
-	local dummyBuild = {
-		configTab = {
-			input = { },
-			varControls = setmetatable({ }, {
-				__index = function()
-					return dummyControl
-				end,
-			}),
-		},
-	}
-	pcall(varData.apply, true, dummyModList, dummyEnemy, dummyBuild)
-	if wrote then
-		return true
-	end
-	pcall(varData.apply, 1, dummyModList, dummyEnemy, dummyBuild)
-	if wrote then
-		return true
-	end
-	pcall(varData.apply, "Fire", dummyModList, dummyEnemy, dummyBuild)
-	return wrote
-end
-
 local VALID_ENEMY_STATE = {
 	source = true,
 	encounter = true,
+}
+
+local VALID_SCOPE = {
+	shared = true,
+	actor = true,
+	player = true,
 }
 
 local function inferEnemyState(varData)
@@ -179,6 +131,9 @@ local function inferScope(varData, sectionScope)
 		return "actor"
 	end
 	if varData.scope then
+		if not VALID_SCOPE[varData.scope] then
+			error("ConfigScope: invalid scope '"..tostring(varData.scope).."' for "..tostring(varData.var))
+		end
 		return varData.scope
 	end
 	local var = varData.var or ""
@@ -196,9 +151,6 @@ local function inferScope(varData, sectionScope)
 		or var:match("^multiplierMap") or var == "multiplierSextant" or var == "PvpScaling"
 		or var:match("OnEnemy") or var == "ShockStacks" or var == "ScorchStacks"
 	then
-		return "shared"
-	end
-	if applyWritesToEnemy(varData) then
 		return "shared"
 	end
 	return sectionScope or "actor"

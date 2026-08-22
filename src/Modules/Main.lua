@@ -136,6 +136,7 @@ function main:Init()
 		for k, v in pairs(LoadModule("Data/ModCache")) do
 			modLib.parseModCache[k] = v
 		end
+		modLib.invalidateSourceOwnedParseCache()
 	end
 
 	--[[ this does not work properly anymore see PR #7675

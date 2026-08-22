@@ -709,7 +709,7 @@ local function bindSourceOwnedEnemyMod(mod, actor)
 	for _, tag in ipairs(mod) do
 		if not ConfigScope.isSourceOwnedEnemyTag(tag) then
 			t_insert(bound, tag)
-		elseif tag.type == "Condition" and tag.varList then
+		elseif not tag.sourceOwned and tag.type == "Condition" and tag.varList then
 			local kept = { }
 			local sourceMatched = false
 			local hasSourceVar = false
@@ -4343,14 +4343,17 @@ function calcs.perform(env, skipEHP)
 	doActorMisc(env, env.enemy)
 
 	local major, minor = env.spec.treeVersion:match("(%d+)_(%d+)")
-
+	local function actorHidesExposure(actor, cond)
+		return actor and actor.modDB:Flag(nil, "ElementalEquilibrium")
+			and actor.enemySourceDB and actor.enemySourceDB:GetCondition(cond)
+	end
 	-- Apply exposures
 	for _, element in ipairs({"Fire", "Cold", "Lightning"}) do
-		if tonumber(major) <= 3 and tonumber(minor) <= 15 -- Elemental Equilibrium pre-3.16 does not remove Exposure effects
-			or not modDB:Flag(nil, "ElementalEquilibrium") -- if Elemental Equilibrium isn't active we just process Exposure normally
-			or element == "Fire" and not enemyDB:Flag(nil, "Condition:HitByFireDamage")
-			or element == "Cold" and not enemyDB:Flag(nil, "Condition:HitByColdDamage")
-			or element == "Lightning" and not enemyDB:Flag(nil, "Condition:HitByLightningDamage") then
+		-- Elemental Equilibrium pre-3.16 does not remove Exposure effects.
+		-- Each actor with EE only removes exposure for elements that actor hit.
+		if tonumber(major) <= 3 and tonumber(minor) <= 15
+			or not (actorHidesExposure(env.player, "HitBy"..element.."Damage")
+				or actorHidesExposure(env.mercenary, "HitBy"..element.."Damage")) then
 			local min = math.huge
 			local source = ""
 			for _, mod in ipairs(enemyDB:Tabulate("BASE", nil, element.."Exposure")) do

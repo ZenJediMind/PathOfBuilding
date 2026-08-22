@@ -510,6 +510,30 @@ describe("Player and mercenary configuration", function()
 		assert.is_true(ConfigScope.impliesChilledByYourHits("ChillEffectIncDamageTaken"))
 		assert.is_true(ConfigScope.impliesChilledByYourHits("ChillEffectLessDamageDealt"))
 		assert.is_false(ConfigScope.impliesChilledByYourHits("ChillingAreaIncColdDamageTaken"))
+		for _, var in ipairs({
+			"multiplierNearbyRareOrUniqueEnemies",
+			"multiplierRuptureStacks",
+			"multiplierWitheredStackCount",
+			"multiplierCorrosionStackCount",
+			"multiplierEnsnaredStackCount",
+			"overrideBuffBlinded",
+			"conditionScorchedEffect",
+			"HoarfrostStacks",
+			"multiplierBarnacleStacks",
+			"conditionBrittleEffect",
+			"conditionShockEffect",
+			"conditionSapEffect",
+			"multiplierEnemyHallowingFlame",
+			"maniaDebuffsCount",
+		}) do
+			assert.are.equal("shared", ConfigScope.forVar(var), var)
+		end
+		assert.are.equal("actor", ConfigScope.forVar("enemyConditionHitByFireDamage"))
+		assert.are.equal("source", ConfigScope.enemyStateForVar("enemyConditionHitByFireDamage"))
+		assert.is_true(ConfigScope.isSourceOwnedEnemyTag({ type = "Condition", var = "Ignited", sourceOwned = true }))
+		assert.is_true(ConfigScope.isSourceOwnedEnemyTag({ type = "Condition", var = "HitByFireDamage" }))
+		assert.is_false(ConfigScope.isSourceOwnedEnemyTag({ type = "Condition", var = "Ignited" }))
+		assert.is_nil(ConfigScope.applyWritesToEnemy)
 	end)
 
 	it("classifies minion-state config as actor-scoped, not player-only", function()
@@ -680,5 +704,98 @@ describe("Player and mercenary configuration", function()
 		configSet.input.multiplierFrozenByYouSeconds = 10
 		local env = calculate()
 		assert.are.equal(50, enemyDamageTaken(env) - baseline)
+	end)
+
+	local ignitedByYouMod = "Enemies Ignited by you take 20% increased Damage"
+	local againstIgnitedMod = "20% increased Damage against Ignited Enemies"
+
+	local function innerEnemyMod(line)
+		local mods = assert(modLib.parseMod(line))
+		for _, mod in ipairs(mods) do
+			if mod.name == "EnemyModifier" and mod.value and mod.value.mod then
+				return mod.value.mod
+			end
+		end
+		return mods[1]
+	end
+
+	it("marks enemies-ignited-by-you as source-owned without redefining Ignited", function()
+		local inner = innerEnemyMod(ignitedByYouMod)
+		assert.are.equal("Ignited", inner[1].var)
+		assert.is_true(inner[1].sourceOwned)
+		assert.are.equal("DamageTaken", inner.name)
+	end)
+
+	it("marks other by-you ailment tags as source-owned", function()
+		for _, line in ipairs({
+			"Enemies Shocked by you take 20% increased Damage",
+			"Enemies Poisoned by you take 20% increased Damage",
+			"Enemies Frozen by you take 20% increased Damage",
+			"Enemies Shocked or Frozen by you take 20% increased Damage",
+		}) do
+			local inner = innerEnemyMod(line)
+			assert.is_true(inner[1].sourceOwned, line)
+		end
+	end)
+
+	it("does not mark against-ignited damage as source-owned", function()
+		local mods = assert(modLib.parseMod(againstIgnitedMod))
+		local tag = mods[1][1]
+		assert.are.equal("ActorCondition", tag.type)
+		assert.are.equal("Ignited", tag.var)
+		assert.is_not_true(tag.sourceOwned)
+	end)
+
+	it("does not let the player's ignited config apply the Mercenary's ignited-by-you damage taken", function()
+		local configSet = build.configTab.configSets[build.configTab.activeConfigSetId]
+		build.configTab:EnsureActorConfig(configSet)
+		configSet.input.conditionEnemyIgnited = true
+		local baseline = enemyDamageTaken(calculate())
+		configSet.actors.mercenary.customModsList[1].text = ignitedByYouMod
+		local env = calculate()
+		assert.is_not_nil(env.mercenary, table.concat(env.mercenaryCalculationErrors or { }, "\n"))
+		assert.are.equal(baseline, enemyDamageTaken(env))
+	end)
+
+	it("does not let the player's shocked config apply the Mercenary's shocked-by-you damage taken", function()
+		local configSet = build.configTab.configSets[build.configTab.activeConfigSetId]
+		build.configTab:EnsureActorConfig(configSet)
+		configSet.input.conditionEnemyShocked = true
+		local baseline = enemyDamageTaken(calculate())
+		configSet.actors.mercenary.customModsList[1].text = "Enemies Shocked by you take 20% increased Damage"
+		local env = calculate()
+		assert.is_not_nil(env.mercenary, table.concat(env.mercenaryCalculationErrors or { }, "\n"))
+		assert.are.equal(baseline, enemyDamageTaken(env))
+	end)
+
+	it("applies the player's ignited-by-you damage taken from the shared ignited config", function()
+		local configSet = build.configTab.configSets[build.configTab.activeConfigSetId]
+		build.configTab:EnsureActorConfig(configSet)
+		local baseline = enemyDamageTaken(calculate())
+		configSet.customModsList[1].text = ignitedByYouMod
+		configSet.input.conditionEnemyIgnited = true
+		local env = calculate()
+		assert.are.equal(20, enemyDamageTaken(env) - baseline)
+	end)
+
+	it("does not let the player's EE hit-element config set the Mercenary overlay", function()
+		local configSet = build.configTab.configSets[build.configTab.activeConfigSetId]
+		build.configTab:EnsureActorConfig(configSet)
+		configSet.input.enemyConditionHitByFireDamage = true
+		local env = calculate()
+		assert.is_not_nil(env.mercenary, table.concat(env.mercenaryCalculationErrors or { }, "\n"))
+		assert.is_true(env.player.enemySourceDB:GetCondition("HitByFireDamage"))
+		assert.is_not_true(env.mercenary.enemySourceDB:GetCondition("HitByFireDamage"))
+		assert.is_not_true(env.enemyDB:GetCondition("HitByFireDamage") or env.enemyDB:Flag(nil, "Condition:HitByFireDamage"))
+	end)
+
+	it("applies the Mercenary's EE hit-element config only to the Mercenary overlay", function()
+		local configSet = build.configTab.configSets[build.configTab.activeConfigSetId]
+		build.configTab:EnsureActorConfig(configSet)
+		configSet.actors.mercenary.input.enemyConditionHitByFireDamage = true
+		local env = calculate()
+		assert.is_not_nil(env.mercenary, table.concat(env.mercenaryCalculationErrors or { }, "\n"))
+		assert.is_true(env.mercenary.enemySourceDB:GetCondition("HitByFireDamage"))
+		assert.is_not_true(env.player.enemySourceDB:GetCondition("HitByFireDamage"))
 	end)
 end)

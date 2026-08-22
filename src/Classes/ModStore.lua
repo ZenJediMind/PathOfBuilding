@@ -15,6 +15,8 @@ local m_modf = math.modf
 local band = bit.band
 local bor = bit.bor
 
+local ConfigScope = require("Modules/ConfigScope")
+
 local mod_createMod = modLib.createMod
 
 -- Magic tables for caching multiplier/condition modifier names
@@ -53,9 +55,9 @@ local function getActor(self, actorType)
 	end
 end
 
-local function actorModDB(self, actorType)
-	if actorType == "enemy" and self.actor and self.actor.enemySourceDB then
-		return self.actor.enemySourceDB
+local function actorModDB(self, actorType, tag)
+	if actorType == "enemy" and ConfigScope.isSourceOwnedEnemyTag(tag) then
+		return self.actor and self.actor.enemySourceDB
 	end
 	local actor = getActor(self, actorType)
 	return actor and actor.modDB
@@ -382,13 +384,13 @@ function ModStoreClass:EvalMod(mod, cfg, globalLimits)
 			-- This explicit target is necessary because even though the GetMultiplier method does call self.parent.GetMultiplier, it does so with noMod = true,
 			-- disabling the summation (3rd part): (not noMod and self:Sum("BASE", cfg, multiplierName[var]) or 0)
 			if tag.limitActor then
-				limitTarget = actorModDB(self, tag.limitActor)
+				limitTarget = actorModDB(self, tag.limitActor, tag)
 				if not limitTarget then
 					return
 				end
 			end
 			if tag.actor then
-				target = actorModDB(self, tag.actor)
+				target = actorModDB(self, tag.actor, tag)
 				if not target then
 					return
 				end
@@ -455,13 +457,13 @@ function ModStoreClass:EvalMod(mod, cfg, globalLimits)
 			local target = self
 			local thresholdTarget = self
 			if tag.thresholdActor then
-				thresholdTarget = actorModDB(self, tag.thresholdActor)
+				thresholdTarget = actorModDB(self, tag.thresholdActor, tag)
 				if not thresholdTarget then
 					return
 				end
 			end
 			if tag.actor then
-				target = actorModDB(self, tag.actor)
+				target = actorModDB(self, tag.actor, tag)
 				if not target then
 					return
 				end
@@ -483,7 +485,7 @@ function ModStoreClass:EvalMod(mod, cfg, globalLimits)
 			local target = self
 			-- This functions similar to the above tagTypes in regard to which actor to use, but for PerStat
 			-- if the actor is 'parent', we don't want to return if we're already using 'parent', just keep using 'self'
-			local perStatDB = actorModDB(self, tag.actor)
+			local perStatDB = actorModDB(self, tag.actor, tag)
 			if perStatDB then
 				target = perStatDB
 			end
@@ -535,7 +537,7 @@ function ModStoreClass:EvalMod(mod, cfg, globalLimits)
 			local target = self
 			-- This functions similar to the above tagTypes in regard to which actor to use, but for PercentStat
 			-- if the actor is 'parent', we don't want to return if we're already using 'parent', just keep using 'self'
-			local percentStatDB = actorModDB(self, tag.actor)
+			local percentStatDB = actorModDB(self, tag.actor, tag)
 			if percentStatDB then
 				target = percentStatDB
 			end
@@ -668,7 +670,7 @@ function ModStoreClass:EvalMod(mod, cfg, globalLimits)
 			local match = false
 			local target = self
 			if tag.actor then
-				target = actorModDB(self, tag.actor)
+				target = actorModDB(self, tag.actor, tag)
 			end
 			if target and (tag.var or tag.varList) then
 				if tag.varList then

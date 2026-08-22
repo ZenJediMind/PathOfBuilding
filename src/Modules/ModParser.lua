@@ -7035,21 +7035,6 @@ local count = 0
 --local foo = io.open("../unsupported.txt", "w")
 --foo:close()
 
--- ModCache snapshots omit sourceOwned. Drop those lines so live parsing
--- attaches the flag instead of serving stale "by you" tags.
-local function lineImpliesSourceOwned(line)
-	local lower = line:lower()
-	return lower:find("by you", 1, true) or lower:find("by your", 1, true) or lower:find("you curse", 1, true)
-end
-
-local function invalidateSourceOwnedParseCache()
-	for line in pairs(cache) do
-		if lineImpliesSourceOwned(line) then
-			cache[line] = nil
-		end
-	end
-end
-
 return {
 	parseMod = function(line, isComb)
 		if not cache[line] then
@@ -7072,5 +7057,4 @@ return {
 		return unpack(copyTable(cache[line]))
 	end,
 	parseModCache = cache,
-	invalidateSourceOwnedParseCache = invalidateSourceOwnedParseCache,
 }

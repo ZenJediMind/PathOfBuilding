@@ -31,12 +31,14 @@ function require(name)
 	return l_require(name)
 end
 
+-- CI sets LUA_PATH to runtime/lua only. Local modules use require(), so keep
+-- the source directory on package.path for headless regeneration and tests.
+package.path = "./?.lua;./?/init.lua;" .. package.path
+
 
 dofile("Launch.lua")
 
--- Prevents loading of ModCache
--- Allows running mod parsing related tests without pushing ModCache
--- The CI env var will be true when run from github workflows but should be false for other tools using the headless wrapper 
+-- The CI env var will be true when run from github workflows but should be false for other tools using the headless wrapper
 __mainObject__.continuousIntegrationMode = os.getenv("CI")
 
 runCallback("OnInit")

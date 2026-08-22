@@ -788,6 +788,15 @@ describe("Player and mercenary configuration", function()
 		assert.is_not_true(tag.sourceOwned)
 	end)
 
+	it("keeps sourceOwned on cached by-you mods", function()
+		local cached = modLib.parseModCache["Enemies Frozen by you take 20% increased Damage"]
+		assert.is_not_nil(cached)
+		assert.is_not_nil(cached[1])
+		local inner = cached[1][1].value.mod
+		assert.is_true(inner[1].sourceOwned)
+		assert.is_nil(modLib.invalidateSourceOwnedParseCache)
+	end)
+
 	it("does not let the player's ignited config apply the Mercenary's ignited-by-you damage taken", function()
 		local configSet = build.configTab.configSets[build.configTab.activeConfigSetId]
 		build.configTab:EnsureActorConfig(configSet)

@@ -1483,7 +1483,7 @@ Huge sets the radius to 11.
 	{ var = "buffHerEmbrace", type = "check", label = "Are you in Her Embrace?", ifCond = "HerEmbrace", tooltip = "This option is specific to Oni-Goroshi.", apply = function(val, modList, enemyModList)
 		modList:NewMod("HerEmbrace", "FLAG", true, "Config", { type = "Condition", var = "Combat" }, { type = "Condition", var = "CanGainHerEmbrace" })
 	end },
-	{ var = "conditionChampionIntimidate", type = "check", label = "Is Champion's Intimidate active?", ifEnemyCond = "ChampionIntimidate", defaultState = true, apply = function(val, modList, enemyModList)
+	{ var = "conditionChampionIntimidate", type = "check", label = "Is Champion's Intimidate active?", ifEnemyCond = "ChampionIntimidate", enemyState = "source", defaultState = true, apply = function(val, modList, enemyModList)
 		enemyModList:NewMod("Condition:ChampionIntimidate", "FLAG", true, "Config", { type = "Condition", var = "Combat" })
 	end },
 	{ var = "conditionUsedSkillRecently", type = "check", label = "Have you used a Skill Recently?", ifCond = "UsedSkillRecently", apply = function(val, modList, enemyModList)
@@ -1900,7 +1900,7 @@ Huge sets the radius to 11.
 		enemyModList:NewMod("Condition:Chilled", "FLAG", true, "Config", { type = "Condition", var = "Effective" })
 		enemyModList:NewMod("Condition:ChilledConfig", "FLAG", true, "Config", { type = "Condition", var = "Effective" })
 	end },
-	{ var = "multiplierChilledByYouSeconds", type = "count", label = "Seconds of chill on enemy?", ifEnemyCond = "ChilledByYou", apply = function(val, modList, enemyModList)
+	{ var = "multiplierChilledByYouSeconds", type = "count", label = "Seconds of chill on enemy?", ifEnemyCond = "ChilledByYou", enemyState = "source", apply = function(val, modList, enemyModList)
 		enemyModList:NewMod("Multiplier:ChilledByYouSeconds", "BASE", val, "Config", { type = "Condition", var = "Combat" })
 		enemyModList:NewMod("Condition:ChilledByYou", "FLAG", true, "Config", { type = "Condition", var = "Effective" })
 	end },
@@ -1908,7 +1908,7 @@ Huge sets the radius to 11.
 		enemyModList:NewMod("ChillVal", "BASE", val, "Chill", { type = "Condition", var = "ChilledConfig" })
 		enemyModList:NewMod("DesiredChillVal", "BASE", val, "Chill", { type = "Condition", var = "ChilledConfig", neg = true })
 	end },
-	{ var = "conditionEnemyChilledByYourHits", type = "check", ifEnemyCond = "ChilledByYourHits", label = "Is the enemy ^x3F6DB3Chilled ^7by your Hits?", apply = function(val, modList, enemyModList)
+	{ var = "conditionEnemyChilledByYourHits", type = "check", ifEnemyCond = "ChilledByYourHits", enemyState = "source", label = "Is the enemy ^x3F6DB3Chilled ^7by your Hits?", apply = function(val, modList, enemyModList)
 		enemyModList:NewMod("Condition:Chilled", "FLAG", true, "Config", { type = "Condition", var = "Effective" })
 		enemyModList:NewMod("Condition:ChilledByYourHits", "FLAG", true, "Config", { type = "Condition", var = "Effective" })
 	end },
@@ -1924,7 +1924,7 @@ Huge sets the radius to 11.
 	{ var = "conditionEnemyFrozen", type = "check", label = "Is the enemy ^x3F6DB3Frozen?", ifEnemyCond = "Frozen", apply = function(val, modList, enemyModList)
 		enemyModList:NewMod("Condition:Frozen", "FLAG", true, "Config", { type = "Condition", var = "Effective" })
 	end },
-	{ var = "multiplierFrozenByYouSeconds", type = "count", label = "Seconds of freeze on enemy?", ifEnemyCond = "FrozenByYou", apply = function(val, modList, enemyModList)
+	{ var = "multiplierFrozenByYouSeconds", type = "count", label = "Seconds of freeze on enemy?", ifEnemyCond = "FrozenByYou", enemyState = "source", apply = function(val, modList, enemyModList)
 		enemyModList:NewMod("Multiplier:FrozenByYouSeconds", "BASE", val, "Config", { type = "Condition", var = "Combat" })
 		enemyModList:NewMod("Condition:FrozenByYou", "FLAG", true, "Config", { type = "Condition", var = "Effective" })
 	end },
@@ -1997,7 +1997,7 @@ Huge sets the radius to 11.
 	{ var = "conditionHallowingFlameMagnitude", type = "countAllowZero", label = "Inc. magnitude of Hallowing Flame stacks", ifOption = "conditionEnemyHallowingFlame", tooltip = "The magnitude of Hallowing Flame stacks applied to the enemy", apply = function(val, modList, enemyModList)
 		modList:NewMod("HallowingFlameMagnitude", "OVERRIDE", val, "Config")
 	end },
-	{ var = "conditionNearLinkedTarget", type = "check", label = "Is the enemy near you Linked target?", ifEnemyCond = "NearLinkedTarget", apply = function(val, modList, enemyModList)
+	{ var = "conditionNearLinkedTarget", type = "check", label = "Is the enemy near you Linked target?", ifEnemyCond = "NearLinkedTarget", enemyState = "source", apply = function(val, modList, enemyModList)
 		enemyModList:NewMod("Condition:NearLinkedTarget", "FLAG", true, "Config", { type = "Condition", var = "Effective" })
 	end },
 	{ var = "conditionEnemyUnnerved", type = "check", label = "Is the enemy Unnerved?", tooltip = "Unnerved enemies take 10% increased Spell Damage.", apply = function(val, modList, enemyModList)
@@ -2042,7 +2042,7 @@ Huge sets the radius to 11.
 	{ var = "conditionEnemyInFrostGlobe", type = "check", label = "Is the enemy in the Frost Shield area?", ifEnemyCond = "EnemyInFrostGlobe", apply = function(val, modList, enemyModList)
 		enemyModList:NewMod("Condition:EnemyInFrostGlobe", "FLAG", true, "Config", { type = "Condition", var = "Effective" })
 	end },
-	{ var = "conditionEnemyLifeHigherThanPlayer", type = "check", label = "Is the enemy ^xE05030Life^7% higher than yours?", ifEnemyCond = "HigherLifePercentThanPlayer", apply = function(val, modList, enemyModList)
+	{ var = "conditionEnemyLifeHigherThanPlayer", type = "check", label = "Is the enemy ^xE05030Life^7% higher than yours?", ifEnemyCond = "HigherLifePercentThanPlayer", enemyState = "source", apply = function(val, modList, enemyModList)
 		enemyModList:NewMod("Condition:HigherLifePercentThanPlayer", "FLAG", true, "Config", { type = "Condition", var = "Effective" })
 	end },
 	{ var = "enemyConditionHitByFireDamage", type = "check", label = "Enemy was Hit by ^xB97123Fire ^7Damage?", ifFlag = "ElementalEquilibrium", apply = function(val, modList, enemyModList)
@@ -2058,7 +2058,7 @@ Huge sets the radius to 11.
 		modList:NewMod("Condition:InRFOrScorchingRay", "FLAG", true, "Config")
 	end },
 	{ var = "EEIgnoreHitDamage", type = "check", label = "Ignore Skill Hit Damage?", ifFlag = "ElementalEquilibrium", tooltip = "This option prevents EE from being reset by the hit damage of your main skill." },
-	{ var = "conditionBetweenYouAndLinkedTarget", type = "check", label = "Is the enemy in your Link beams?", ifEnemyCond = "BetweenYouAndLinkedTarget", tooltip = "This option sets whether an enemy is between you and your linked target.", apply = function(val, modList, enemyModList)
+	{ var = "conditionBetweenYouAndLinkedTarget", type = "check", label = "Is the enemy in your Link beams?", ifEnemyCond = "BetweenYouAndLinkedTarget", enemyState = "source", tooltip = "This option sets whether an enemy is between you and your linked target.", apply = function(val, modList, enemyModList)
 		enemyModList:NewMod("Condition:BetweenYouAndLinkedTarget", "FLAG", true, "Config", { type = "Condition", var = "Effective" })
 	end },
 	{ var = "conditionEnemyFireResZero", type = "check", label = "Enemy hit you with ^xB97123Fire Damage^7?", ifFlag = "Condition:HaveTrickstersSmile", tooltip = "This option sets whether or not the enemy has hit you with ^xB97123Fire Damage^7 in the last 4 seconds.", apply = function(val, modList, enemyModList)

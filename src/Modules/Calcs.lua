@@ -11,6 +11,7 @@ local m_min = math.min
 local m_max = math.max
 local m_ceil = math.ceil
 local MercenaryTools = require("Modules/MercenaryTools")
+local ConfigScope = require("Modules/ConfigScope")
 
 ---@class Calcs
 local calcs = require("Modules.CalcBase")
@@ -655,8 +656,8 @@ function calcs.buildOutput(build, mode)
 		env.tagTypesUsed = { }
 		env.modsUsed = { }
 		env.actorUsage = {
-			player = { conditions = { }, multipliers = { }, mods = { }, perStats = { }, minionConditions = { } },
-			mercenary = { conditions = { }, multipliers = { }, mods = { }, perStats = { }, minionConditions = { } },
+			player = { conditions = { }, multipliers = { }, mods = { }, perStats = { }, minionConditions = { }, enemyConditions = { }, enemyMultipliers = { }, enemyPerStats = { } },
+			mercenary = { conditions = { }, multipliers = { }, mods = { }, perStats = { }, minionConditions = { }, enemyConditions = { }, enemyMultipliers = { }, enemyPerStats = { } },
 		}
 		local function actorUsageFor(actor)
 			if actor == env.mercenary then
@@ -718,6 +719,12 @@ function calcs.buildOutput(build, mode)
 					end
 				end
 			end
+			if ConfigScope.impliesChilledByYourHits(mod.name) then
+				addTo(env.enemyConditionsUsed, "ChilledByYourHits", mod)
+				if usage then
+					addTo(usage.enemyConditions, "ChilledByYourHits", mod)
+				end
+			end
 			
 			for _, tag in ipairs(mod) do
 				addTo(env.tagTypesUsed, tag.type, mod)
@@ -739,6 +746,9 @@ function calcs.buildOutput(build, mode)
 				elseif tag.type == "ActorCondition" and tag.var then
 					if tag.actor == "enemy" then
 						addTo(env.enemyConditionsUsed, tag.var, mod)
+						if usage then
+							addTo(usage.enemyConditions, tag.var, mod)
+						end
 					else
 						addTo(env.conditionsUsed, tag.var, mod)
 						if usage then
@@ -755,6 +765,9 @@ function calcs.buildOutput(build, mode)
 						end
 					elseif tag.actor == "enemy" then
 						addVarTag(env.enemyMultipliersUsed, tag, mod)
+						if usage then
+							addVarTag(usage.enemyMultipliers, tag, mod)
+						end
 					end
 				elseif tag.type == "PerStat" or tag.type == "StatThreshold" then
 					if not tag.actor then
@@ -766,6 +779,28 @@ function calcs.buildOutput(build, mode)
 						end
 					elseif tag.actor == "enemy" then
 						addStatTag(env.enemyPerStatsUsed, tag, mod)
+						if usage then
+							addStatTag(usage.enemyPerStats, tag, mod)
+						end
+					end
+				end
+			end
+			if mod.name == "EnemyModifier" and mod.value and mod.value.mod then
+				for _, innerTag in ipairs(mod.value.mod) do
+					if innerTag.type == "IgnoreCond" then
+						break
+					elseif innerTag.type == "Condition" then
+						addVarTag(env.enemyConditionsUsed, innerTag, mod.value.mod)
+						if usage then
+							addVarTag(usage.enemyConditions, innerTag, mod.value.mod)
+						end
+					elseif innerTag.type == "Multiplier" or innerTag.type == "MultiplierThreshold" then
+						if not innerTag.actor then
+							addVarTag(env.enemyMultipliersUsed, innerTag, mod.value.mod)
+							if usage then
+								addVarTag(usage.enemyMultipliers, innerTag, mod.value.mod)
+							end
+						end
 					end
 				end
 			end

@@ -197,6 +197,19 @@ local function addMercenaryPassiveStats(mercenary, mercenaryBuild, errors)
 	end
 end
 
+local function attachEnemySourceDB(env, actor, sourceModList)
+	if not actor then
+		return
+	end
+	local sourceDB = new("ModDB"):ModDB(env.enemyDB)
+	sourceDB.conditions.Combat = env.mode_combat
+	sourceDB.conditions.Effective = env.mode_effective
+	if sourceModList then
+		sourceDB:AddList(sourceModList)
+	end
+	actor.enemySourceDB = sourceDB
+end
+
 function calcs.initMercenary(env)
 	local tab = env.build.mercenaryTab
 	env.mercenary = nil
@@ -268,6 +281,7 @@ function calcs.initMercenary(env)
 	if env.build.configTab.mercenaryModList then
 		mercenary.modDB:AddList(env.build.configTab.mercenaryModList)
 	end
+	attachEnemySourceDB(env, mercenary, env.build.configTab.mercenaryEnemyModList)
 	local baseStats = env.data.mercenaries.baseStats
 	mercenary.modDB:NewMod("Life", "BASE", baseStats.lifePerLevel * mercenary.level, "Base")
 	mercenary.modDB:NewMod("Mana", "BASE", env.data.monsterConstants.base_maximum_mana + baseStats.manaPerLevel * mercenary.level, "Base")
@@ -1127,6 +1141,8 @@ function calcs.initEnv(build, mode, override, specEnv)
 			env.minion.modDB.parent = cachedMinionDB
 		end
 	end
+
+	attachEnemySourceDB(env, env.player, env.build.configTab.playerEnemyModList)
 
 	if override.conditions then
 		for _, flag in ipairs(override.conditions) do

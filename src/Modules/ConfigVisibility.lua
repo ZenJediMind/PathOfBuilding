@@ -40,6 +40,9 @@ local ACTOR_USED_FIELD = {
 	modsUsed = "mods",
 	perStatsUsed = "perStats",
 	minionConditionsUsed = "minionConditions",
+	enemyConditionsUsed = "enemyConditions",
+	enemyMultipliersUsed = "enemyMultipliers",
+	enemyPerStatsUsed = "enemyPerStats",
 }
 
 local function usedForVar(mainEnv, envKey, varData, viewActor)

@@ -2,6 +2,7 @@
 --
 -- Module: Config Scope
 -- Classifies Configuration options as shared (encounter), actor, or player-only.
+-- Enemy writes are further classified as encounter state or source-owned ("by you") state.
 --
 local ConfigScope = { }
 
@@ -24,11 +25,78 @@ local SHARED_SECTIONS = {
 	["Map Modifiers and Player Debuffs"] = true,
 }
 
+-- Enemy conditions/multipliers whose wording establishes source ownership.
+-- Each actor evaluates these against its own overlay; resulting encounter effects
+-- (Shock, Exposure, increased damage taken, ...) are published to shared enemy state.
+local SOURCE_OWNED_ENEMY_VARS = {
+	ChilledByYou = true,
+	ChilledByYourHits = true,
+	FrozenByYou = true,
+	ChilledByYouSeconds = true,
+	FrozenByYouSeconds = true,
+	BetweenYouAndLinkedTarget = true,
+	NearLinkedTarget = true,
+	ChampionIntimidate = true,
+	HigherLifePercentThanPlayer = true,
+}
+
+-- Actor flags that only apply while that actor's hits have chilled the enemy.
+-- These mods do not tag ChilledByYourHits themselves, so usage must be implied
+-- for Config visibility and overlay gating.
+local CHILL_BY_HITS_EFFECT_FLAGS = {
+	ChillEffectIncDamageTaken = true,
+	ChillEffectIncColdDamageTaken = true,
+	ChillEffectLessDamageDealt = true,
+}
+
 local scopeByVar = { }
+local enemyStateByVar = { }
 local indexed = false
 
--- Classify apply() functions that mutate the enemy list as shared encounter state.
--- This is based on the apply body, not variable naming.
+local function isSourceOwnedName(name)
+	return name and SOURCE_OWNED_ENEMY_VARS[name] or false
+end
+
+local function anySourceOwned(value)
+	if type(value) == "table" then
+		for _, name in ipairs(value) do
+			if isSourceOwnedName(name) then
+				return true
+			end
+		end
+		return false
+	end
+	return isSourceOwnedName(value)
+end
+
+function ConfigScope.isSourceOwnedEnemyVar(var)
+	return isSourceOwnedName(var)
+end
+
+function ConfigScope.isSourceOwnedEnemyMod(mod)
+	if not mod or not mod.name then
+		return false
+	end
+	local var = mod.name:match("^Condition:(.+)$") or mod.name:match("^Multiplier:(.+)$")
+	return var and isSourceOwnedName(var)
+end
+
+function ConfigScope.isSourceOwnedEnemyTag(tag)
+	if not tag then
+		return false
+	end
+	if tag.type ~= "Condition" and tag.type ~= "Multiplier" and tag.type ~= "MultiplierThreshold" then
+		return false
+	end
+	return anySourceOwned(tag.var or tag.varList)
+end
+
+function ConfigScope.impliesChilledByYourHits(modName)
+	return modName and CHILL_BY_HITS_EFFECT_FLAGS[modName] or false
+end
+
+-- Last-resort classifier for unannotated apply() bodies that write to the enemy list.
+-- Source-owned vs encounter must not be inferred from this probe; that is explicit/named data.
 local function applyWritesToEnemy(varData)
 	if not varData.apply then
 		return false
@@ -87,7 +155,29 @@ local function applyWritesToEnemy(varData)
 	return wrote
 end
 
+local VALID_ENEMY_STATE = {
+	source = true,
+	encounter = true,
+}
+
+local function inferEnemyState(varData)
+	if varData.enemyState then
+		if not VALID_ENEMY_STATE[varData.enemyState] then
+			error("ConfigScope: invalid enemyState '"..tostring(varData.enemyState).."' for "..tostring(varData.var))
+		end
+		return varData.enemyState
+	end
+	if anySourceOwned(varData.ifEnemyCond) or anySourceOwned(varData.ifEnemyMult) then
+		return "source"
+	end
+	return "encounter"
+end
+
 local function inferScope(varData, sectionScope)
+	-- Source-owned enemy predicates are per-actor even if a section default is shared.
+	if inferEnemyState(varData) == "source" then
+		return "actor"
+	end
 	if varData.scope then
 		return varData.scope
 	end
@@ -116,6 +206,7 @@ end
 
 function ConfigScope.index(varList)
 	scopeByVar = { }
+	enemyStateByVar = { }
 	local sectionScope = "actor"
 	for _, varData in ipairs(varList or { }) do
 		if varData.section then
@@ -128,9 +219,12 @@ function ConfigScope.index(varList)
 			end
 		end
 		if varData.var then
+			local enemyState = inferEnemyState(varData)
 			local scope = inferScope(varData, sectionScope)
 			scopeByVar[varData.var] = scope
+			enemyStateByVar[varData.var] = enemyState
 			varData.resolvedScope = scope
+			varData.resolvedEnemyState = enemyState
 		end
 	end
 	indexed = true
@@ -151,6 +245,23 @@ function ConfigScope.forVarData(varData)
 		return ConfigScope.forVar(varData.var)
 	end
 	return "actor"
+end
+
+function ConfigScope.enemyStateForVar(var)
+	if not var then
+		return "encounter"
+	end
+	return enemyStateByVar[var] or "encounter"
+end
+
+function ConfigScope.enemyStateForVarData(varData)
+	if varData and varData.resolvedEnemyState then
+		return varData.resolvedEnemyState
+	end
+	if varData and varData.var then
+		return ConfigScope.enemyStateForVar(varData.var)
+	end
+	return "encounter"
 end
 
 function ConfigScope.isIndexed()

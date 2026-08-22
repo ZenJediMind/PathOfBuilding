@@ -735,6 +735,7 @@ function calcs.buildActiveSkillModList(env, activeSkill)
 			else
 				minion.parent = activeSkill.actor
 				minion.enemy = env.enemy
+				minion.enemySourceDB = activeSkill.actor.enemySourceDB
 			end
 			minion.player = env.player
 			minion.level = activeSkill.skillData.minionLevelIsActorLevel and activeSkill.actor.level or

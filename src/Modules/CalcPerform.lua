@@ -6,6 +6,7 @@
 ---@class Calcs
 local calcs = require("Modules.CalcBase")
 local MercenaryTools = require("Modules/MercenaryTools")
+local ConfigScope = require("Modules/ConfigScope")
 
 local pairs = pairs
 local ipairs = ipairs
@@ -669,6 +670,98 @@ local function determineCursePriority(curseName, activeSkill)
 	return basePriority + socketPriority + slotPriority + sourcePriority
 end
 
+local function evalSourceOwnedTag(sourceDB, mod, value, tag)
+	tag = copyTable(tag, true)
+	tag.actor = nil
+	return sourceDB:EvalMod({
+		name = mod.name,
+		type = mod.type,
+		value = value,
+		flags = mod.flags or 0,
+		keywordFlags = mod.keywordFlags or 0,
+		tag,
+	})
+end
+
+local function bindSourceOwnedEnemyMod(mod, actor)
+	if not mod then
+		return nil
+	end
+	local hasSource = false
+	for _, tag in ipairs(mod) do
+		if ConfigScope.isSourceOwnedEnemyTag(tag) then
+			hasSource = true
+			break
+		end
+	end
+	if not hasSource then
+		return mod
+	end
+	local sourceDB = actor and actor.enemySourceDB
+	if not sourceDB then
+		return nil
+	end
+	local bound = copyTable(mod, true)
+	for i = #bound, 1, -1 do
+		bound[i] = nil
+	end
+	local value = mod.value
+	for _, tag in ipairs(mod) do
+		if not ConfigScope.isSourceOwnedEnemyTag(tag) then
+			t_insert(bound, tag)
+		elseif tag.type == "Condition" and tag.varList then
+			local kept = { }
+			local sourceMatched = false
+			local hasSourceVar = false
+			for _, var in ipairs(tag.varList) do
+				if ConfigScope.isSourceOwnedEnemyVar(var) then
+					hasSourceVar = true
+					if sourceDB:GetCondition(var) then
+						sourceMatched = true
+					end
+				else
+					t_insert(kept, var)
+				end
+			end
+			if hasSourceVar and #kept > 0 then
+				if tag.neg then
+					if sourceMatched then
+						return nil
+					end
+					t_insert(bound, { type = "Condition", varList = kept, neg = true })
+				elseif sourceMatched then
+					-- OR list already matched from this actor's source state
+				else
+					t_insert(bound, { type = "Condition", varList = kept })
+				end
+			else
+				local baked = evalSourceOwnedTag(sourceDB, mod, value, tag)
+				if baked == nil then
+					return nil
+				end
+				value = baked
+			end
+		else
+			local baked = evalSourceOwnedTag(sourceDB, mod, value, tag)
+			if baked == nil then
+				return nil
+			end
+			value = baked
+		end
+	end
+	bound.value = value
+	return bound
+end
+
+local function actorHasChilledByHitsFlag(actor, flagName)
+	return actor and actor.modDB:Flag(nil, flagName)
+		and actor.enemySourceDB and actor.enemySourceDB:GetCondition("ChilledByYourHits")
+end
+
+local function anyActorHasChilledByHitsFlag(env, flagName)
+	return actorHasChilledByHitsFlag(env.player, flagName) or actorHasChilledByHitsFlag(env.mercenary, flagName)
+end
+
 local function applyEnemyModifiers(actor, clearCache)
 	if clearCache or not actor.appliedEnemyModifiers then
 		actor.appliedEnemyModifiers = { }
@@ -678,8 +771,11 @@ local function applyEnemyModifiers(actor, clearCache)
 	for _, value in ipairs(actor.modDB:Tabulate(nil, nil, "EnemyModifier")) do
 		local mod = value.value and value.value.mod
 		if mod and not cache[mod] then
-			local source = mod.source or value.mod.source
-			enemyDB:AddMod(modLib.setSource(mod, source))
+			local bound = bindSourceOwnedEnemyMod(mod, actor)
+			if bound then
+				local source = bound.source or mod.source or value.mod.source
+				enemyDB:AddMod(modLib.setSource(bound, source))
+			end
 			cache[mod] = true
 		end
 	end
@@ -4123,16 +4219,16 @@ function calcs.perform(env, skipEHP)
 			condition = "Chilled",
 			mods = function(num)
 				local mods = { modLib.createMod("ActionSpeed", "INC", -num, "Chill", { type = "Condition", var = "Chilled" }) }
-				if modDB:Flag(nil, "ChillEffectIncDamageTaken") then
+				if anyActorHasChilledByHitsFlag(env, "ChillEffectIncDamageTaken") then
 					t_insert(mods, modLib.createMod("DamageTaken", "INC", num, "Ahuana's Bite", { type = "Condition", var = "Chilled" }))
-				elseif modDB:Flag(nil, "ChillEffectIncColdDamageTaken") then
+				elseif anyActorHasChilledByHitsFlag(env, "ChillEffectIncColdDamageTaken") then
 					t_insert(mods, modLib.createMod("ColdDamageTaken", "INC", num, "Chilled by Hits", { type = "Condition", var = "Chilled" }))
 				elseif modDB:Flag(nil, "ChillingAreaIncColdDamageTaken") then
 					t_insert(mods, modLib.createMod("ColdDamageTaken", "INC", num, "Chilling Area", { type = "Condition", var = "Chilled" }))
 				elseif output.HasBonechill and (hasGuaranteedBonechill or enemyDB:Sum("BASE", nil, "ChillVal") > 0) then
 					t_insert(mods, modLib.createMod("ColdDamageTaken", "INC", num, "Bonechill", { type = "Condition", var = "Chilled" }))
 				end
-				if modDB:Flag(nil, "ChillEffectLessDamageDealt") then
+				if anyActorHasChilledByHitsFlag(env, "ChillEffectLessDamageDealt") then
 					t_insert(mods, modLib.createMod("Damage", "MORE", -num / 2, "Shaper of Winter", { type = "Condition", var = "Chilled" }))
 				end
 				return mods

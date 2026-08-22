@@ -1524,12 +1524,31 @@ function ConfigTabClass:BuildModList()
 	local playerModList = new("ModList"):ModList()
 	local mercenaryModList = new("ModList"):ModList()
 	local enemyModList = new("ModList"):ModList()
+	local playerEnemyModList = new("ModList"):ModList()
+	local mercenaryEnemyModList = new("ModList"):ModList()
 	self.modList = playerModList
 	self.mercenaryModList = mercenaryModList
 	self.enemyModList = enemyModList
+	self.playerEnemyModList = playerEnemyModList
+	self.mercenaryEnemyModList = mercenaryEnemyModList
 	local input = configSet.input
 	local placeholder = configSet.placeholder
 	self:UpdateLevel() -- enemy level handled here because it's needed to correctly set boss stats
+
+	local tempEnemy = new("ModList"):ModList()
+	local function applyPartitioned(varData, srcInput, srcPlaceholder, actorMods, sourceEnemy)
+		for i = #tempEnemy, 1, -1 do
+			tempEnemy[i] = nil
+		end
+		applyConfigVar(varData, srcInput, srcPlaceholder, actorMods, tempEnemy, self.build)
+		for _, mod in ipairs(tempEnemy) do
+			if ConfigScope.isSourceOwnedEnemyMod(mod) then
+				sourceEnemy:AddMod(mod)
+			else
+				enemyModList:AddMod(mod)
+			end
+		end
+	end
 
 	local sharedMods = new("ModList"):ModList()
 	for _, varData in ipairs(varList) do
@@ -1537,7 +1556,11 @@ function ConfigTabClass:BuildModList()
 		if scope == "shared" then
 			applyConfigVar(varData, input, placeholder, sharedMods, enemyModList, self.build)
 		elseif scope == "actor" or scope == "player" then
-			applyConfigVar(varData, input, placeholder, playerModList, enemyModList, self.build)
+			if ConfigScope.enemyStateForVarData(varData) == "source" then
+				applyPartitioned(varData, input, placeholder, playerModList, playerEnemyModList)
+			else
+				applyConfigVar(varData, input, placeholder, playerModList, enemyModList, self.build)
+			end
 		end
 	end
 	playerModList:AddList(sharedMods)
@@ -1547,7 +1570,11 @@ function ConfigTabClass:BuildModList()
 	local mercenaryEnemyMods = new("ModList"):ModList()
 	for _, varData in ipairs(varList) do
 		if ConfigScope.forVarData(varData) == "actor" then
-			applyConfigVar(varData, mercenary.input, mercenary.placeholder, mercenaryModList, mercenaryEnemyMods, self.build)
+			if ConfigScope.enemyStateForVarData(varData) == "source" then
+				applyPartitioned(varData, mercenary.input, mercenary.placeholder, mercenaryModList, mercenaryEnemyModList)
+			else
+				applyConfigVar(varData, mercenary.input, mercenary.placeholder, mercenaryModList, mercenaryEnemyMods, self.build)
+			end
 		end
 	end
 	enemyModList:AddList(mercenaryEnemyMods)

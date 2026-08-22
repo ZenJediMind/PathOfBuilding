@@ -489,6 +489,27 @@ describe("Player and mercenary configuration", function()
 		assert.are.equal("player", ConfigScope.forVar("pantheonMajorGod"))
 		assert.are.equal("player", ConfigScope.forVar("pantheonMinorGod"))
 		assert.are.equal("player", ConfigScope.forVar("bandit"))
+		assert.are.equal("actor", ConfigScope.forVar("conditionEnemyChilledByYourHits"))
+		assert.are.equal("actor", ConfigScope.forVar("multiplierChilledByYouSeconds"))
+		assert.are.equal("actor", ConfigScope.forVar("multiplierFrozenByYouSeconds"))
+		assert.are.equal("source", ConfigScope.enemyStateForVar("conditionEnemyChilledByYourHits"))
+		assert.are.equal("source", ConfigScope.enemyStateForVar("multiplierChilledByYouSeconds"))
+		assert.are.equal("source", ConfigScope.enemyStateForVar("multiplierFrozenByYouSeconds"))
+		assert.are.equal("encounter", ConfigScope.enemyStateForVar("conditionEnemyChilled"))
+		assert.are.equal("encounter", ConfigScope.enemyStateForVar("multiplierWitheredStackCount"))
+		assert.are.equal("actor", ConfigScope.forVar("conditionBetweenYouAndLinkedTarget"))
+		assert.are.equal("actor", ConfigScope.forVar("conditionNearLinkedTarget"))
+		assert.are.equal("actor", ConfigScope.forVar("conditionChampionIntimidate"))
+		assert.are.equal("source", ConfigScope.enemyStateForVar("conditionBetweenYouAndLinkedTarget"))
+		assert.are.equal("source", ConfigScope.enemyStateForVar("conditionChampionIntimidate"))
+		assert.are.equal("source", ConfigScope.enemyStateForVar("conditionEnemyLifeHigherThanPlayer"))
+		assert.is_true(ConfigScope.isSourceOwnedEnemyTag({ type = "Condition", var = "ChilledByYourHits" }))
+		assert.is_true(ConfigScope.isSourceOwnedEnemyTag({ type = "Condition", varList = { "Shocked", "FrozenByYou" } }))
+		assert.is_false(ConfigScope.isSourceOwnedEnemyTag({ type = "Condition", var = "Chilled" }))
+		assert.is_false(ConfigScope.isSourceOwnedEnemyTag({ type = "SkillName", var = "ChilledByYourHits" }))
+		assert.is_true(ConfigScope.impliesChilledByYourHits("ChillEffectIncDamageTaken"))
+		assert.is_true(ConfigScope.impliesChilledByYourHits("ChillEffectLessDamageDealt"))
+		assert.is_false(ConfigScope.impliesChilledByYourHits("ChillingAreaIncColdDamageTaken"))
 	end)
 
 	it("classifies minion-state config as actor-scoped, not player-only", function()
@@ -566,5 +587,98 @@ describe("Player and mercenary configuration", function()
 		configTab:Undo()
 		assert.are.equal(originalId, itemsTab.activeItemSetId)
 		assert.are.equal(originalId, configTab.configSets[configTab.activeConfigSetId].actors.player.itemSetId)
+	end)
+
+	local chilledByHitsMod = "Enemies Chilled by your Hits are Shocked"
+	local frozenByYouMod = "Enemies permanently take 5% increased Damage for each second they've ever been Frozen by you, up to a maximum of 50%"
+
+	local function enemyShocked(env)
+		return env.enemyDB:GetCondition("Shocked") or env.enemyDB:Flag(nil, "Condition:Shocked")
+	end
+
+	local function enemyDamageTaken(env)
+		return env.enemyDB:Sum("INC", nil, "DamageTaken")
+	end
+
+	it("does not let the player's chilled-by-your-hits config trigger the Mercenary's shocked-if-chilled-by-your-hits mod", function()
+		local configSet = build.configTab.configSets[build.configTab.activeConfigSetId]
+		build.configTab:EnsureActorConfig(configSet)
+		configSet.input.conditionEnemyChilledByYourHits = true
+		configSet.actors.mercenary.customModsList[1].text = chilledByHitsMod
+		local env = calculate()
+		assert.is_not_nil(env.mercenary, table.concat(env.mercenaryCalculationErrors or { }, "\n"))
+		assert.is_not_true(enemyShocked(env))
+		assert.is_true(env.enemyDB:GetCondition("Chilled") or env.enemyDB:Flag(nil, "Condition:Chilled"))
+	end)
+
+	it("lets the Mercenary's own chilled-by-your-hits config shock the enemy for both actors", function()
+		local configSet = build.configTab.configSets[build.configTab.activeConfigSetId]
+		build.configTab:EnsureActorConfig(configSet)
+		configSet.actors.mercenary.input.conditionEnemyChilledByYourHits = true
+		configSet.actors.mercenary.customModsList[1].text = chilledByHitsMod
+		local env = calculate()
+		assert.is_not_nil(env.mercenary, table.concat(env.mercenaryCalculationErrors or { }, "\n"))
+		assert.is_true(enemyShocked(env))
+	end)
+
+	it("does not let the Mercenary's chilled-by-your-hits config trigger the player's shocked-if-chilled-by-your-hits mod", function()
+		local configSet = build.configTab.configSets[build.configTab.activeConfigSetId]
+		build.configTab:EnsureActorConfig(configSet)
+		configSet.customModsList[1].text = chilledByHitsMod
+		configSet.actors.mercenary.input.conditionEnemyChilledByYourHits = true
+		local env = calculate()
+		assert.is_not_nil(env.mercenary, table.concat(env.mercenaryCalculationErrors or { }, "\n"))
+		assert.is_not_true(enemyShocked(env))
+	end)
+
+	it("lets the player's own chilled-by-your-hits config shock the enemy for both actors", function()
+		local configSet = build.configTab.configSets[build.configTab.activeConfigSetId]
+		build.configTab:EnsureActorConfig(configSet)
+		configSet.customModsList[1].text = chilledByHitsMod
+		configSet.input.conditionEnemyChilledByYourHits = true
+		local env = calculate()
+		assert.is_true(enemyShocked(env))
+	end)
+
+	it("does not let the player's frozen-by-you seconds apply the Mercenary's frozen-by-you damage taken", function()
+		local configSet = build.configTab.configSets[build.configTab.activeConfigSetId]
+		build.configTab:EnsureActorConfig(configSet)
+		configSet.input.multiplierFrozenByYouSeconds = 10
+		local baseline = enemyDamageTaken(calculate())
+		configSet.actors.mercenary.customModsList[1].text = frozenByYouMod
+		local env = calculate()
+		assert.is_not_nil(env.mercenary, table.concat(env.mercenaryCalculationErrors or { }, "\n"))
+		assert.are.equal(baseline, enemyDamageTaken(env))
+	end)
+
+	it("applies the Mercenary's frozen-by-you damage taken from the Mercenary's own freeze seconds", function()
+		local configSet = build.configTab.configSets[build.configTab.activeConfigSetId]
+		build.configTab:EnsureActorConfig(configSet)
+		local baseline = enemyDamageTaken(calculate())
+		configSet.actors.mercenary.input.multiplierFrozenByYouSeconds = 10
+		configSet.actors.mercenary.customModsList[1].text = frozenByYouMod
+		local env = calculate()
+		assert.is_not_nil(env.mercenary, table.concat(env.mercenaryCalculationErrors or { }, "\n"))
+		assert.are.equal(50, enemyDamageTaken(env) - baseline)
+	end)
+
+	it("does not let the Mercenary's frozen-by-you seconds apply the player's frozen-by-you damage taken", function()
+		local configSet = build.configTab.configSets[build.configTab.activeConfigSetId]
+		build.configTab:EnsureActorConfig(configSet)
+		configSet.customModsList[1].text = frozenByYouMod
+		configSet.actors.mercenary.input.multiplierFrozenByYouSeconds = 10
+		local env = calculate()
+		assert.is_not_nil(env.mercenary, table.concat(env.mercenaryCalculationErrors or { }, "\n"))
+		assert.are.equal(0, enemyDamageTaken(env))
+	end)
+
+	it("applies the player's frozen-by-you damage taken from the player's own freeze seconds", function()
+		local configSet = build.configTab.configSets[build.configTab.activeConfigSetId]
+		build.configTab:EnsureActorConfig(configSet)
+		local baseline = enemyDamageTaken(calculate())
+		configSet.customModsList[1].text = frozenByYouMod
+		configSet.input.multiplierFrozenByYouSeconds = 10
+		local env = calculate()
+		assert.are.equal(50, enemyDamageTaken(env) - baseline)
 	end)
 end)

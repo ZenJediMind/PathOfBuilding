@@ -460,14 +460,14 @@ function ConfigTabClass:ConfigTab(build)
 					if implyCond(varData) then
 						return true
 					end
-					return self.build.calcsTab.mainEnv.minionConditionsUsed[ifOption]
+					return configVisibility.usedForVar(self.build.calcsTab.mainEnv, "minionConditionsUsed", varData, self:GetViewActor())[ifOption]
 				end))
 				t_insert(tooltipFuncs, listOrSingleIfTooltip(varData.ifMinionCond, function(ifOption)
 					if not launch.devModeAlt then
 						return
 					end
 					local out
-					local mods = self.build.calcsTab.mainEnv.minionConditionsUsed[ifOption]
+					local mods = configVisibility.usedForVar(self.build.calcsTab.mainEnv, "minionConditionsUsed", varData, self:GetViewActor())[ifOption]
 					if not mods then
 						return out
 					end

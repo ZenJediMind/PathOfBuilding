@@ -655,8 +655,8 @@ function calcs.buildOutput(build, mode)
 		env.tagTypesUsed = { }
 		env.modsUsed = { }
 		env.actorUsage = {
-			player = { conditions = { }, multipliers = { }, mods = { }, perStats = { } },
-			mercenary = { conditions = { }, multipliers = { }, mods = { }, perStats = { } },
+			player = { conditions = { }, multipliers = { }, mods = { }, perStats = { }, minionConditions = { } },
+			mercenary = { conditions = { }, multipliers = { }, mods = { }, perStats = { }, minionConditions = { } },
 		}
 		local function actorUsageFor(actor)
 			if actor == env.mercenary then
@@ -664,6 +664,14 @@ function calcs.buildOutput(build, mode)
 			end
 			if actor == env.player then
 				return env.actorUsage.player
+			end
+		end
+		local function ownerUsageForMinion(actor)
+			if actor == env.minion or (actor and actor.parent == env.player) then
+				return env.actorUsage.player
+			end
+			if actor == env.mercenaryMinion or (actor and actor.parent == env.mercenary) then
+				return env.actorUsage.mercenary
 			end
 		end
 		local function addTo(out, var, mod)
@@ -723,6 +731,10 @@ function calcs.buildOutput(build, mode)
 						end
 					else
 						addVarTag(env.minionConditionsUsed, tag, mod)
+						local ownerUsage = ownerUsageForMinion(actor)
+						if ownerUsage then
+							addVarTag(ownerUsage.minionConditions, tag, mod)
+						end
 					end
 				elseif tag.type == "ActorCondition" and tag.var then
 					if tag.actor == "enemy" then

@@ -405,6 +405,31 @@ describe("Player and mercenary configuration", function()
 		assert.are.equal("player", ConfigScope.forVar("bandit"))
 	end)
 
+	it("classifies minion-state config as actor-scoped, not player-only", function()
+		local ConfigScope = require("Modules/ConfigScope")
+		assert.are.equal("actor", ConfigScope.forVar("minionsConditionFullLife"))
+		assert.are.equal("actor", ConfigScope.forVar("minionsConditionLowLife"))
+		assert.are.equal("actor", ConfigScope.forVar("minionsConditionFullEnergyShield"))
+		assert.are.equal("actor", ConfigScope.forVar("minionsConditionCreatedRecently"))
+		assert.are.equal("actor", ConfigScope.forVar("minionsConditionLeechingEnergyShield"))
+		assert.are.equal("actor", ConfigScope.forVar("minionConditionOnProfaneGround"))
+		assert.are.equal("actor", ConfigScope.forVar("minionsUsePowerCharges"))
+	end)
+
+	it("stores minion Full Life config on the viewed actor", function()
+		local configTab = build.configTab
+		local configSet = configTab.configSets[configTab.activeConfigSetId]
+		configTab:EnsureActorConfig(configSet)
+		configTab:SetViewActor("mercenary")
+		configTab:SetConfigValue("minionsConditionFullLife", true)
+		assert.is_true(configSet.actors.mercenary.input.minionsConditionFullLife)
+		assert.is_not_true(configSet.input.minionsConditionFullLife)
+		configTab:SetViewActor("player")
+		configTab:SetConfigValue("minionsConditionFullLife", true)
+		assert.is_true(configSet.input.minionsConditionFullLife)
+		assert.is_true(configSet.actors.mercenary.input.minionsConditionFullLife)
+	end)
+
 	it("hides player-only pantheon options when viewing the Mercenary", function()
 		local configTab = build.configTab
 		configTab:SetConfigValue("pantheonMajorGod", "TheBrineKing")

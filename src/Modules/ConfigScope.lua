@@ -95,10 +95,9 @@ local function inferScope(varData, sectionScope)
 	if var:match("^playerCursed") then
 		return "actor"
 	end
-	if PLAYER_VARS[var] or var:match("^minions") or var:match("^overrideEmpty") then
-		return "player"
-	end
-	if varData.ifMinionCond then
+	-- Minion-state options (minionsCondition*, minionsUse*, ifMinionCond) describe the
+	-- viewed actor's minions, including Mercenary minions, so they stay actor-scoped.
+	if PLAYER_VARS[var] or var:match("^overrideEmpty") then
 		return "player"
 	end
 	if varData.ifEnemyCond or varData.ifEnemyMult or varData.ifEnemyStat

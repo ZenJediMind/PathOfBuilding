@@ -1643,4 +1643,74 @@ Iron Hat
 		assert.is_nil(statusOnly.mainSkill)
 		assert.matches("unavailable", formatCalcStr("{output:ActorUnavailableMessage}", statusOnly))
 	end)
+
+	it("applies mercenary minion Full Life config independently of the player", function()
+		configure("AurasMinionsTemplar", "AurasMinionsTemplarStaff", "HeraldOfPurityMercenary")
+		build.skillsTab:PasteSocketGroup("Summon Raging Spirit 20/0  1")
+		local configSet = build.configTab.configSets[build.configTab.activeConfigSetId]
+		build.configTab:EnsureActorConfig(configSet)
+		local fullLifeMod = "Minions have 100% chance to deal double damage while they are on full life"
+		configSet.customModsList[1].text = fullLifeMod
+		configSet.actors.mercenary.customModsList[1].text = fullLifeMod
+		configSet.actors.mercenary.input.minionsConditionFullLife = true
+		local env = calculate()
+		assert.is_table(env.mercenaryMinion)
+		assert.is_table(env.minion)
+		assert.is_true(env.mercenaryMinion.modDB:Flag(nil, "Condition:FullLife"))
+		assert.is_not_true(env.minion.modDB:Flag(nil, "Condition:FullLife"))
+		assert.are.equal(100, env.mercenaryMinion.modDB:Sum("BASE", nil, "DoubleDamageChance"))
+		assert.are.equal(0, env.minion.modDB:Sum("BASE", nil, "DoubleDamageChance"))
+
+		configSet.actors.mercenary.input.minionsConditionFullLife = nil
+		configSet.input.minionsConditionFullLife = true
+		env = calculate()
+		assert.is_not_true(env.mercenaryMinion.modDB:Flag(nil, "Condition:FullLife"))
+		assert.is_true(env.minion.modDB:Flag(nil, "Condition:FullLife"))
+		assert.are.equal(0, env.mercenaryMinion.modDB:Sum("BASE", nil, "DoubleDamageChance"))
+		assert.are.equal(100, env.minion.modDB:Sum("BASE", nil, "DoubleDamageChance"))
+	end)
+
+	it("shows minion Full Life config only for the actor whose minions use it", function()
+		configure("AurasMinionsTemplar", "AurasMinionsTemplarStaff", "HeraldOfPurityMercenary")
+		local configSet = build.configTab.configSets[build.configTab.activeConfigSetId]
+		build.configTab:EnsureActorConfig(configSet)
+		local fullLifeMod = "Minions have 100% chance to deal double damage while they are on full life"
+		configSet.actors.mercenary.customModsList[1].text = fullLifeMod
+		local env = calculate()
+		assert.is_table(env.mercenaryMinion)
+		assert.is_nil(env.minion)
+
+		local fullLifeConfig
+		for _, varData in ipairs(configOptions) do
+			if varData.var == "minionsConditionFullLife" then fullLifeConfig = varData break end
+		end
+		assert.is_false(configVisibility.isRelevantForBuild(assert(fullLifeConfig), build, "player"))
+		assert.is_true(configVisibility.isRelevantForBuild(fullLifeConfig, build, "mercenary"))
+		build.configTab:SetViewActor("player")
+		assert.is_false(build.configTab.varControls.minionsConditionFullLife.shown())
+		build.configTab:SetViewActor("mercenary")
+		assert.is_true(build.configTab.varControls.minionsConditionFullLife.shown())
+
+		configSet.actors.mercenary.customModsList[1].text = ""
+		configSet.customModsList[1].text = fullLifeMod
+		build.skillsTab:PasteSocketGroup("Summon Raging Spirit 20/0  1")
+		env = calculate()
+		assert.is_table(env.minion)
+		assert.is_true(configVisibility.isRelevantForBuild(fullLifeConfig, build, "player"))
+		assert.is_false(configVisibility.isRelevantForBuild(fullLifeConfig, build, "mercenary"))
+		build.configTab:SetViewActor("player")
+		assert.is_true(build.configTab.varControls.minionsConditionFullLife.shown())
+		build.configTab:SetViewActor("mercenary")
+		assert.is_false(build.configTab.varControls.minionsConditionFullLife.shown())
+	end)
+
+	it("applies mercenary Minions Created Recently to the mercenary, not the player", function()
+		configure("AurasMinionsTemplar", "AurasMinionsTemplarStaff", "HeraldOfPurityMercenary")
+		local configSet = build.configTab.configSets[build.configTab.activeConfigSetId]
+		build.configTab:EnsureActorConfig(configSet)
+		configSet.actors.mercenary.input.minionsConditionCreatedRecently = true
+		local env = calculate()
+		assert.is_true(env.mercenary.modDB:Flag(nil, "Condition:MinionsCreatedRecently"))
+		assert.is_not_true(env.player.modDB:Flag(nil, "Condition:MinionsCreatedRecently"))
+	end)
 end)

@@ -942,7 +942,6 @@ function calcs.initEnv(build, mode, override, specEnv)
 	if override.itemSetId ~= nil and not build.itemsTab.itemSets[override.itemSetId] then
 		error("Unknown item set id: "..tostring(override.itemSetId))
 	end
-	local overrideItemSet = override.itemSetId and build.itemsTab.itemSets[override.itemSetId]
 	local replacesPlayerItem = MercenaryTools.overrideReplacesPlayerItem(override, build.itemsTab.activeItemSetId)
 	local modDB = nil
 	local enemyDB = nil

@@ -536,6 +536,48 @@ describe("Player and mercenary configuration", function()
 		assert.is_nil(ConfigScope.applyWritesToEnemy)
 	end)
 
+	it("requires enemy-list config writes to be shared or source-owned", function()
+		local ConfigScope = require("Modules/ConfigScope")
+		local varList = LoadModule("Modules/ConfigOptions")
+		local sourceLines = { }
+		local file = assert(io.open("Modules/ConfigOptions.lua", "r"))
+		local lineNo = 0
+		for line in file:lines() do
+			lineNo = lineNo + 1
+			sourceLines[lineNo] = line
+		end
+		file:close()
+
+		local sawWithered = false
+		local failures = { }
+		for _, varData in ipairs(varList) do
+			if varData.var and type(varData.apply) == "function" then
+				local info = debug.getinfo(varData.apply, "S")
+				local writesEnemy = false
+				if info and info.linedefined and info.lastlinedefined then
+					for i = info.linedefined, info.lastlinedefined do
+						if sourceLines[i] and sourceLines[i]:find("enemyModList:", 1, true) then
+							writesEnemy = true
+							break
+						end
+					end
+				end
+				if writesEnemy then
+					if varData.var == "multiplierWitheredStackCount" then
+						sawWithered = true
+					end
+					local scope = ConfigScope.forVar(varData.var)
+					local enemyState = ConfigScope.enemyStateForVar(varData.var)
+					if not (scope == "shared" or (scope == "actor" and enemyState == "source")) then
+						table.insert(failures, varData.var.." (scope="..tostring(scope)..", enemyState="..tostring(enemyState)..")")
+					end
+				end
+			end
+		end
+		assert.is_true(sawWithered, "scan should observe Withered stacks writing to enemyModList")
+		assert.are.same({ }, failures)
+	end)
+
 	it("classifies minion-state config as actor-scoped, not player-only", function()
 		local ConfigScope = require("Modules/ConfigScope")
 		assert.are.equal("actor", ConfigScope.forVar("minionsConditionFullLife"))

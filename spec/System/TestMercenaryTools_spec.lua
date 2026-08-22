@@ -97,8 +97,10 @@ describe("Mercenary tools", function()
 	it("keeps tree jewel comparisons on the player", function()
 		local itemsTab = {
 			activeItemSetId = 1,
+			viewItemSetId = 2,
 			build = { mercenaryTab = { itemSetId = 2 } },
 		}
+		assert.are.equal("PLAYER", tools.comparisonActorForSlot("Jewel 12345", 2, itemsTab))
 		local override = tools.itemCalculationOverride(2, "Jewel 12345", { name = "jewel" }, itemsTab)
 		assert.is_nil(override.itemSetId)
 		assert.are.equal("PLAYER", override.comparisonActor)

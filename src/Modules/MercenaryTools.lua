@@ -25,7 +25,14 @@ function MercenaryTools.comparisonActorForItemSet(itemSetId, itemsTab)
 	return "PLAYER"
 end
 
+local function isTreeJewelSlot(slotName)
+	return type(slotName) == "string" and slotName:match("^Jewel ") ~= nil
+end
+
 function MercenaryTools.comparisonActorForSlot(slotName, itemSetId, itemsTab)
+	if isTreeJewelSlot(slotName) then
+		return "PLAYER"
+	end
 	if MercenaryTools.baseItemSlotName(slotName) then
 		return "MERCENARY"
 	end
@@ -33,10 +40,10 @@ function MercenaryTools.comparisonActorForSlot(slotName, itemSetId, itemsTab)
 end
 
 function MercenaryTools.itemCalculationOverride(itemSetId, slotName, item, itemsTab)
-	local isTreeJewel = type(slotName) == "string" and slotName:match("^Jewel ") ~= nil
+	local isTreeJewel = isTreeJewelSlot(slotName)
 	return {
 		itemSetId = (not isTreeJewel) and itemSetId or nil,
-		comparisonActor = isTreeJewel and "PLAYER" or MercenaryTools.comparisonActorForSlot(slotName, itemSetId, itemsTab),
+		comparisonActor = MercenaryTools.comparisonActorForSlot(slotName, itemSetId, itemsTab),
 		repSlotName = slotName,
 		repItem = item,
 	}

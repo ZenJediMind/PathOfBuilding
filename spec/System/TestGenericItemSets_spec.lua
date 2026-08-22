@@ -355,6 +355,58 @@ describe("Generic item sets for player, Animate Guardian, and Mercenary", functi
 		assert.are.equal("Jewel "..socketNode.id, build.itemsTab:GetComparisonSlotNameForItem(jewel))
 	end)
 
+	it("compares tree jewels against the player while Mercenary gear is visible", function()
+		selectScionLuminary()
+		build.mercenaryTab.profile.buildId = "MeleeAOEMarauderFireSlam"
+		build.mercenaryTab:Changed()
+		local mercSet = assert(build.mercenaryTab:GetItemSet(true))
+		local spec = build.spec
+		local socketNode
+		for _, node in pairs(spec.nodes) do
+			if node.type == "Socket" then
+				socketNode = node
+				break
+			end
+		end
+		socketNode = assert(socketNode)
+		socketNode.alloc = true
+		spec.allocNodes[socketNode.id] = socketNode
+		build.itemsTab:UpdateSockets()
+		local jewel = new("Item"):Item("Rarity: RARE\nPlain Spark\nCrimson Jewel\nImplicits: 0\n+100 to maximum Life\n")
+		build.itemsTab:AddItem(jewel, true)
+		local jewelSlot = build.itemsTab.sockets[socketNode.id]
+		assert(build.itemsTab:SetViewItemSet(mercSet.id))
+		build.configTab:BuildModList()
+		build.buildFlag = true
+		runCallback("OnFrame")
+
+		local capturedActor
+		local compared
+		local originalCompare = build.AddStatComparesToTooltip
+		build.AddStatComparesToTooltip = function(self, tooltip, baseOutput, compareOutput, header, nodeCount, actor)
+			compared = true
+			capturedActor = actor
+			return originalCompare(self, tooltip, baseOutput, compareOutput, header, nodeCount, actor)
+		end
+		local tooltip = new("Tooltip"):Tooltip()
+		local ok, err = pcall(function()
+			build.itemsTab:AddItemTooltip(tooltip, jewel, jewelSlot)
+		end)
+		build.AddStatComparesToTooltip = originalCompare
+		assert(ok, err)
+
+		local tooltipText = { }
+		for _, line in ipairs(tooltip.lines) do
+			if line.text then
+				table.insert(tooltipText, line.text)
+			end
+		end
+		assert.is_true(compared)
+		assert.is_nil(capturedActor)
+		assert.matches("Equipping this item", table.concat(tooltipText, "\n"))
+		assert.does_not.match("Mercenary comparison unavailable", table.concat(tooltipText, "\n"))
+	end)
+
 	it("loads Mercenary-prefixed slots into generic slots and ignores owner", function()
 		local itemsTab = build.itemsTab
 		itemsTab.items[9001] = { id = 9001, name = "Legacy Merc Helmet", type = "Helmet", base = { type = "Helmet" }, rarity = "NORMAL" }

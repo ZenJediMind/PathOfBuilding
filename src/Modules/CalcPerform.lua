@@ -399,13 +399,13 @@ local function doActorAttribsConditions(env, actor)
 		if actor.mainSkill.skillFlags.trap then
 			condList["TriggeredTrapsRecently"] = true
 		end
-		if modDB:Sum("BASE", nil, "EnemyScorchChance") > 0 or modDB:Flag(nil, "CritAlwaysAltAilments") and not modDB:Flag(env.player.mainSkill.skillCfg, "NeverCrit") or modDB:Flag(nil, "IgniteCanScorch") then
+		if modDB:Sum("BASE", nil, "EnemyScorchChance") > 0 or modDB:Flag(nil, "CritAlwaysAltAilments") and not modDB:Flag(actor.mainSkill.skillCfg, "NeverCrit") or modDB:Flag(nil, "IgniteCanScorch") then
 			condList["CanInflictScorch"] = true
 		end
-		if modDB:Sum("BASE", nil, "EnemyBrittleChance") > 0 or modDB:Flag(nil, "CritAlwaysAltAilments") and not modDB:Flag(env.player.mainSkill.skillCfg, "NeverCrit") then
+		if modDB:Sum("BASE", nil, "EnemyBrittleChance") > 0 or modDB:Flag(nil, "CritAlwaysAltAilments") and not modDB:Flag(actor.mainSkill.skillCfg, "NeverCrit") then
 			condList["CanInflictBrittle"] = true
 		end
-		if modDB:Sum("BASE", nil, "EnemySapChance") > 0 or modDB:Flag(nil, "CritAlwaysAltAilments") and not modDB:Flag(env.player.mainSkill.skillCfg, "NeverCrit") then
+		if modDB:Sum("BASE", nil, "EnemySapChance") > 0 or modDB:Flag(nil, "CritAlwaysAltAilments") and not modDB:Flag(actor.mainSkill.skillCfg, "NeverCrit") then
 			condList["CanInflictSap"] = true
 		end
 		-- Shrine Buffs: Must be done before life pool calculated for massive shrine
@@ -512,13 +512,13 @@ local function doActorAttribsConditions(env, actor)
 		end
 	end
 	if env.mode_effective then
-		if env.player.mainSkill.skillModList:Sum("BASE", env.player.mainSkill.skillCfg, "FireExposureChance") > 0 or modDB:Sum("BASE", nil, "FireExposureChance") > 0 then
+		if actor.mainSkill.skillModList:Sum("BASE", actor.mainSkill.skillCfg, "FireExposureChance") > 0 or modDB:Sum("BASE", nil, "FireExposureChance") > 0 then
 			condList["CanApplyFireExposure"] = true
 		end
-		if env.player.mainSkill.skillModList:Sum("BASE", env.player.mainSkill.skillCfg, "ColdExposureChance") > 0 or modDB:Sum("BASE", nil, "ColdExposureChance") > 0 then
+		if actor.mainSkill.skillModList:Sum("BASE", actor.mainSkill.skillCfg, "ColdExposureChance") > 0 or modDB:Sum("BASE", nil, "ColdExposureChance") > 0 then
 			condList["CanApplyColdExposure"] = true
 		end
-		if env.player.mainSkill.skillModList:Sum("BASE", env.player.mainSkill.skillCfg, "LightningExposureChance") > 0 or modDB:Sum("BASE", nil, "LightningExposureChance") > 0 then
+		if actor.mainSkill.skillModList:Sum("BASE", actor.mainSkill.skillCfg, "LightningExposureChance") > 0 or modDB:Sum("BASE", nil, "LightningExposureChance") > 0 then
 			condList["CanApplyLightningExposure"] = true
 		end
 	end
@@ -1470,7 +1470,7 @@ function calcs.perform(env, skipEHP)
 	env.keystonesAdded = { }
 	modLib.mergeKeystones(env, env.modDB)
 	if env.mercenary then
-		modLib.mergeKeystones({ spec = env.spec, keystonesAdded = { } }, env.mercenary.modDB)
+		modLib.mergeKeystones(env.mercenary.calcEnv, env.mercenary.modDB)
 	end
 
 	-- Build minion skills
@@ -1516,6 +1516,10 @@ function calcs.perform(env, skipEHP)
 		initMinionModDB(env, env.player.mainSkill, output.Minion)
 	end
 	env.mercenaryMinion = env.mercenary and env.mercenary.mainSkill and env.mercenary.mainSkill.minion
+	if env.mercenary and env.mercenary.calcEnv then
+		-- false (not nil) so __index does not fall through to the player's minion.
+		env.mercenary.calcEnv.minion = env.mercenaryMinion or false
+	end
 	if env.mercenaryMinion then
 		env.mercenary.output.Minion = { }
 		initMinionModDB(env, env.mercenary.mainSkill, env.mercenary.output.Minion)
@@ -4194,7 +4198,9 @@ function calcs.perform(env, skipEHP)
 
 	-- Merge keystones again to catch any that were added by buffs
 	modLib.mergeKeystones(env, env.modDB)
-	if env.mercenary then modLib.mergeKeystones({ spec = env.spec, keystonesAdded = { } }, env.mercenary.modDB) end
+	if env.mercenary then
+		modLib.mergeKeystones(env.mercenary.calcEnv, env.mercenary.modDB)
+	end
 
 	-- Special handling for Dancing Dervish
 	if modDB:Flag(nil, "DisableWeapons") then

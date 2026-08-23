@@ -379,12 +379,18 @@ function calcs.initMercenary(env)
 	-- everything else still falls through to the real environment.
 	-- Actor-local fields that must stay correct under both player and Mercenary
 	-- calculation contexts: player, modDB, configInput, configPlaceholder,
-	-- enemySourceDB / source-owned state, and item/skill ownership.
+	-- keystonesAdded, minion, enemySourceDB / source-owned state, and item/skill ownership.
 	-- Mercenary-related calculation entry points should take this environment
 	-- rather than the root env when they read those fields.
 	-- Invariant: `mercenaryEnv.player` is the Mercenary; `env.player` is always
-	-- the character.
-	local mercenaryEnv = setmetatable({ modDB = mercenary.modDB, player = mercenary }, { __index = env })
+	-- the character. `mercenaryEnv.minion` is the Mercenary minion or false.
+	-- false (not nil) prevents __index from returning the player's minion.
+	local mercenaryEnv = setmetatable({
+		modDB = mercenary.modDB,
+		player = mercenary,
+		keystonesAdded = { },
+		minion = false,
+	}, { __index = env })
 	if env.build.configTab.GetActorConfigInput then
 		local mercInput, mercPlaceholder = env.build.configTab:GetActorConfigInput("mercenary")
 		mercenaryEnv.configInput = mercInput

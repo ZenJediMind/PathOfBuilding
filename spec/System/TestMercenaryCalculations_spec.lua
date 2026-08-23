@@ -2122,4 +2122,73 @@ Gain 8% of Elemental Damage as Extra Chaos Damage
 		assert.are.equal(0, cold)
 		assert.are.equal(0, lightning)
 	end)
+
+	it("does not copy the player's skill Exposure onto the Mercenary", function()
+		build.skillsTab:PasteSocketGroup("Spark 20/0  1\nAwakened Fire Penetration 20/0  1\n")
+		configure("TrapsMinesShadow", "TrapsMinesShadowLightning", "LightningTrapMercenary")
+		local env = calculate()
+		assert.is_true(env.player.modDB.conditions.CanApplyFireExposure)
+		assert.is_not_true(env.mercenary.modDB.conditions.CanApplyFireExposure)
+	end)
+
+	it("detects Exposure from the Mercenary's own skill, not the player's", function()
+		configure("AurasMinionsTemplar", "AurasMinionsTemplarStaff", "MoltenStrikeHolyMercenary", {
+			supports = { { id = "HolyMoltenStrikeSpecificLightningExposureHigh", tier = 3 } },
+		})
+		local staff = new("Item"):Item("Rarity: Normal\nGnarled Branch")
+		staff.id = 9101
+		build.itemsTab.items[staff.id] = staff
+		equipmentSlot("Weapon 1").selItemId = staff.id
+		build.skillsTab:PasteSocketGroup("Spark 20/0  1")
+		local env = calculate()
+		assert.is_true(env.mercenary.modDB.conditions.CanApplyLightningExposure)
+		assert.is_not_true(env.player.modDB.conditions.CanApplyLightningExposure)
+	end)
+
+	it("does not treat the player's Precise Technique as the Mercenary's", function()
+		allocate("Precise Technique")
+		configure("MeleeAOEMarauder", "MeleeAOEMarauderFireSlam", "TectonicSlamFireMercenary")
+		local env = calculate()
+		assert.is_true(env.keystonesAdded["Precise Technique"])
+		assert.is_true(env.player.output.PreciseTechnique)
+		assert.is_not_true(env.mercenary.calcEnv.keystonesAdded["Precise Technique"])
+		assert.is_not_true(env.mercenary.output.PreciseTechnique)
+	end)
+
+	it("applies Precise Technique from Mercenary equipment, not the player's tree", function()
+		configure("MeleeAOEMarauder", "MeleeAOEMarauderFireSlam", "TectonicSlamFireMercenary")
+		local helmet = new("Item"):Item([[Rarity: Rare
+Precise Technique Test Helm
+Iron Hat
+--------
+Precise Technique
+]])
+		build.itemsTab:AddItem(helmet, true)
+		equipmentSlot("Helmet").selItemId = helmet.id
+		local env = calculate()
+		assert.is_nil(env.mercenaryCalculationErrors and env.mercenaryCalculationErrors[1], table.concat(env.mercenaryCalculationErrors or { }, "\n"))
+		assert.is_not_true(env.keystonesAdded["Precise Technique"])
+		assert.is_not_true(env.player.output.PreciseTechnique)
+		assert.is_true(env.mercenary.calcEnv.keystonesAdded["Precise Technique"])
+		assert.is_true(env.mercenary.output.PreciseTechnique)
+	end)
+
+	it("points mercEnv.minion at the Mercenary minion, not the player's", function()
+		build.skillsTab:PasteSocketGroup("Raise Zombie 20/0  1")
+		configure("AurasMinionsTemplar", "AurasMinionsTemplarStaff", "HeraldOfPurityMercenary")
+		local env = calculate()
+		assert.is_table(env.minion)
+		assert.is_table(env.mercenaryMinion)
+		assert.are.equal(env.mercenaryMinion, env.mercenary.calcEnv.minion)
+		assert.are_not.equal(env.minion, env.mercenary.calcEnv.minion)
+	end)
+
+	it("does not fall through mercEnv.minion to the player's minion", function()
+		build.skillsTab:PasteSocketGroup("Raise Zombie 20/0  1")
+		configure("TrapsMinesShadow", "TrapsMinesShadowLightning", "LightningTrapMercenary")
+		local env = calculate()
+		assert.is_table(env.minion)
+		assert.is_nil(env.mercenaryMinion)
+		assert.is_false(env.mercenary.calcEnv.minion)
+	end)
 end)

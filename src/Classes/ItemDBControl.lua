@@ -8,7 +8,7 @@ local ipairs = ipairs
 local t_insert = table.insert
 local m_max = math.max
 local m_floor = math.floor
-local MercenaryTools = require("Modules/MercenaryTools")
+local MercenaryTools = require("Modules.MercenaryTools")
 
 
 ---@class ItemDBControl: ListControl

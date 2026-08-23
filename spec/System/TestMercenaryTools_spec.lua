@@ -1,5 +1,5 @@
 describe("Mercenary tools", function()
-	local tools = require("Modules/MercenaryTools")
+	local tools = require("Modules.MercenaryTools")
 	local data = {
 		builds = { build = {
 			skillIds = { "skill", "other_skill" },
@@ -395,7 +395,7 @@ end)
 
 describe("Generated Mercenary data", function()
 	it("has deterministic orders and resolvable references", function()
-		local tools = require("Modules/MercenaryTools")
+		local tools = require("Modules.MercenaryTools")
 		local mercenaries = data.mercenaries
 		local classGroups = select(1, tools.classGroups(mercenaries))
 		local classLabels = { }
@@ -502,7 +502,7 @@ describe("Generated Mercenary data", function()
 	end)
 
 	it("populates every input of an inherited preDamageFunc", function()
-		local tools = require("Modules/MercenaryTools")
+		local tools = require("Modules.MercenaryTools")
 		local statData = data.mercenaryStatData
 		local problems = { }
 		local declarationUsedBy = { }

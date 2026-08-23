@@ -1,5 +1,5 @@
 describe("TestImportReimport", function()
-	local MercenaryTools = require("Modules/MercenaryTools")
+	local MercenaryTools = require("Modules.MercenaryTools")
 	local DEFAULT_CHARACTER_LEVEL = 12
 	local DEFAULT_ITEM_LEVEL = 10
 	local TEST_IMPORT_ITEM_ID = "test-import-item-1"

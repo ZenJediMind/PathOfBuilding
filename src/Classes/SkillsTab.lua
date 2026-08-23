@@ -10,7 +10,7 @@ local t_remove = table.remove
 local m_min = math.min
 local m_max = math.max
 
-local skillOptions = require("Modules/SkillOptions")
+local skillOptions = require("Modules.SkillOptions")
 
 local groupSlotDropList = {
 	{ label = "None" },

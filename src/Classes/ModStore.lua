@@ -15,7 +15,7 @@ local m_modf = math.modf
 local band = bit.band
 local bor = bit.bor
 
-local ConfigScope = require("Modules/ConfigScope")
+local ConfigScope = require("Modules.ConfigScope")
 
 local mod_createMod = modLib.createMod
 

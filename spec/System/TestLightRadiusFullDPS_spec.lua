@@ -1,5 +1,5 @@
 describe("Light Radius integration", function()
-	local MercenaryTools = require("Modules/MercenaryTools")
+	local MercenaryTools = require("Modules.MercenaryTools")
 
 	local function selectScionLuminary()
 		local scionId

@@ -32,7 +32,7 @@ local function anyIfValue(ifOption, predicate)
 	return predicate(ifOption) and true or false
 end
 
-local ConfigScope = require("Modules/ConfigScope")
+local ConfigScope = require("Modules.ConfigScope")
 
 local ACTOR_USED_FIELD = {
 	conditionsUsed = "conditions",

@@ -42,7 +42,7 @@ describe("Calcs source-skill flag visibility", function()
 		profile.mainSkillId = skillId
 		profile.lifeComparison = "AUTO"
 		profile.skills = { { id = skillId, enabled = true, includeInFullDPS = false, count = 1, supports = { } } }
-		local MercenaryTools = require("Modules/MercenaryTools")
+		local MercenaryTools = require("Modules.MercenaryTools")
 		local itemSet = build.mercenaryTab:GetItemSet(true)
 		local mace = new("Item"):Item("Rarity: Normal\nDriftwood Club")
 		local shield = new("Item"):Item("Rarity: Normal\nTwig Spirit Shield")

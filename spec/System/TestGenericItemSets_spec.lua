@@ -1,5 +1,5 @@
 describe("Generic item sets for player, Animate Guardian, and Mercenary", function()
-	local MercenaryTools = require("Modules/MercenaryTools")
+	local MercenaryTools = require("Modules.MercenaryTools")
 
 	local function selectScionLuminary()
 		for classId, class in pairs(build.spec.tree.classes) do

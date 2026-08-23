@@ -10,7 +10,7 @@ local b_rshift = bit.rshift
 local band = bit.band
 local m_max = math.max
 local dkjson = require "dkjson"
-local MercenaryTools = require("Modules/MercenaryTools")
+local MercenaryTools = require("Modules.MercenaryTools")
 
 
 

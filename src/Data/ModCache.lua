@@ -19862,6 +19862,7 @@ c["Shadow: 12% increased Attack and Cast Speed"]={{[1]={[1]={type="Condition",va
 c["Share Endurance Charges with nearby party members"]={nil,"Share Endurance Charges with nearby party members "}
 c["Share Endurance Charges with nearby party members Gain an Endurance Charge when you are Hit"]={nil,"Share Endurance Charges with nearby party members Gain an Endurance Charge when you are Hit "}
 c["Share Endurance Charges with nearby party members Gain up to maximum Endurance Charges when you take a Critical Strike"]={nil,"Share Endurance Charges with nearby party members Gain up to maximum Endurance Charges when you take a Critical Strike "}
+end)();(function()
 c["Share Endurance, Frenzy and Power Charges with nearby party members"]={nil,"Share Endurance, Frenzy and Power Charges with nearby party members "}
 c["Share Endurance, Frenzy and Power Charges with nearby party members Limited to 1 Keystone Tattoo"]={nil,"Share Endurance, Frenzy and Power Charges with nearby party members Limited to 1 Keystone Tattoo "}
 c["Shared Suffering"]={nil,"Shared Suffering "}

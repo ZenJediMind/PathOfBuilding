@@ -1,5 +1,5 @@
 describe("Permanent Mercenary calculations", function()
-	local MercenaryTools = require("Modules/MercenaryTools")
+	local MercenaryTools = require("Modules.MercenaryTools")
 	local configOptions = LoadModule("Modules/ConfigOptions")
 	local configVisibility = LoadModule("Modules/ConfigVisibility")
 	local function equipmentSlot(slotName)

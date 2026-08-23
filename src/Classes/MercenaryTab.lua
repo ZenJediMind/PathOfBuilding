@@ -3,8 +3,8 @@
 -- Class: Mercenary Tab
 -- Permanent Mercenary configuration, persistence, import, and equipment validation.
 --
-local MercenaryTools = require("Modules/MercenaryTools")
-local skillOptions = require("Modules/SkillOptions")
+local MercenaryTools = require("Modules.MercenaryTools")
+local skillOptions = require("Modules.SkillOptions")
 local gemTooltip = LoadModule("Classes/GemTooltip")
 
 local t_insert = table.insert

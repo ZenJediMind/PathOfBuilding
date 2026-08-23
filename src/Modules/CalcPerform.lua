@@ -5,8 +5,8 @@
 --
 ---@class Calcs
 local calcs = require("Modules.CalcBase")
-local MercenaryTools = require("Modules/MercenaryTools")
-local ConfigScope = require("Modules/ConfigScope")
+local MercenaryTools = require("Modules.MercenaryTools")
+local ConfigScope = require("Modules.ConfigScope")
 
 local pairs = pairs
 local ipairs = ipairs
@@ -1727,10 +1727,10 @@ function calcs.perform(env, skipEHP)
 			env.minion.breakdown = require(calcs.breakdownModule)(env.minion.modDB, env.minion.output, env.minion)
 		end
 		if env.mercenary then
-			env.mercenary.breakdown = LoadModule(calcs.breakdownModule)(env.mercenary.modDB, env.mercenary.output, env.mercenary)
+			env.mercenary.breakdown = require(calcs.breakdownModule)(env.mercenary.modDB, env.mercenary.output, env.mercenary)
 		end
 		if env.mercenaryMinion then
-			env.mercenaryMinion.breakdown = LoadModule(calcs.breakdownModule)(env.mercenaryMinion.modDB, env.mercenaryMinion.output, env.mercenaryMinion)
+			env.mercenaryMinion.breakdown = require(calcs.breakdownModule)(env.mercenaryMinion.modDB, env.mercenaryMinion.output, env.mercenaryMinion)
 		end
 	end
 

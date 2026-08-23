@@ -21,7 +21,7 @@ describe("CompareTab", function()
 	end
 
 	it("imports Mercenary builds and preserves their Calcs skill selection", function()
-		local MercenaryTools = require("Modules/MercenaryTools")
+		local MercenaryTools = require("Modules.MercenaryTools")
 		newBuild()
 		allocatePermanentHire()
 		build.mercenaryTab.profile = {
@@ -106,7 +106,7 @@ describe("CompareTab", function()
 	end)
 
 	it("copies an item from the visible Mercenary set into the primary Mercenary set", function()
-		local MercenaryTools = require("Modules/MercenaryTools")
+		local MercenaryTools = require("Modules.MercenaryTools")
 		newBuild()
 		allocatePermanentHire()
 		build.mercenaryTab.profile = {
@@ -147,6 +147,5 @@ describe("CompareTab", function()
 		assert.is_true(copiedItemId > 0)
 		assert.are.equal("Crude Bow", build.itemsTab.items[copiedItemId].name)
 		assert.are.equal(0, playerWeapon.selItemId)
-	end)
 	end)
 end)

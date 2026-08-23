@@ -1,5 +1,5 @@
 describe("Mercenary equipment validation", function()
-	local MercenaryTools = require("Modules/MercenaryTools")
+	local MercenaryTools = require("Modules.MercenaryTools")
 	local tab, itemSet, mercenaryItemSet
 	local function selectScionLuminary()
 		for classId, class in pairs(build.spec.tree.classes) do
@@ -703,7 +703,7 @@ Note: ~b/o 1 mirror
 	end)
 
 	it("reuses player gem sort options and persists Mercenary preferences", function()
-		local skillOptions = require("Modules/SkillOptions")
+		local skillOptions = require("Modules.SkillOptions")
 		assert.are.same(skillOptions.sortGemTypeList, tab.controls.sortGemsByDPSFieldControl.list)
 		local xml = { }
 		tab.sortGemsByDPS = false

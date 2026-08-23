@@ -5,7 +5,7 @@
 --
 ---@class Calcs
 local calcs = require("Modules.CalcBase")
-local MercenaryTools = require("Modules/MercenaryTools")
+local MercenaryTools = require("Modules.MercenaryTools")
 
 local pairs = pairs
 local ipairs = ipairs

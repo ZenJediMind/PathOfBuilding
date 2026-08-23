@@ -1,5 +1,5 @@
 describe("Mercenary review regressions", function()
-	local MercenaryTools = require("Modules/MercenaryTools")
+	local MercenaryTools = require("Modules.MercenaryTools")
 
 	local function allocatePermanentHire()
 		for classId, class in pairs(build.spec.tree.classes) do

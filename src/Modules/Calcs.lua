@@ -10,8 +10,8 @@ local s_format = string.format
 local m_min = math.min
 local m_max = math.max
 local m_ceil = math.ceil
-local MercenaryTools = require("Modules/MercenaryTools")
-local ConfigScope = require("Modules/ConfigScope")
+local MercenaryTools = require("Modules.MercenaryTools")
+local ConfigScope = require("Modules.ConfigScope")
 
 ---@class Calcs
 local calcs = require("Modules.CalcBase")

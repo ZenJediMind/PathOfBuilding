@@ -220,7 +220,7 @@ describe("Player and mercenary configuration", function()
 	end)
 
 	it("equips the player from Config without taking Items comparison context", function()
-		local MercenaryTools = require("Modules/MercenaryTools")
+		local MercenaryTools = require("Modules.MercenaryTools")
 		local itemsTab = build.itemsTab
 		local configTab = build.configTab
 		local playerSetId = itemsTab.activeItemSetId
@@ -262,7 +262,7 @@ describe("Player and mercenary configuration", function()
 	end)
 
 	it("equips the Mercenary from Config without taking Items comparison context", function()
-		local MercenaryTools = require("Modules/MercenaryTools")
+		local MercenaryTools = require("Modules.MercenaryTools")
 		local itemsTab = build.itemsTab
 		local configTab = build.configTab
 		local playerSetId = itemsTab.activeItemSetId
@@ -562,7 +562,7 @@ describe("Player and mercenary configuration", function()
 	end)
 
 	it("classifies skill options as actor-scoped and enemy wither stacks as shared", function()
-		local ConfigScope = require("Modules/ConfigScope")
+		local ConfigScope = require("Modules.ConfigScope")
 		assert.are.equal("actor", ConfigScope.forVar("VigilantStrikeBypassCD"))
 		assert.are.equal("actor", ConfigScope.forVar("toxicRainPodOverlap"))
 		assert.are.equal("actor", ConfigScope.forVar("detonateDeadCorpseLife"))
@@ -619,7 +619,7 @@ describe("Player and mercenary configuration", function()
 	end)
 
 	it("requires enemy-list config writes to be shared or source-owned", function()
-		local ConfigScope = require("Modules/ConfigScope")
+		local ConfigScope = require("Modules.ConfigScope")
 		local varList = LoadModule("Modules/ConfigOptions")
 		local sourceLines = { }
 		local file = assert(io.open("Modules/ConfigOptions.lua", "r"))
@@ -661,7 +661,7 @@ describe("Player and mercenary configuration", function()
 	end)
 
 	it("classifies minion-state config as actor-scoped, not player-only", function()
-		local ConfigScope = require("Modules/ConfigScope")
+		local ConfigScope = require("Modules.ConfigScope")
 		assert.are.equal("actor", ConfigScope.forVar("minionsConditionFullLife"))
 		assert.are.equal("actor", ConfigScope.forVar("minionsConditionLowLife"))
 		assert.are.equal("actor", ConfigScope.forVar("minionsConditionFullEnergyShield"))
@@ -672,7 +672,7 @@ describe("Player and mercenary configuration", function()
 	end)
 
 	it("requires configuration sections to declare ownership", function()
-		local ConfigScope = require("Modules/ConfigScope")
+		local ConfigScope = require("Modules.ConfigScope")
 		local varList = LoadModule("Modules/ConfigOptions")
 		for _, varData in ipairs(varList) do
 			if varData.section then

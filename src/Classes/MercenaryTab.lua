@@ -966,7 +966,7 @@ function MercenaryTabClass:Load(xml)
 	end
 	local function loadProfile(node, profile)
 		profile.buildId = node.attrib.buildId
-		profile.foundAreaLevel = tonumber(node.attrib.foundAreaLevel) or 68
+		profile.foundAreaLevel = tonumber(node.attrib.foundAreaLevel)
 		profile.importedWarrant = node.attrib.importedWarrant == "true"
 		profile.mainSkillId = node.attrib.mainSkillId
 		profile.lifeComparison = node.attrib.lifeComparison or "AUTO"
@@ -1025,7 +1025,7 @@ function MercenaryTabClass:Save(xml)
 				id = tostring(setId),
 				title = profile.title,
 				buildId = profile.buildId,
-				foundAreaLevel = tostring(profile.foundAreaLevel or 68),
+				foundAreaLevel = profile.foundAreaLevel and tostring(profile.foundAreaLevel),
 				importedWarrant = tostring(profile.importedWarrant == true),
 				mainSkillId = profile.mainSkillId,
 				lifeComparison = profile.lifeComparison,

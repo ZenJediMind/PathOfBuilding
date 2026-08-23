@@ -687,7 +687,8 @@ function MercenaryTools.validateEquippedItem(item, slotName, context)
 	if not mercBuild or not class then
 		return false, "select a Mercenary build first"
 	end
-	if ARMOUR_SLOTS[slotName] then
+	local isArmourEquipment = ARMOUR_SLOTS[slotName] or item.type == "Shield"
+	if isArmourEquipment then
 		local itemRequirements = item.requirements or { }
 		local attributes = class.attributeId or ""
 		local attributeCount, requiredAttributeCount, hasAssociatedRequirement = 0, 0, false

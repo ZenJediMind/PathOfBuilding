@@ -1050,25 +1050,50 @@ Iron Hat
 		end
 
 		local baseNameByType = { }
-		local function lowestBaseName(itemType)
-			if baseNameByType[itemType] then return baseNameByType[itemType] end
+		-- Shields are armour, so the lowest base of type Shield is not always legal.
+		-- Cache by type and build so Int Mercenaries do not receive a Dex buckler.
+		local function lowestBaseName(itemType, mercenaryBuild)
+			local cacheKey = itemType == "Shield" and itemType.."\0"..mercenaryBuild.id or itemType
+			if baseNameByType[cacheKey] then return baseNameByType[cacheKey] end
 			local bestName, bestLevel
 			for name, base in pairs(build.data.itemBases) do
 				if base.type == itemType then
-					local level = base.req and base.req.level or 0
-					if not bestLevel or level < bestLevel or level == bestLevel and name < bestName then
-						bestName, bestLevel = name, level
+					local legal = true
+					if itemType == "Shield" then
+						legal = MercenaryTools.validateEquippedItem({
+							type = "Shield",
+							rarity = "NORMAL",
+							requirements = {
+								level = base.req and base.req.level or 0,
+								str = base.req and base.req.str or 0,
+								dex = base.req and base.req.dex or 0,
+								int = base.req and base.req.int or 0,
+							},
+						}, "Weapon 2", {
+							profile = { buildId = mercenaryBuild.id, foundAreaLevel = 68 },
+							mercenaryData = build.data.mercenaries,
+							itemSet = { },
+							playerItemSet = { },
+							items = { },
+							playerHasFlag = function() return false end,
+						})
+					end
+					if legal then
+						local level = base.req and base.req.level or 0
+						if not bestLevel or level < bestLevel or level == bestLevel and name < bestName then
+							bestName, bestLevel = name, level
+						end
 					end
 				end
 			end
-			baseNameByType[itemType] = assert(bestName, itemType)
+			baseNameByType[cacheKey] = assert(bestName, itemType)
 			return bestName
 		end
 
 		local nextItemId = 990000
-		local function equip(slotName, itemType)
+		local function equip(slotName, itemType, mercenaryBuild)
 			if not itemType or itemType == "None" then return end
-			local item = new("Item"):Item("Rarity: Normal\n"..lowestBaseName(itemType))
+			local item = new("Item"):Item("Rarity: Normal\n"..lowestBaseName(itemType, mercenaryBuild))
 			item.id = nextItemId
 			nextItemId = nextItemId + 1
 			build.itemsTab.items[item.id] = item
@@ -1094,8 +1119,8 @@ Iron Hat
 			equipmentSlot("Weapon 2").selItemId = 0
 			local buildId = buildForSkill[skillId]
 			local mercenaryBuild = build.data.mercenaries.builds[buildId]
-			equip("Weapon 1", mercenaryBuild.weaponConfiguration.mainHandTypes[1])
-			if mercenaryBuild.weaponConfiguration.offHandRequired then equip("Weapon 2", mercenaryBuild.weaponConfiguration.offHandTypes[1]) end
+			equip("Weapon 1", mercenaryBuild.weaponConfiguration.mainHandTypes[1], mercenaryBuild)
+			if mercenaryBuild.weaponConfiguration.offHandRequired then equip("Weapon 2", mercenaryBuild.weaponConfiguration.offHandTypes[1], mercenaryBuild) end
 			build.mercenaryTab.profile = {
 				classId = mercenaryBuild.classId,
 				buildId = buildId,

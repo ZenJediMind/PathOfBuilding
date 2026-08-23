@@ -361,6 +361,31 @@ describe("Player and mercenary configuration", function()
 		assert.are.equal(altMerc.id, build.mercenaryTab.itemSetId)
 	end)
 
+	it("does not invent a Mercenary item set from live state when config omits it", function()
+		local itemsTab = build.itemsTab
+		local configTab = build.configTab
+		local liveMercenaryId = build.mercenaryTab.itemSetId
+		assert.is_not_nil(liveMercenaryId)
+		local xml = {
+			elem = "Config",
+			attrib = { activeConfigSet = "1" },
+			{
+				elem = "ConfigSet",
+				attrib = { id = "1", title = "Mapping" },
+				{ elem = "Actor", attrib = { id = "player" } },
+				{ elem = "Actor", attrib = { id = "mercenary" } },
+			},
+		}
+		configTab:Load(xml, "no-merc-itemset.xml")
+		configTab:PostLoad()
+
+		local mapping = configTab.configSets[1]
+		configTab:EnsureActorConfig(mapping)
+		assert.are.equal(itemsTab.activeItemSetId, mapping.actors.player.itemSetId)
+		assert.is_nil(mapping.actors.mercenary.itemSetId)
+		assert.are.equal(liveMercenaryId, build.mercenaryTab.itemSetId)
+	end)
+
 	it("fills missing item-set ids from live gear after loading a legacy config", function()
 		local itemsTab = build.itemsTab
 		local configTab = build.configTab

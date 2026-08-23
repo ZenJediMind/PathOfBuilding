@@ -474,7 +474,7 @@ describe("Mercenary equipment validation", function()
 		assert.is_false(validateEquippedItem(item({ type = "Shield" }), "Weapon 2"))
 
 		selectBuild("MeleeStrikesMarauderFire")
-		assert.is_true(validateEquippedItem(item({ type = "Shield" }), "Weapon 2"))
+		assert.is_true(validateEquippedItem(item({ type = "Shield", requirements = { str = 1 } }), "Weapon 2"))
 		assert.is_true(validateEquippedItem(item({ type = "One Handed Sword" }), "Weapon 2"))
 
 		selectBuild("AurasMinionsTemplarSmite")
@@ -484,6 +484,20 @@ describe("Mercenary equipment validation", function()
 		selectBuild("NonEleBowRangerPhys")
 		assert.is_true(validateEquippedItem(item({ type = "Bow" }), "Weapon 1"))
 		assert.is_true(validateEquippedItem(item({ type = "Quiver" }), "Weapon 2"))
+	end)
+
+	it("applies armour attribute alignment to shields in Weapon 2", function()
+		selectBuild("MeleeStrikesMarauderFire")
+		assert.is_true(validateEquippedItem(item({ type = "Shield", requirements = { str = 100 } }), "Weapon 2"))
+		assert.is_true(validateEquippedItem(item({ type = "Shield", requirements = { str = 100, dex = 50 } }), "Weapon 2"))
+		assert.is_false(validateEquippedItem(item({ type = "Shield", requirements = { dex = 100 } }), "Weapon 2"))
+		assert.is_false(validateEquippedItem(item({ type = "Shield", requirements = { int = 15 } }), "Weapon 2"))
+		assert.is_false(validateEquippedItem(item({ type = "Shield", requirements = { str = 1, dex = 1, int = 1 } }), "Weapon 2"))
+
+		selectBuild("AurasMinionsTemplarSmite")
+		assert.is_true(validateEquippedItem(item({ type = "Shield", requirements = { str = 100, int = 100 } }), "Weapon 2"))
+		assert.is_false(validateEquippedItem(item({ type = "Shield", requirements = { dex = 1 } }), "Weapon 2"))
+		assert.is_false(validateEquippedItem(item({ type = "Shield", requirements = { str = 100, dex = 1 } }), "Weapon 2"))
 	end)
 
 	it("rejects shared physical item ids", function()
@@ -922,6 +936,44 @@ Note: ~b/o 1 mirror
 		for _ = 1, 7 do tab.controls.skillList.controls.new.onClick() end
 		assert.are.equal(6, #tab.profile.skills)
 		assert.is_true(not tab.controls.skillList.controls.new.enabled())
+	end)
+
+	it("does not invent found-area level when loading a MercenarySet", function()
+		local function loadSet(attrib)
+			tab:Load({
+				attrib = { },
+				{
+					elem = "MercenarySet",
+					attrib = attrib,
+					{ elem = "Skill", attrib = { id = "TectonicSlamFireMercenary", enabled = "true" } },
+				},
+			})
+		end
+
+		loadSet({
+			id = "1",
+			buildId = "MeleeAOEMarauderFireSlam",
+			mainSkillId = "TectonicSlamFireMercenary",
+		})
+		assert.is_nil(tab.profile.foundAreaLevel)
+		assert.matches("Found%-area level", table.concat(tab:GetErrors(), "\n"))
+
+		loadSet({
+			id = "1",
+			buildId = "MeleeAOEMarauderFireSlam",
+			foundAreaLevel = "not-a-number",
+			mainSkillId = "TectonicSlamFireMercenary",
+		})
+		assert.is_nil(tab.profile.foundAreaLevel)
+		assert.matches("Found%-area level", table.concat(tab:GetErrors(), "\n"))
+
+		loadSet({
+			id = "1",
+			buildId = "MeleeAOEMarauderFireSlam",
+			foundAreaLevel = "83",
+			mainSkillId = "TectonicSlamFireMercenary",
+		})
+		assert.are.equal(83, tab.profile.foundAreaLevel)
 	end)
 
 	it("keeps a malformed XML fixture for diagnosis and blocks calculation", function()

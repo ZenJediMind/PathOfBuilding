@@ -993,14 +993,9 @@ end
 
 function ConfigTabClass:PostLoad()
 	local itemsTab = self.build.itemsTab
-	local mercenaryTab = self.build.mercenaryTab
 	local livePlayerId = itemsTab and itemsTab.activeItemSetId
 	if livePlayerId and itemsTab and not itemsTab.itemSets[livePlayerId] then
 		livePlayerId = itemsTab.itemSetOrderList[1]
-	end
-	local liveMercenaryId = mercenaryTab and mercenaryTab.itemSetId
-	if liveMercenaryId and itemsTab and not itemsTab.itemSets[liveMercenaryId] then
-		liveMercenaryId = nil
 	end
 	for _, configSetId in ipairs(self.configSetOrderList) do
 		local configSet = self.configSets[configSetId]
@@ -1008,9 +1003,6 @@ function ConfigTabClass:PostLoad()
 		self:SanitizeActorItemSets(configSet)
 		if not configSet.actors.player.itemSetId then
 			configSet.actors.player.itemSetId = livePlayerId
-		end
-		if not configSet.actors.mercenary.itemSetId then
-			configSet.actors.mercenary.itemSetId = liveMercenaryId
 		end
 	end
 	self:ApplyActorItemSets()

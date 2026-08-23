@@ -661,6 +661,12 @@ describe("Player and mercenary configuration", function()
 				{ var = "brandNewEncounterFlag", type = "check" },
 			})
 		end)
+		assert.has_error(function()
+			ConfigScope.index({
+				{ section = "Enemy Stats", col = 1 },
+				{ var = "legacySharedSectionFlag", type = "check" },
+			})
+		end)
 		ConfigScope.index(varList)
 	end)
 

@@ -15,16 +15,6 @@ local PLAYER_VARS = {
 	ignoreJewelLimits = true,
 }
 
--- Sections that remain player-only even when Config is viewing the Mercenary.
--- Skill Options are actor-scoped; keep this table for genuinely player-only sections.
-local PLAYER_SECTIONS = {
-}
-
-local SHARED_SECTIONS = {
-	["Enemy Stats"] = true,
-	["Map Modifiers and Player Debuffs"] = true,
-}
-
 -- Enemy conditions/multipliers whose wording establishes source ownership.
 -- Each actor evaluates these against its own overlay; resulting encounter effects
 -- (Shock, Exposure, increased damage taken, ...) are published to shared enemy state.
@@ -162,18 +152,12 @@ function ConfigScope.index(varList)
 	local sectionScope = "actor"
 	for _, varData in ipairs(varList or { }) do
 		if varData.section then
-			if varData.scope then
-				if not VALID_SCOPE[varData.scope] then
-					error("ConfigScope: invalid scope '"..tostring(varData.scope).."' for section "..tostring(varData.section))
-				end
-				sectionScope = varData.scope
-			elseif PLAYER_SECTIONS[varData.section] then
-				sectionScope = "player"
-			elseif SHARED_SECTIONS[varData.section] then
-				sectionScope = "shared"
-			else
+			if not varData.scope then
 				error("ConfigScope: section '"..tostring(varData.section).."' needs explicit scope")
+			elseif not VALID_SCOPE[varData.scope] then
+				error("ConfigScope: invalid scope '"..tostring(varData.scope).."' for section "..tostring(varData.section))
 			end
+			sectionScope = varData.scope
 		end
 		if varData.var then
 			local enemyState = inferEnemyState(varData)

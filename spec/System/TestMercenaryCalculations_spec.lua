@@ -2054,13 +2054,52 @@ Gain 8% of Elemental Damage as Extra Chaos Damage
 		assert.are.near(atDefault, damageMore(), 10 ^ -9)
 	end)
 
+	it("reads TotemsSummoned from the Mercenary environment, not the player's", function()
+		configureSkill("HolyFlameTotemMercenary")
+		local configSet = build.configTab.configSets[build.configTab.activeConfigSetId]
+		build.configTab:EnsureActorConfig(configSet)
+		configSet.input.TotemsSummoned = 5
+		local mercenary = assert(calculate().mercenary, table.concat(build.calcsTab.mainEnv.mercenaryCalculationErrors or { }, "\n"))
+		local defaultCount = mercenary.output.ActiveTotemLimit
+		assert.is_true(defaultCount >= 1)
+		assert.are.equal(defaultCount, mercenary.output.TotemsSummoned)
+		configSet.actors.mercenary.input.TotemsSummoned = 3
+		mercenary = assert(calculate().mercenary)
+		assert.are.equal(3, mercenary.output.TotemsSummoned)
+		configSet.input.TotemsSummoned = 1
+		mercenary = assert(calculate().mercenary)
+		assert.are.equal(3, mercenary.output.TotemsSummoned)
+	end)
+
+	it("reads WarcryMaxHit from the Mercenary environment, not the player's", function()
+		configure("MeleeAOEMarauder", "MeleeAOEMarauderFireSlam", "InfernalCryMercenary")
+		local configSet = build.configTab.configSets[build.configTab.activeConfigSetId]
+		build.configTab:EnsureActorConfig(configSet)
+		configSet.input.warcryMode = "AVERAGE"
+		configSet.actors.mercenary.input.warcryMode = "AVERAGE"
+		local average = assert(calculate().mercenary).output.WarcryEffectMod
+		assert.is_true(average > 0)
+		configSet.actors.mercenary.input.warcryMode = "MAX"
+		local maxHit = assert(calculate().mercenary).output.WarcryEffectMod
+		assert.is_true(maxHit > average)
+		configSet.input.warcryMode = "MAX"
+		configSet.actors.mercenary.input.warcryMode = "AVERAGE"
+		assert.are.near(average, assert(calculate().mercenary).output.WarcryEffectMod, 10 ^ -9)
+	end)
+
 	it("calculates Mercenary minions with Mercenary physMode, not the player's", function()
 		configure("AurasMinionsTemplar", "AurasMinionsTemplarStaff", "HeraldOfPurityMercenary")
 		local configSet = build.configTab.configSets[build.configTab.activeConfigSetId]
 		build.configTab:EnsureActorConfig(configSet)
-		configSet.actors.mercenary.customModsList[1].text = "Minions gain 35% of Physical Damage as Extra Damage of a random Element"
 		configSet.input.physMode = "FIRE"
 		configSet.actors.mercenary.input.physMode = "COLD"
+		local origBuildModList = build.configTab.BuildModList
+		function build.configTab:BuildModList(...)
+			origBuildModList(self, ...)
+			self.mercenaryModList:NewMod("MinionModifier", "LIST", {
+				mod = modLib.createMod("PhysicalDamageGainAsRandom", "BASE", 35)
+			}, "Test")
+		end
 		local function gainAs(env)
 			local minion = assert(env.mercenaryMinion, table.concat(env.mercenaryCalculationErrors or { }, "\n"))
 			local skill = minion.mainSkill

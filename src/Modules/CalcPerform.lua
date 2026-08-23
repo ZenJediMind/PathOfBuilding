@@ -4570,31 +4570,30 @@ function calcs.perform(env, skipEHP)
 		calcs.offence(env, env.minion, env.minion.mainSkill)
 	end
 
-	if env.mercenary and env.mercenary.mainSkill then
-		local savedInput, savedPlaceholder = env.configInput, env.configPlaceholder
-		if env.mercenary.calcEnv and env.mercenary.calcEnv.configInput then
-			env.configInput = env.mercenary.calcEnv.configInput
-			env.configPlaceholder = env.mercenary.calcEnv.configPlaceholder
+	if env.mercenary and (env.mercenary.mainSkill or (env.mercenaryMinion and env.mercenaryMinion.mainSkill)) then
+		local mercEnv = assert(env.mercenary.calcEnv, "Mercenary calculation requires Mercenary calculation environment")
+		if env.mercenary.mainSkill then
+			calcs.defence(mercEnv, env.mercenary)
+			if not skipEHP then
+				calcs.buildDefenceEstimations(mercEnv, env.mercenary)
+			end
+			calcs.triggers(mercEnv, env.mercenary)
+			if not calcs.mirages(mercEnv) then
+				calcs.offence(mercEnv, env.mercenary, env.mercenary.mainSkill)
+			end
 		end
-		calcs.defence(env, env.mercenary)
-		if not skipEHP then calcs.buildDefenceEstimations(env, env.mercenary) end
-		calcs.triggers(env.mercenary.calcEnv, env.mercenary)
-		if not calcs.mirages(env.mercenary.calcEnv) then
-			calcs.offence(env, env.mercenary, env.mercenary.mainSkill)
+		if env.mercenaryMinion and env.mercenaryMinion.mainSkill then
+			-- Mercenary-created minions must run in the Mercenary actor environment so
+			-- env.modDB / env.player / env.configInput (physMode, ailmentMode, distances,
+			-- ...) match the summoner instead of the root character.
+			doActorLifeMana(env.mercenaryMinion)
+			calcs.defence(mercEnv, env.mercenaryMinion)
+			if not skipEHP then
+				calcs.buildDefenceEstimations(mercEnv, env.mercenaryMinion)
+			end
+			calcs.triggers(mercEnv, env.mercenaryMinion)
+			calcs.offence(mercEnv, env.mercenaryMinion, env.mercenaryMinion.mainSkill)
 		end
-		env.configInput = savedInput
-		env.configPlaceholder = savedPlaceholder
-	end
-	if env.mercenaryMinion and env.mercenaryMinion.mainSkill then
-		-- Mercenary-created minions must run in the Mercenary actor environment so
-		-- env.configInput / env.configPlaceholder (physMode, ailmentMode, distances,
-		-- ...) match the summoner instead of the root character.
-		local mercEnv = env.mercenary.calcEnv or env
-		doActorLifeMana(env.mercenaryMinion)
-		calcs.defence(mercEnv, env.mercenaryMinion)
-		if not skipEHP then calcs.buildDefenceEstimations(mercEnv, env.mercenaryMinion) end
-		calcs.triggers(mercEnv, env.mercenaryMinion)
-		calcs.offence(mercEnv, env.mercenaryMinion, env.mercenaryMinion.mainSkill)
 	end
 
 	-- Hit-by-element conditions for EE are established during offence.

@@ -1258,32 +1258,18 @@ function ItemsTabClass:Load(xml, dbFileName)
 			local itemSet = self:NewItemSet(tonumber(node.attrib.id))
 			itemSet.title = node.attrib.title
 			itemSet.useSecondWeaponSet = node.attrib.useSecondWeaponSet == "true"
-			local pendingMercenarySlots = { }
 			for _, child in ipairs(node) do
 				if child.elem == "Slot" then
 					local slotName = child.attrib.name or ""
-					local mercenaryBase = MercenaryTools.baseItemSlotName(slotName)
-					if mercenaryBase then
-						pendingMercenarySlots[mercenaryBase] = child
-					else
-						local itemSlot = itemSet[slotName]
-						if itemSlot then
-							itemSlot.selItemId = tonumber(child.attrib.itemId) or 0
-							itemSlot.active = child.attrib.active == "true"
-							itemSlot.pbURL = child.attrib.itemPbURL or ""
-						end
+					local itemSlot = itemSet[slotName]
+					if itemSlot then
+						itemSlot.selItemId = tonumber(child.attrib.itemId) or 0
+						itemSlot.active = child.attrib.active == "true"
+						itemSlot.pbURL = child.attrib.itemPbURL or ""
 					end
 				elseif child.elem == "SocketIdURL" then
 					local id = tonumber(child.attrib.nodeId)
 					itemSet[id] = { pbURL = child.attrib.itemPbURL or "" }
-				end
-			end
-			for slotName, child in pairs(pendingMercenarySlots) do
-				local itemSlot = itemSet[slotName]
-				if itemSlot and (itemSlot.selItemId or 0) == 0 then
-					itemSlot.selItemId = tonumber(child.attrib.itemId) or 0
-					itemSlot.active = child.attrib.active == "true"
-					itemSlot.pbURL = child.attrib.itemPbURL or ""
 				end
 			end
 			t_insert(self.itemSetOrderList, itemSet.id)

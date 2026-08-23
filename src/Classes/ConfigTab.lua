@@ -1019,8 +1019,9 @@ function ConfigTabClass:PostLoad()
 end
 
 function ConfigTabClass:GetDefaultState(var, varType)
-	if self.configSets[self.activeConfigSetId].placeholder[var] ~= nil then
-		return self.configSets[self.activeConfigSetId].placeholder[var]
+	local _, placeholder = self:GetVarTables(var)
+	if placeholder[var] ~= nil then
+		return placeholder[var]
 	end
 
 	if self.defaultState[var] ~= nil then
@@ -1430,6 +1431,7 @@ function ConfigTabClass:EnsureActorConfig(configSet)
 		for _, varData in ipairs(varList) do
 			if varData.var and ConfigScope.forVarData(varData) == "actor" then
 				mercenaryInput[varData.var] = varData.defaultState
+				mercenaryPlaceholder[varData.var] = varData.defaultPlaceholderState
 				if varData.defaultIndex then
 					mercenaryInput[varData.var] = varData.list[varData.defaultIndex].val
 				end

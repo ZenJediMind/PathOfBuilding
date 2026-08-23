@@ -407,47 +407,6 @@ describe("Generic item sets for player, Animate Guardian, and Mercenary", functi
 		assert.does_not.match("Mercenary comparison unavailable", table.concat(tooltipText, "\n"))
 	end)
 
-	it("loads Mercenary-prefixed slots into generic slots and ignores owner", function()
-		local itemsTab = build.itemsTab
-		itemsTab.items[9001] = { id = 9001, name = "Legacy Merc Helmet", type = "Helmet", base = { type = "Helmet" }, rarity = "NORMAL" }
-		itemsTab.items[9002] = { id = 9002, name = "Legacy AG Helmet", type = "Helmet", base = { type = "Helmet" }, rarity = "NORMAL" }
-		itemsTab:Load({
-			attrib = { activeItemSet = "1", useSecondWeaponSet = "false" },
-			{
-				elem = "ItemSet",
-				attrib = { id = "1", owner = "Mercenary", title = "Legacy Merc", useSecondWeaponSet = "false" },
-				{ elem = "Slot", attrib = { name = MercenaryTools.itemSlotName("Helmet"), itemId = "9001" } },
-			},
-			{
-				elem = "ItemSet",
-				attrib = { id = "2", owner = "Animate Guardian", title = "Legacy AG", useSecondWeaponSet = "false" },
-				{ elem = "Slot", attrib = { name = "Helmet", itemId = "9002" } },
-			},
-		})
-		assert.is_nil(itemsTab.itemSets[1].owner)
-		assert.is_nil(itemsTab.itemSets[2].owner)
-		assert.are.equal(9001, itemsTab.itemSets[1].Helmet.selItemId)
-		assert.is_nil(itemsTab.itemSets[1][MercenaryTools.itemSlotName("Helmet")])
-		assert.are.equal(9002, itemsTab.itemSets[2].Helmet.selItemId)
-	end)
-
-	it("does not overwrite existing generic slots when migrating mixed Mercenary keys", function()
-		local itemsTab = build.itemsTab
-		itemsTab.items[9001] = { id = 9001, name = "Kept Helmet", type = "Helmet", base = { type = "Helmet" }, rarity = "NORMAL" }
-		itemsTab.items[9100] = { id = 9100, name = "Prefixed Helmet", type = "Helmet", base = { type = "Helmet" }, rarity = "NORMAL" }
-		itemsTab:Load({
-			attrib = { activeItemSet = "7", useSecondWeaponSet = "false" },
-			{
-				elem = "ItemSet",
-				attrib = { id = "7", title = "Legacy Active", useSecondWeaponSet = "false" },
-				{ elem = "Slot", attrib = { name = "Helmet", itemId = "9001" } },
-				{ elem = "Slot", attrib = { name = MercenaryTools.itemSlotName("Helmet"), itemId = "9100" } },
-			},
-		})
-		assert.are.equal(9001, itemsTab.itemSets[7].Helmet.selItemId)
-		assert.is_nil(itemsTab.itemSets[7][MercenaryTools.itemSlotName("Helmet")])
-	end)
-
 	it("does not write owner on save", function()
 		selectScionLuminary()
 		build.mercenaryTab.profile.buildId = "MeleeAOEMarauderFireSlam"

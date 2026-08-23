@@ -2014,4 +2014,73 @@ Gain 8% of Elemental Damage as Extra Chaos Damage
 		assert.is_true(env.mercenary.modDB:Flag(nil, "Condition:MinionsCreatedRecently"))
 		assert.is_not_true(env.player.modDB:Flag(nil, "Condition:MinionsCreatedRecently"))
 	end)
+
+	it("uses default projectile distance for a fresh Mercenary projectile skill", function()
+		configure("EleBowRanger", "EleBowRangerFire", "BurningArrowMercenary")
+		local bow = new("Item"):Item("Rarity: Normal\nCrude Bow")
+		local quiver = new("Item"):Item("Rarity: Normal\nSerrated Arrow Quiver")
+		bow.id, quiver.id = 9060, 9061
+		build.itemsTab.items[bow.id], build.itemsTab.items[quiver.id] = bow, quiver
+		equipmentSlot("Weapon 1").selItemId, equipmentSlot("Weapon 2").selItemId = bow.id, quiver.id
+		local configSet = build.configTab.configSets[build.configTab.activeConfigSetId]
+		build.configTab:EnsureActorConfig(configSet)
+		assert.are.equal(40, configSet.actors.mercenary.placeholder.projectileDistance)
+		local env = calculate()
+		assert.are.equal(40, env.mercenary.mainSkill.skillCfg.skillDist)
+	end)
+
+	it("applies DistanceRamp using the Mercenary projectile distance, not the player's", function()
+		configure("EleBowRanger", "EleBowRangerFire", "BurningArrowMercenary")
+		local bow = new("Item"):Item("Rarity: Normal\nCrude Bow")
+		local quiver = new("Item"):Item("Rarity: Normal\nSerrated Arrow Quiver")
+		bow.id, quiver.id = 9062, 9063
+		build.itemsTab.items[bow.id], build.itemsTab.items[quiver.id] = bow, quiver
+		equipmentSlot("Weapon 1").selItemId, equipmentSlot("Weapon 2").selItemId = bow.id, quiver.id
+		local configSet = build.configTab.configSets[build.configTab.activeConfigSetId]
+		build.configTab:EnsureActorConfig(configSet)
+		configSet.actors.mercenary.customModsList[1].text = "Projectiles gain Damage as they travel farther, dealing up to 30% more Damage with Hits and Ailments"
+		configSet.input.projectileDistance = 70
+		local function damageMore()
+			local env = calculate()
+			local skill = assert(env.mercenary, table.concat(env.mercenaryCalculationErrors or { }, "\n")).mainSkill
+			return skill.skillModList:More(skill.skillCfg, "Damage")
+		end
+		local atDefault = damageMore()
+		configSet.actors.mercenary.input.projectileDistance = 70
+		local atSeventy = damageMore()
+		assert.is_true(atSeventy > atDefault)
+		configSet.actors.mercenary.input.projectileDistance = 40
+		configSet.input.projectileDistance = 10
+		assert.are.near(atDefault, damageMore(), 10 ^ -9)
+	end)
+
+	it("calculates Mercenary minions with Mercenary physMode, not the player's", function()
+		configure("AurasMinionsTemplar", "AurasMinionsTemplarStaff", "HeraldOfPurityMercenary")
+		local configSet = build.configTab.configSets[build.configTab.activeConfigSetId]
+		build.configTab:EnsureActorConfig(configSet)
+		configSet.actors.mercenary.customModsList[1].text = "Minions gain 35% of Physical Damage as Extra Damage of a random Element"
+		configSet.input.physMode = "FIRE"
+		configSet.actors.mercenary.input.physMode = "COLD"
+		local function gainAs(env)
+			local minion = assert(env.mercenaryMinion, table.concat(env.mercenaryCalculationErrors or { }, "\n"))
+			local skill = minion.mainSkill
+			return skill.skillModList:Sum("BASE", skill.skillCfg, "PhysicalDamageGainAsFire"),
+				skill.skillModList:Sum("BASE", skill.skillCfg, "PhysicalDamageGainAsCold"),
+				skill.skillModList:Sum("BASE", skill.skillCfg, "PhysicalDamageGainAsLightning")
+		end
+		local fire, cold, lightning = gainAs(calculate())
+		assert.are.equal(0, fire)
+		assert.are.equal(35, cold)
+		assert.are.equal(0, lightning)
+		configSet.input.physMode = "LIGHTNING"
+		fire, cold, lightning = gainAs(calculate())
+		assert.are.equal(0, fire)
+		assert.are.equal(35, cold)
+		assert.are.equal(0, lightning)
+		configSet.actors.mercenary.input.physMode = "FIRE"
+		fire, cold, lightning = gainAs(calculate())
+		assert.are.equal(35, fire)
+		assert.are.equal(0, cold)
+		assert.are.equal(0, lightning)
+	end)
 end)

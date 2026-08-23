@@ -131,7 +131,7 @@ end
 
 return {
 	-- Section: General options
-	{ section = "General", col = 1 },
+	{ section = "General", col = 1, scope = "actor" },
 	{ var = "resistancePenalty", type = "list", label = "Resistance penalty:", list = {{val=0,label="None"},{val=-30,label="Act 5 (-30%)"},{val=-60,label="Act 10 (-60%)"}}, defaultIndex = 3 },
 	{ var = "bandit", type = "list", defaultIndex = 1, label = "Bandit quest:", tooltipFunc = banditTooltip, list = {{val="None",label="Kill all"},{val="Oak",label="Help Oak"},{val="Kraityn",label="Help Kraityn"},{val="Alira",label="Help Alira"}} },
 	{ var = "pantheonMajorGod", type = "list", defaultIndex = 1, label = "Major God:", tooltipFunc = applyPantheonDescription, list = {
@@ -253,7 +253,7 @@ return {
 	{ var = "overrideEmptyWhiteSockets", type = "count", label = "# of Empty White Sockets", ifMult = "EmptyWhiteSocketsInAnySlot", tooltip = "This option allows you to override the default calculation for the number of Empty White Sockets.\nThe default calculation assumes enabled gems in skill socket groups fill the item in socket order disregarding gem colour.\nLeave blank for default calculation." },
 
 	-- Section: Skill-specific options
-	{ section = "Skill Options", col = 2 },
+	{ section = "Skill Options", col = 2, scope = "actor" },
 	{ label = "Arcane Cloak:", ifSkill = "Arcane Cloak"},
 	{ var = "arcaneCloakUsedRecentlyCheck", type = "check", label = "Include in ^x7070FFMana ^7spent Recently?", ifSkill = "Arcane Cloak", tooltip = "When enabled, the mana spent by Arcane Cloak used at full mana \nwill be added to the value provided in # of ^x7070FFMana ^7spent Recently.", apply = function(val, modList, enemyModList)
 		modList:NewMod("Condition:ArcaneCloakUsedRecently", "FLAG", true, "Config")
@@ -834,7 +834,7 @@ Huge sets the radius to 11.
 	{ var = "balanceOfTerrorSelfCastTemporalChains", type = "check", label = "Temporal Chains self-only", ifSkill = "Temporal Chains", ifCond = "SelfCastTemporalChains", tooltip = "Counts Temporal Chains as self-cast for Balance of Terror without applying it to enemies." },
 	{ var = "balanceOfTerrorSelfCastVulnerability", type = "check", label = "Vulnerability self-only", ifSkill = "Vulnerability", ifCond = "SelfCastVulnerability", tooltip = "Counts Vulnerability as self-cast for Balance of Terror without applying it to enemies." },
 	-- Section: Map modifiers/curses
-	{ section = "Map Modifiers and Player Debuffs", col = 2 },
+	{ section = "Map Modifiers and Player Debuffs", col = 2, scope = "shared" },
 	{ var = "multiplierSextant", type = "count", label = "# of Sextants affecting the area", ifMult = "Sextant", apply = function(val, modList, enemyModList)
 		modList:NewMod("Multiplier:Sextant", "BASE", m_min(val, 5), "Config")
 	end },
@@ -896,7 +896,7 @@ Huge sets the radius to 11.
 	end },
 
 	-- Section: Combat options
-	{ section = "When In Combat", col = 1 },
+	{ section = "When In Combat", col = 1, scope = "actor" },
 	{ var = "usePowerCharges", type = "check", label = "Do you use Power Charges?", apply = function(val, modList, enemyModList)
 		modList:NewMod("UsePowerCharges", "FLAG", true, "Config", { type = "Condition", var = "Combat" })
 	end },
@@ -1776,7 +1776,7 @@ Huge sets the radius to 11.
 		modList:NewMod("Condition:BloodShrineOfBats", "FLAG", true, "Config", { type = "Condition", var = "Combat" })
 	end },
 	-- Section: Effective DPS options
-	{ section = "For Effective DPS", col = 1 },
+	{ section = "For Effective DPS", col = 1, scope = "actor" },
 	{ var = "skillForkCount", type = "count", label = "# of times Skill has Forked:", ifFlag = "forking", apply = function(val, modList, enemyModList)
 		modList:NewMod("ForkedCount", "BASE", val, "Config", { type = "Condition", var = "Effective" })
 	end },
@@ -2078,7 +2078,7 @@ Huge sets the radius to 11.
 		enemyModList:NewMod("EnergyShieldRecoveryRate", "INC", -val * 10, val.." Mania Stacks", { type = "GlobalEffect", effectType = "Debuff" }, { type = "Condition", var = "AfflictedByMania" })
 	end },
 	-- Section: Enemy Stats
-	{ section = "Enemy Stats", col = 3 },
+	{ section = "Enemy Stats", col = 3, scope = "shared" },
 	{ var = "enemyLevel", type = "count", label = "Enemy Level:", tooltip = "This overrides the default enemy level used to estimate your hit and ^x33FF77evade ^7chance.\n\nThe default level for normal enemies and standard bosses is 83.\nTheir default level is capped by your character level.\n\nThe default level for pinnacle bosses is 84, and the default level for uber pinnacle bosses is 85.\nTheir default level is not capped by your character level." },
 	{ var = "conditionEnemyRareOrUnique", type = "check", label = "Is the enemy Rare or Unique?", ifEnemyCond = "EnemyRareOrUnique", tooltip = "The enemy will automatically be considered to be Unique if they are a Boss,\nbut you can use this option to force it if necessary.", apply = function(val, modList, enemyModList)
 		enemyModList:NewMod("Condition:RareOrUnique", "FLAG", true, "Config", { type = "Condition", var = "Effective" })
@@ -2376,5 +2376,5 @@ Huge sets the radius to 11.
 	{ var = "enemyChaosDamage", type = "countAllowZero", label = "Enemy Skill ^xD02090Chaos Damage:"},
 	
 	-- Section: Custom mods
-	{ section = "Custom Modifiers", col = 1 },
+	{ section = "Custom Modifiers", col = 1, scope = "actor" },
 }

@@ -49,6 +49,15 @@ describe("Player and mercenary configuration", function()
 		return build.calcsTab.mainEnv
 	end
 
+	local function envMercenarySkillDist(env)
+		return assert(env.mercenary, table.concat(env.mercenaryCalculationErrors or { }, "\n")).mainSkill.skillCfg.skillDist
+	end
+
+	local function envMercenaryDamageMore(env)
+		local skill = assert(env.mercenary, table.concat(env.mercenaryCalculationErrors or { }, "\n")).mainSkill
+		return skill.skillModList:More(skill.skillCfg, "Damage")
+	end
+
 	before_each(function()
 		newBuild()
 		selectScionLuminary()
@@ -425,11 +434,59 @@ describe("Player and mercenary configuration", function()
 		assert.are.equal(bossingSet.id, itemsTab.activeItemSetId)
 	end)
 
-	it("saves mercenary combat values that match the player placeholder", function()
+	it("initializes Mercenary placeholder defaults independently of the player", function()
+		local configTab = build.configTab
+		local configSet = configTab.configSets[configTab.activeConfigSetId]
+		configTab:EnsureActorConfig(configSet)
+		assert.are.equal(15, configSet.actors.mercenary.placeholder.meleeDistance)
+		assert.are.equal(40, configSet.actors.mercenary.placeholder.projectileDistance)
+		assert.are.equal(15, envMercenarySkillDist(calculate()))
+	end)
+
+	it("keeps independent explicit melee distances for player and Mercenary", function()
+		local configSet = build.configTab.configSets[build.configTab.activeConfigSetId]
+		build.configTab:EnsureActorConfig(configSet)
+		configSet.input.meleeDistance = 1
+		configSet.actors.mercenary.input.meleeDistance = 40
+		assert.are.equal(40, envMercenarySkillDist(calculate()))
+		configSet.input.meleeDistance = 40
+		configSet.actors.mercenary.input.meleeDistance = 1
+		assert.are.equal(1, envMercenarySkillDist(calculate()))
+	end)
+
+	it("resolves GetDefaultState from the viewed actor without leaking placeholder state", function()
 		local configTab = build.configTab
 		local configSet = configTab.configSets[configTab.activeConfigSetId]
 		configTab:EnsureActorConfig(configSet)
 		configSet.placeholder.meleeDistance = 15
+		configSet.actors.mercenary.placeholder.meleeDistance = 7
+		configTab:SetViewActor("player")
+		assert.are.equal(15, configTab:GetDefaultState("meleeDistance"))
+		configTab:SetViewActor("mercenary")
+		assert.are.equal(7, configTab:GetDefaultState("meleeDistance"))
+		configTab:SetViewActor("player")
+		assert.are.equal(15, configTab:GetDefaultState("meleeDistance"))
+		assert.are.equal(7, configSet.actors.mercenary.placeholder.meleeDistance)
+	end)
+
+	it("applies MeleeProximity using the Mercenary melee distance, not the player's", function()
+		local configSet = build.configTab.configSets[build.configTab.activeConfigSetId]
+		build.configTab:EnsureActorConfig(configSet)
+		configSet.actors.mercenary.customModsList[1].text = "Deal up to 15% more Melee Damage to Enemies, based on proximity"
+		configSet.input.meleeDistance = 40
+		local atDefault = envMercenaryDamageMore(calculate())
+		configSet.actors.mercenary.input.meleeDistance = 40
+		local atForty = envMercenaryDamageMore(calculate())
+		assert.is_true(atDefault > atForty)
+		configSet.actors.mercenary.input.meleeDistance = 15
+		configSet.input.meleeDistance = 1
+		assert.are.near(atDefault, envMercenaryDamageMore(calculate()), 10 ^ -9)
+	end)
+
+	it("does not save Mercenary meleeDistance when it matches the Mercenary placeholder", function()
+		local configTab = build.configTab
+		local configSet = configTab.configSets[configTab.activeConfigSetId]
+		configTab:EnsureActorConfig(configSet)
 		configSet.actors.mercenary.input.meleeDistance = 15
 		local xml = { elem = "Config" }
 		configTab:Save(xml)
@@ -443,7 +500,7 @@ describe("Player and mercenary configuration", function()
 				end
 			end
 		end
-		assert.are.equal(15, saved)
+		assert.is_nil(saved)
 	end)
 
 	it("writes the loadout player item set even when it is already equipped", function()
@@ -587,6 +644,24 @@ describe("Player and mercenary configuration", function()
 		assert.are.equal("actor", ConfigScope.forVar("minionsConditionLeechingEnergyShield"))
 		assert.are.equal("actor", ConfigScope.forVar("minionConditionOnProfaneGround"))
 		assert.are.equal("actor", ConfigScope.forVar("minionsUsePowerCharges"))
+	end)
+
+	it("requires configuration sections to declare ownership", function()
+		local ConfigScope = require("Modules/ConfigScope")
+		local varList = LoadModule("Modules/ConfigOptions")
+		for _, varData in ipairs(varList) do
+			if varData.section then
+				assert.is_truthy(varData.scope, varData.section.." is missing explicit scope")
+				assert.is_truthy(({ shared = true, actor = true, player = true })[varData.scope], varData.section)
+			end
+		end
+		assert.has_error(function()
+			ConfigScope.index({
+				{ section = "Brand New Encounter Settings", col = 1 },
+				{ var = "brandNewEncounterFlag", type = "check" },
+			})
+		end)
+		ConfigScope.index(varList)
 	end)
 
 	it("stores minion Full Life config on the viewed actor", function()

@@ -4586,11 +4586,15 @@ function calcs.perform(env, skipEHP)
 		env.configPlaceholder = savedPlaceholder
 	end
 	if env.mercenaryMinion and env.mercenaryMinion.mainSkill then
+		-- Mercenary-created minions must run in the Mercenary actor environment so
+		-- env.configInput / env.configPlaceholder (physMode, ailmentMode, distances,
+		-- ...) match the summoner instead of the root character.
+		local mercEnv = env.mercenary.calcEnv or env
 		doActorLifeMana(env.mercenaryMinion)
-		calcs.defence(env, env.mercenaryMinion)
-		if not skipEHP then calcs.buildDefenceEstimations(env, env.mercenaryMinion) end
-		calcs.triggers(env, env.mercenaryMinion)
-		calcs.offence(env, env.mercenaryMinion, env.mercenaryMinion.mainSkill)
+		calcs.defence(mercEnv, env.mercenaryMinion)
+		if not skipEHP then calcs.buildDefenceEstimations(mercEnv, env.mercenaryMinion) end
+		calcs.triggers(mercEnv, env.mercenaryMinion)
+		calcs.offence(mercEnv, env.mercenaryMinion, env.mercenaryMinion.mainSkill)
 	end
 
 	-- Hit-by-element conditions for EE are established during offence.

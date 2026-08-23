@@ -162,12 +162,17 @@ function ConfigScope.index(varList)
 	local sectionScope = "actor"
 	for _, varData in ipairs(varList or { }) do
 		if varData.section then
-			if PLAYER_SECTIONS[varData.section] then
+			if varData.scope then
+				if not VALID_SCOPE[varData.scope] then
+					error("ConfigScope: invalid scope '"..tostring(varData.scope).."' for section "..tostring(varData.section))
+				end
+				sectionScope = varData.scope
+			elseif PLAYER_SECTIONS[varData.section] then
 				sectionScope = "player"
 			elseif SHARED_SECTIONS[varData.section] then
 				sectionScope = "shared"
 			else
-				sectionScope = varData.scope or "actor"
+				error("ConfigScope: section '"..tostring(varData.section).."' needs explicit scope")
 			end
 		end
 		if varData.var then

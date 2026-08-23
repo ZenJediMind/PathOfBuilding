@@ -376,10 +376,14 @@ function calcs.initMercenary(env)
 
 	-- Skill building reads `env.player` and `env.modDB` for the actor that owns the
 	-- skill. This proxy environment presents the Mercenary as that actor while
-	-- everything else still falls through to the real environment, which is the
-	-- invariant `calcs.buildActiveSkillModList`, `calcs.mirages` and the Mercenary
-	-- branches of `CalcPerform` rely on: `mercenaryEnv.player` is the Mercenary, and
-	-- `env.player` is always the character.
+	-- everything else still falls through to the real environment.
+	-- Actor-local fields that must stay correct under both player and Mercenary
+	-- calculation contexts: player, modDB, configInput, configPlaceholder,
+	-- enemySourceDB / source-owned state, and item/skill ownership.
+	-- Mercenary-related calculation entry points should take this environment
+	-- rather than the root env when they read those fields.
+	-- Invariant: `mercenaryEnv.player` is the Mercenary; `env.player` is always
+	-- the character.
 	local mercenaryEnv = setmetatable({ modDB = mercenary.modDB, player = mercenary }, { __index = env })
 	if env.build.configTab.GetActorConfigInput then
 		local mercInput, mercPlaceholder = env.build.configTab:GetActorConfigInput("mercenary")

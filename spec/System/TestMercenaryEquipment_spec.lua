@@ -290,24 +290,6 @@ describe("Mercenary equipment validation", function()
 		assert.are.equal(tostring(mercSet.id), mercenaryXml.attrib.itemSetId)
 	end)
 
-	it("does not overwrite generic slots when loading mixed Mercenary keys", function()
-		local itemsTab = build.itemsTab
-		itemsTab.items[9001] = { id = 9001, name = "Kept Helmet", type = "Helmet", base = { type = "Helmet" }, rarity = "NORMAL" }
-		itemsTab.items[9100] = { id = 9100, name = "Prefixed Helmet", type = "Helmet", base = { type = "Helmet" }, rarity = "NORMAL" }
-		itemsTab:Load({
-			attrib = { activeItemSet = "7", useSecondWeaponSet = "false" },
-			{
-				elem = "ItemSet",
-				attrib = { id = "7", title = "Legacy Active", useSecondWeaponSet = "false" },
-				{ elem = "Slot", attrib = { name = "Helmet", itemId = "9001" } },
-				{ elem = "Slot", attrib = { name = "Mercenary Helmet", itemId = "9100" } },
-			},
-		})
-		assert.are.equal(9001, itemsTab.itemSets[7].Helmet.selItemId)
-		assert.is_nil(itemsTab.itemSets[7]["Mercenary Helmet"])
-		assert.is_nil(itemsTab.itemSets[7].owner)
-	end)
-
 	it("selects the Mercenary equipment item set from the Mercenary tab", function()
 		selectBuild("MeleeAOEMarauderFireSlam")
 		local itemsTab = build.itemsTab

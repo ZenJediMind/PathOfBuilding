@@ -54,10 +54,13 @@ describe("Custom modifier controls", function()
 			end
 		end
 
-		assert.are.same({ "Minions deal 12% increased Damage" }, minionDamageEntries)
+		-- Collapse is first-seen among equivalent numeric tiers; the displayed
+		-- value depends on tree.nodes iteration order and must not be hardcoded.
+		assert.are.equal(1, #minionDamageEntries)
+		assert.matches("^Minions deal %d+%% increased Damage$", minionDamageEntries[1])
 		popup.controls.listControl.selIndex = minionDamageIndex
 		popup.controls.save.onClick()
-		assert.are.equal("Minions deal 12% increased Damage", blockData.text)
+		assert.are.equal(minionDamageEntries[1], blockData.text)
 	end)
 
 	it("orders modifiers alphabetically while ignoring numeric values", function()

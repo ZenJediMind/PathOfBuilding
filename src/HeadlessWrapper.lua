@@ -31,15 +31,12 @@ function require(name)
 	return l_require(name)
 end
 
--- Headless bootstrap: keep the source directory on package.path so `require()`
--- of local modules works when CI or a host Lua only supplies runtime/lua via LUA_PATH.
--- This wrapper is the headless/tooling entry point, not GUI runtime.
-package.path = "./?.lua;./?/init.lua;" .. package.path
-
 
 dofile("Launch.lua")
 
--- The CI env var will be true when run from github workflows but should be false for other tools using the headless wrapper
+-- Prevents loading of ModCache
+-- Allows running mod parsing related tests without pushing ModCache
+-- The CI env var will be true when run from github workflows but should be false for other tools using the headless wrapper 
 __mainObject__.continuousIntegrationMode = os.getenv("CI")
 
 runCallback("OnInit")

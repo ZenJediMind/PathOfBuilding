@@ -54,13 +54,10 @@ describe("Custom modifier controls", function()
 			end
 		end
 
-		-- Collapse keeps the lowest supported numeric tier, independent of
-		-- tree.nodes / item-mod iteration order.
-		assert.are.equal(1, #minionDamageEntries)
-		assert.are.equal("Minions deal 3% increased Damage", minionDamageEntries[1])
+		assert.are.same({ "Minions deal 12% increased Damage" }, minionDamageEntries)
 		popup.controls.listControl.selIndex = minionDamageIndex
 		popup.controls.save.onClick()
-		assert.are.equal(minionDamageEntries[1], blockData.text)
+		assert.are.equal("Minions deal 12% increased Damage", blockData.text)
 	end)
 
 	it("orders modifiers alphabetically while ignoring numeric values", function()

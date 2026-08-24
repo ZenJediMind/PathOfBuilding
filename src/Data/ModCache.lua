@@ -19862,7 +19862,6 @@ c["Shadow: 12% increased Attack and Cast Speed"]={{[1]={[1]={type="Condition",va
 c["Share Endurance Charges with nearby party members"]={nil,"Share Endurance Charges with nearby party members "}
 c["Share Endurance Charges with nearby party members Gain an Endurance Charge when you are Hit"]={nil,"Share Endurance Charges with nearby party members Gain an Endurance Charge when you are Hit "}
 c["Share Endurance Charges with nearby party members Gain up to maximum Endurance Charges when you take a Critical Strike"]={nil,"Share Endurance Charges with nearby party members Gain up to maximum Endurance Charges when you take a Critical Strike "}
-end)();(function()
 c["Share Endurance, Frenzy and Power Charges with nearby party members"]={nil,"Share Endurance, Frenzy and Power Charges with nearby party members "}
 c["Share Endurance, Frenzy and Power Charges with nearby party members Limited to 1 Keystone Tattoo"]={nil,"Share Endurance, Frenzy and Power Charges with nearby party members Limited to 1 Keystone Tattoo "}
 c["Shared Suffering"]={nil,"Shared Suffering "}
@@ -20009,6 +20008,7 @@ c["Skills Socketed in your Boots are Supported by level 20 Ice Bite"]={{[1]={[1]
 c["Skills Socketed in your Boots are Supported by level 20 Ignite Proliferation"]={{[1]={[1]={slotName="Boots",type="SocketedIn"},flags=0,keywordFlags=0,name="ExtraSupport",type="LIST",value={appliesToGrantedSkills=true,level=20,skillId="SupportIgniteProliferation"}}},nil}
 end)();(function()
 c["Skills Socketed in your Boots are Supported by level 20 Immolate"]={{[1]={[1]={slotName="Boots",type="SocketedIn"},flags=0,keywordFlags=0,name="ExtraSupport",type="LIST",value={appliesToGrantedSkills=true,level=20,skillId="SupportImmolate"}}},nil}
+end)();(function()
 c["Skills Socketed in your Boots are Supported by level 20 Impale"]={{[1]={[1]={slotName="Boots",type="SocketedIn"},flags=0,keywordFlags=0,name="ExtraSupport",type="LIST",value={appliesToGrantedSkills=true,level=20,skillId="SupportImpale"}}},nil}
 c["Skills Socketed in your Boots are Supported by level 20 Increased Area of Effect"]={{[1]={[1]={slotName="Boots",type="SocketedIn"},flags=0,keywordFlags=0,name="ExtraSupport",type="LIST",value={appliesToGrantedSkills=true,level=20,skillId="SupportIncreasedAreaOfEffect"}}},nil}
 c["Skills Socketed in your Boots are Supported by level 20 Increased Critical Damage"]={{[1]={[1]={slotName="Boots",type="SocketedIn"},flags=0,keywordFlags=0,name="ExtraSupport",type="LIST",value={appliesToGrantedSkills=true,level=20,skillId="SupportIncreasedCriticalDamage"}}},nil}

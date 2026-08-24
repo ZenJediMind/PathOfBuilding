@@ -431,15 +431,7 @@ function ConfigTabClass:ConfigTab(build)
 					if not launch.devModeAlt then
 						return
 					end
-					local out
-					local mods = self.build.calcsTab.mainEnv.conditionsUsed[ifOption]
-					if not mods then
-						return out
-					end
-					for _, mod in ipairs(mods) do
-						out = (out and out.."\n" or "") .. modLib.formatMod(mod) .. "|" .. mod.source
-					end
-					return out
+					return configVisibility.formatUsedMods(self.build.calcsTab.mainEnv, "conditionsUsed", varData, self:GetViewActor(), ifOption)
 				end))
 			end
 			if varData.ifMinionCond then
@@ -453,15 +445,7 @@ function ConfigTabClass:ConfigTab(build)
 					if not launch.devModeAlt then
 						return
 					end
-					local out
-					local mods = configVisibility.usedForVar(self.build.calcsTab.mainEnv, "minionConditionsUsed", varData, self:GetViewActor())[ifOption]
-					if not mods then
-						return out
-					end
-					for _, mod in ipairs(mods) do
-						out = (out and out.."\n" or "") .. modLib.formatMod(mod) .. "|" .. mod.source
-					end
-					return out
+					return configVisibility.formatUsedMods(self.build.calcsTab.mainEnv, "minionConditionsUsed", varData, self:GetViewActor(), ifOption)
 				end))
 			end
 			if varData.ifEnemyCond then
@@ -496,8 +480,7 @@ function ConfigTabClass:ConfigTab(build)
 					if not launch.devModeAlt then
 						return
 					end
-					local out = "Condition state: " .. ifOption .. "=" .. tostring(self.build.calcsTab.mainEnv.player.modDB.conditions[ifOption])
-					return out
+					return configVisibility.formatCondTrue(self.build.calcsTab.mainEnv, varData, self:GetViewActor(), ifOption)
 				end))
 			end
 			if varData.ifMult then
@@ -511,15 +494,7 @@ function ConfigTabClass:ConfigTab(build)
 					if not launch.devModeAlt then
 						return
 					end
-					local out
-					local mods = self.build.calcsTab.mainEnv.multipliersUsed[ifOption]
-					if not mods then
-						return out
-					end
-					for _, mod in ipairs(mods) do
-						out = (out and out.."\n" or "") .. modLib.formatMod(mod) .. "|" .. mod.source
-					end
-					return out
+					return configVisibility.formatUsedMods(self.build.calcsTab.mainEnv, "multipliersUsed", varData, self:GetViewActor(), ifOption)
 				end))
 			end
 			if varData.ifEnemyMult then
@@ -555,13 +530,7 @@ function ConfigTabClass:ConfigTab(build)
 					if not launch.devModeAlt then
 						return
 					end
-					local out
-					local mods = self.build.calcsTab.mainEnv.perStatsUsed[ifOption]
-					if mods then
-						for _, mod in ipairs(mods) do
-							out = (out and out.."\n" or "") .. modLib.formatMod(mod) .. "|" .. mod.source
-						end
-					end
+					local out = configVisibility.formatUsedMods(self.build.calcsTab.mainEnv, "perStatsUsed", varData, self:GetViewActor(), ifOption)
 					local mods2 = self.build.calcsTab.mainEnv.enemyMultipliersUsed[ifOption]
 					if mods2 then
 						for _, mod in ipairs(mods2) do
@@ -634,15 +603,7 @@ function ConfigTabClass:ConfigTab(build)
 					if not launch.devModeAlt then
 						return
 					end
-					local out
-					local mods = self.build.calcsTab.mainEnv.modsUsed[ifOption]
-					if not mods then
-						return out
-					end
-					for _, mod in ipairs(mods) do
-						out = (out and out.."\n" or "") .. modLib.formatMod(mod) .. "|" .. mod.source
-					end
-					return out
+					return configVisibility.formatUsedMods(self.build.calcsTab.mainEnv, "modsUsed", varData, self:GetViewActor(), ifOption)
 				end))
 			end
 			if varData.ifSkill then
@@ -1107,11 +1068,12 @@ function ConfigTabClass:Save(xml)
 		local child = { elem = "ConfigSet", attrib = { id = tostring(configSetId), title = configSet.title } }
 		t_insert(xml, child)
 
-		writeInputs(child, configSet.input, configSet.placeholder, function(var) return ConfigScope.forVar(var) == "shared" end)
-		writePlaceholders(child, configSet.placeholder, function(var) return ConfigScope.forVar(var) == "shared" end)
+		writeInputs(child, configSet.input, configSet.placeholder, function(var) return ConfigScope.tryForVar(var) == "shared" end)
+		writePlaceholders(child, configSet.placeholder, function(var) return ConfigScope.tryForVar(var) == "shared" end)
 		writeActor(child, "player", configSet.input, configSet.placeholder, configSet.customModsList, configSet.actors.player.itemSetId, function(var)
-			local scope = ConfigScope.forVar(var)
-			return scope == "actor" or scope == "player"
+			local scope = ConfigScope.tryForVar(var)
+			-- Unknown leftover keys stay on the player actor instead of being dropped or reclassified.
+			return scope == "actor" or scope == "player" or scope == nil
 		end)
 		writeActor(child, "mercenary", configSet.actors.mercenary.input, configSet.actors.mercenary.placeholder, configSet.actors.mercenary.customModsList, configSet.actors.mercenary.itemSetId)
 	end
@@ -1340,12 +1302,12 @@ function ConfigTabClass:GetActorConfigInput(actor)
 	end
 	local input, placeholder = { }, { }
 	for k, v in pairs(configSet.input) do
-		if ConfigScope.forVar(k) == "shared" then
+		if ConfigScope.tryForVar(k) == "shared" then
 			input[k] = v
 		end
 	end
 	for k, v in pairs(configSet.placeholder) do
-		if ConfigScope.forVar(k) == "shared" then
+		if ConfigScope.tryForVar(k) == "shared" then
 			placeholder[k] = v
 		end
 	end

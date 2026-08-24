@@ -24,7 +24,7 @@ jobs:
         uses: actions/checkout@v4
       - name: Regenerate ModCache
         env:
-          LUA_PATH: ../runtime/lua/?.lua;../runtime/lua/?/init.lua
+          LUA_PATH: ./?.lua;./?/init.lua;../runtime/lua/?.lua;../runtime/lua/?/init.lua
           REGENERATE_MOD_CACHE: 1
         run: cd src; luajit HeadlessWrapper.lua
       - run: git config --global --add safe.directory $(pwd)

@@ -621,30 +621,63 @@ describe("Player and mercenary configuration", function()
 	it("requires enemy-list config writes to be shared or source-owned", function()
 		local ConfigScope = require("Modules.ConfigScope")
 		local varList = LoadModule("Modules/ConfigOptions")
-		local sourceLines = { }
-		local file = assert(io.open("Modules/ConfigOptions.lua", "r"))
-		local lineNo = 0
-		for line in file:lines() do
-			lineNo = lineNo + 1
-			sourceLines[lineNo] = line
+		local stubControl = { SetPlaceholder = function() end, selIndex = 1 }
+		local stubBuild = {
+			configTab = {
+				input = { multiplierMapModEffect = 0 },
+				enemyLevel = 83,
+				UpdateLevel = function() end,
+				varControls = setmetatable({ }, {
+					__index = function()
+						return stubControl
+					end,
+				}),
+			},
+		}
+		local function dummyValue(varData)
+			if varData.type == "check" then
+				return true
+			elseif varData.type == "list" then
+				if varData.list then
+					for _, entry in ipairs(varData.list) do
+						if entry.val and entry.val ~= "NONE" and entry.val ~= "None" then
+							return entry.val
+						end
+					end
+					return varData.list[1] and varData.list[1].val
+				end
+				return "Boss"
+			elseif varData.type == "text" then
+				return "x"
+			end
+			return 1
 		end
-		file:close()
+		local function spyList()
+			local writes = 0
+			local list = {
+				NewMod = function()
+					writes = writes + 1
+				end,
+				AddMod = function()
+					writes = writes + 1
+				end,
+				AddList = function()
+					writes = writes + 1
+				end,
+			}
+			return list, function()
+				return writes
+			end
+		end
 
 		local sawWithered = false
 		local failures = { }
 		for _, varData in ipairs(varList) do
 			if varData.var and type(varData.apply) == "function" then
-				local info = debug.getinfo(varData.apply, "S")
-				local writesEnemy = false
-				if info and info.linedefined and info.lastlinedefined then
-					for i = info.linedefined, info.lastlinedefined do
-						if sourceLines[i] and sourceLines[i]:find("enemyModList:", 1, true) then
-							writesEnemy = true
-							break
-						end
-					end
-				end
-				if writesEnemy then
+				local mods = spyList()
+				local enemy, enemyWrites = spyList()
+				pcall(varData.apply, dummyValue(varData), mods, enemy, stubBuild)
+				if enemyWrites() > 0 then
 					if varData.var == "multiplierWitheredStackCount" then
 						sawWithered = true
 					end
@@ -656,8 +689,47 @@ describe("Player and mercenary configuration", function()
 				end
 			end
 		end
-		assert.is_true(sawWithered, "scan should observe Withered stacks writing to enemyModList")
+		assert.is_true(sawWithered, "apply should observe Withered stacks writing to enemyModList")
 		assert.are.same({ }, failures)
+	end)
+
+	it("rejects unindexed and unknown config vars", function()
+		local live = require("Modules.ConfigScope")
+		package.loaded["Modules.ConfigScope"] = nil
+		local fresh = require("Modules.ConfigScope")
+		assert.has_error(function()
+			fresh.forVar("bandit")
+		end)
+		assert.has_error(function()
+			fresh.enemyStateForVar("conditionEnemyChilled")
+		end)
+		package.loaded["Modules.ConfigScope"] = live
+
+		assert.has_error(function()
+			live.forVar("thisConfigVarDoesNotExist")
+		end)
+		assert.has_error(function()
+			live.enemyStateForVar("thisConfigVarDoesNotExist")
+		end)
+		assert.is_nil(live.tryForVar("thisConfigVarDoesNotExist"))
+		assert.has_error(function()
+			live.index({
+				{ section = "When In Combat", col = 1, scope = "actor" },
+				{ var = "enemyBrandNewEncounterFlag", type = "check" },
+			})
+		end)
+		live.index(LoadModule("Modules/ConfigOptions"))
+	end)
+
+	it("dev tooltips report the viewed actor's condition state", function()
+		local configVisibility = require("Modules.ConfigVisibility")
+		local varData = { var = "conditionUsedRubyFlaskRecently", resolvedScope = "actor" }
+		local mainEnv = {
+			player = { modDB = { conditions = { HaveRubyFlask = true } } },
+			mercenary = { modDB = { conditions = { HaveRubyFlask = false } } },
+		}
+		assert.are.equal("Condition state: HaveRubyFlask=true", configVisibility.formatCondTrue(mainEnv, varData, "player", "HaveRubyFlask"))
+		assert.are.equal("Condition state: HaveRubyFlask=false", configVisibility.formatCondTrue(mainEnv, varData, "mercenary", "HaveRubyFlask"))
 	end)
 
 	it("classifies minion-state config as actor-scoped, not player-only", function()

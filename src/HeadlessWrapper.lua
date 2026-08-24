@@ -31,8 +31,9 @@ function require(name)
 	return l_require(name)
 end
 
--- CI sets LUA_PATH to runtime/lua only. Local modules use require(), so keep
--- the source directory on package.path for headless regeneration and tests.
+-- Headless bootstrap: keep the source directory on package.path so `require()`
+-- of local modules works when CI or a host Lua only supplies runtime/lua via LUA_PATH.
+-- This wrapper is the headless/tooling entry point, not GUI runtime.
 package.path = "./?.lua;./?/init.lua;" .. package.path
 
 

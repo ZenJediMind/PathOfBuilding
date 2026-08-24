@@ -2216,4 +2216,32 @@ Precise Technique
 		assert.is_nil(env.mercenaryMinion)
 		assert.is_false(env.mercenary.calcEnv.minion)
 	end)
+
+	it("refuses to construct a Mercenary env that omits actor-local fields", function()
+		local calcs = require("Modules.CalcBase")
+		assert.has_error(function()
+			calcs.createActorCalcEnv({ data = { } }, {
+				modDB = { },
+				player = { },
+				keystonesAdded = { },
+				minion = false,
+			})
+		end)
+		local root = { data = { shared = true }, player = { name = "root" }, minion = { name = "rootMinion" } }
+		local proxy = calcs.createActorCalcEnv(root, {
+			modDB = { },
+			player = { name = "merc" },
+			keystonesAdded = { },
+			minion = false,
+			configInput = { },
+			configPlaceholder = { },
+		})
+		assert.are.equal("merc", proxy.player.name)
+		assert.is_true(proxy.data.shared)
+		assert.is_false(proxy.minion)
+		proxy.minion = nil
+		assert.has_error(function()
+			return proxy.minion
+		end)
+	end)
 end)

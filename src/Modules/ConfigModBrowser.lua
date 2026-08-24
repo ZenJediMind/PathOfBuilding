@@ -47,6 +47,25 @@ local function getModTemplate(modText)
 	end
 	return modTemplateCache[modText]
 end
+local function numericPrefix(line)
+	return tonumber(line:match("(%-?%d+%.?%d*)")) or math.huge
+end
+
+-- Collapse equivalent numeric tiers with a total order so tree/item iteration
+-- cannot change the kept line: supported text wins, then the lowest first
+-- number, then lexicographically earliest text.
+local function isBetterCollapsed(candidate, candidateSupported, current, currentSupported)
+	local candSup, curSup = not not candidateSupported, not not currentSupported
+	if candSup ~= curSup then
+		return candSup
+	end
+	local currentNum, candidateNum = numericPrefix(current), numericPrefix(candidate)
+	if candidateNum ~= currentNum then
+		return candidateNum < currentNum
+	end
+	return candidate < current
+end
+
 ---@param set table
 ---@param line string
 ---@param source string
@@ -56,16 +75,14 @@ local function addModLine(set, line, source, supported)
 	local template = getModTemplate(line)
 	local modEntry = set[template]
 	if not modEntry then
-		modEntry = { text = line, sources = { [source] = true } }
+		modEntry = { text = line, sources = { [source] = true }, supported = supported or false }
 		set[template] = modEntry
-	else
-		modEntry.sources[source] = true
+		return
 	end
-	if supported ~= nil then
-		if supported and not modEntry.supported then
-			modEntry.text = line
-		end
-		modEntry.supported = modEntry.supported or supported
+	modEntry.sources[source] = true
+	if isBetterCollapsed(line, supported, modEntry.text, modEntry.supported) then
+		modEntry.text = line
+		modEntry.supported = supported or false
 	end
 end
 ---@param seenGroups table
@@ -73,29 +90,36 @@ end
 ---@param mod table
 ---@param source string
 local function addItemMod(seenGroups, set, mod, source)
-	if not seenGroups[mod.group] then
+	local alreadySeenGroup = seenGroups[mod.group]
+	if not alreadySeenGroup then
 		seenGroups[mod.group] = true
+	end
+	local function consider(line)
 		-- the actual trade hashes aren't relevant, but this
 		-- field is separated by stat description, which
 		-- means that getting rid of split lines won't
 		-- result in accidentally combining two separate
 		-- stats
-		if mod.tradeHashes then
-			for _, statDescription in pairs(mod.tradeHashes) do
-				local line = table.concat(statDescription, " ")
-				-- note that exactly 0.5 range is necessary as that is what the
-				-- mod cache uses
-				local rangedLine = itemLib.applyRange(line, 0.5)
-				local modList, extra = modLib.parseMod(rangedLine)
-				addModLine(set, rangedLine, source, (not not modList) and not extra)
-			end
-		else
-			-- crafted mods have a different format
-			for _, line in ipairs(mod) do
-				local rangedLine = itemLib.applyRange(line, 0.5)
-				local modList, extra = modLib.parseMod(rangedLine)
-				addModLine(set, rangedLine, source, (not not modList) and not extra)
-			end
+		-- note that exactly 0.5 range is necessary as that is what the
+		-- mod cache uses
+		local rangedLine = itemLib.applyRange(line, 0.5)
+		local template = getModTemplate(rangedLine)
+		if alreadySeenGroup and not set[template] then
+			-- Later tiers of a multi-stat group would otherwise add a new row
+			-- per tier. Same-template numeric tiers still reach addModLine.
+			return
+		end
+		local modList, extra = modLib.parseMod(rangedLine)
+		addModLine(set, rangedLine, source, (not not modList) and not extra)
+	end
+	if mod.tradeHashes then
+		for _, statDescription in pairs(mod.tradeHashes) do
+			consider(table.concat(statDescription, " "))
+		end
+	else
+		-- crafted mods have a different format
+		for _, line in ipairs(mod) do
+			consider(line)
 		end
 	end
 end

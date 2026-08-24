@@ -222,6 +222,47 @@ local function attachEnemySourceDB(env, actor, sourceModList)
 	actor.enemySourceDB = sourceDB
 end
 
+-- Fields that must never fall through a proxy env to another actor.
+-- Add new actor-local env keys here; createActorCalcEnv will refuse to
+-- construct a proxy that omits them, and will error if they are read unset.
+calcs.ACTOR_LOCAL_ENV_KEYS = {
+	"player",
+	"modDB",
+	"configInput",
+	"configPlaceholder",
+	"keystonesAdded",
+	"minion",
+}
+
+local actorLocalEnvKeySet = { }
+for _, key in ipairs(calcs.ACTOR_LOCAL_ENV_KEYS) do
+	actorLocalEnvKeySet[key] = true
+end
+
+-- Build an actor-scoped calculation environment over `rootEnv`.
+-- Inheritable encounter/build state is read from the root; actor-local
+-- fields must be supplied on `actorFields` (use `false` rather than nil
+-- when the actor has no value, so __index cannot leak the root actor).
+function calcs.createActorCalcEnv(rootEnv, actorFields)
+	if not rootEnv then
+		error("createActorCalcEnv requires a root environment")
+	end
+	actorFields = actorFields or { }
+	for _, key in ipairs(calcs.ACTOR_LOCAL_ENV_KEYS) do
+		if actorFields[key] == nil then
+			error("createActorCalcEnv: missing actor-local field '"..key.."'")
+		end
+	end
+	return setmetatable(actorFields, {
+		__index = function(_, key)
+			if actorLocalEnvKeySet[key] then
+				error("createActorCalcEnv: actor-local field '"..key.."' is unset")
+			end
+			return rootEnv[key]
+		end,
+	})
+end
+
 function calcs.initMercenary(env)
 	local tab = env.build.mercenaryTab
 	env.mercenary = nil
@@ -376,26 +417,22 @@ function calcs.initMercenary(env)
 
 	-- Skill building reads `env.player` and `env.modDB` for the actor that owns the
 	-- skill. This proxy environment presents the Mercenary as that actor while
-	-- everything else still falls through to the real environment.
-	-- Actor-local fields that must stay correct under both player and Mercenary
-	-- calculation contexts: player, modDB, configInput, configPlaceholder,
-	-- keystonesAdded, minion, enemySourceDB / source-owned state, and item/skill ownership.
-	-- Mercenary-related calculation entry points should take this environment
-	-- rather than the root env when they read those fields.
+	-- inheritable encounter/build state still falls through to the real environment.
 	-- Invariant: `mercenaryEnv.player` is the Mercenary; `env.player` is always
 	-- the character. `mercenaryEnv.minion` is the Mercenary minion or false.
 	-- false (not nil) prevents __index from returning the player's minion.
-	local mercenaryEnv = setmetatable({
+	local mercInput, mercPlaceholder = { }, { }
+	if env.build.configTab.GetActorConfigInput then
+		mercInput, mercPlaceholder = env.build.configTab:GetActorConfigInput("mercenary")
+	end
+	local mercenaryEnv = calcs.createActorCalcEnv(env, {
 		modDB = mercenary.modDB,
 		player = mercenary,
 		keystonesAdded = { },
 		minion = false,
-	}, { __index = env })
-	if env.build.configTab.GetActorConfigInput then
-		local mercInput, mercPlaceholder = env.build.configTab:GetActorConfigInput("mercenary")
-		mercenaryEnv.configInput = mercInput
-		mercenaryEnv.configPlaceholder = mercPlaceholder
-	end
+		configInput = mercInput,
+		configPlaceholder = mercPlaceholder,
+	})
 	mercenary.calcEnv = mercenaryEnv
 	local function addActiveSkill(selectedSkill, grantedEffect, supports, isPrimary, sourceItem)
 		local skillPart = isPrimary and selectedSkill.skillPart or env.data.mercenaryStatData.defaultSkillParts[grantedEffect.id] or 1

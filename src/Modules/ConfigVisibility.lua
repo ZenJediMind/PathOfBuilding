@@ -76,6 +76,34 @@ local function actorKeysForVar(varData, viewActor)
 	return { "mercenary" }
 end
 
+local function formatUsedMods(mainEnv, envKey, varData, viewActor, ifOption)
+	local mods = usedForVar(mainEnv, envKey, varData, viewActor)[ifOption]
+	if not mods then
+		return
+	end
+	local out
+	for _, mod in ipairs(mods) do
+		out = (out and out.."\n" or "") .. modLib.formatMod(mod) .. "|" .. mod.source
+	end
+	return out
+end
+
+local function formatCondTrue(mainEnv, varData, viewActor, ifOption)
+	local keys = actorKeysForVar(varData, viewActor)
+	if #keys == 1 then
+		local actor = mainEnv and mainEnv[keys[1]]
+		return "Condition state: " .. ifOption .. "=" .. tostring(actor and actor.modDB and actor.modDB.conditions[ifOption])
+	end
+	local out
+	for _, actorKey in ipairs(keys) do
+		local actor = mainEnv and mainEnv[actorKey]
+		local value = actor and actor.modDB and actor.modDB.conditions[ifOption]
+		local line = actorKey .. " " .. ifOption .. "=" .. tostring(value)
+		out = (out and out.."\n" or "") .. line
+	end
+	return out and ("Condition state:\n" .. out) or ("Condition state: " .. ifOption .. "=nil")
+end
+
 local function anyPrimaryActor(mainEnv, predicate, actorKeys)
 	for _, actorKey in ipairs(actorKeys or PRIMARY_ACTOR_KEYS) do
 		local actor = mainEnv and mainEnv[actorKey]
@@ -252,4 +280,6 @@ return {
 	isRelevantForBuild = isRelevantForBuild,
 	isShowAllExcluded = isShowAllExcluded,
 	usedForVar = usedForVar,
+	formatUsedMods = formatUsedMods,
+	formatCondTrue = formatCondTrue,
 }

@@ -54,10 +54,10 @@ describe("Custom modifier controls", function()
 			end
 		end
 
-		-- Collapse is first-seen among equivalent numeric tiers; the displayed
-		-- value depends on tree.nodes iteration order and must not be hardcoded.
+		-- Collapse keeps the lowest supported numeric tier, independent of
+		-- tree.nodes / item-mod iteration order.
 		assert.are.equal(1, #minionDamageEntries)
-		assert.matches("^Minions deal %d+%% increased Damage$", minionDamageEntries[1])
+		assert.are.equal("Minions deal 3% increased Damage", minionDamageEntries[1])
 		popup.controls.listControl.selIndex = minionDamageIndex
 		popup.controls.save.onClick()
 		assert.are.equal(minionDamageEntries[1], blockData.text)

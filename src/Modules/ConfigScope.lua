@@ -4,6 +4,14 @@
 -- Classifies Configuration options as shared (encounter), actor, or player-only.
 -- Enemy writes are further classified as encounter state or source-owned ("by you") state.
 --
+-- Runtime bootstrap: Classes/ConfigTab.lua calls ConfigScope.index(ConfigOptions).
+-- Querying before a successful index(), or looking up a name that was not indexed,
+-- is an error. Legacy XML keys that are no longer in ConfigOptions should use tryForVar().
+--
+-- Options inherit their section's scope unless they set `scope` explicitly. Naming
+-- heuristics still detect likely section overrides so a new option cannot silently
+-- change actor vs encounter ownership; those cases require explicit metadata.
+--
 local ConfigScope = { }
 
 local PLAYER_VARS = {
@@ -102,6 +110,12 @@ local VALID_SCOPE = {
 	player = true,
 }
 
+local function requireIndexed()
+	if not indexed then
+		error("ConfigScope queried before index()")
+	end
+end
+
 local function inferEnemyState(varData)
 	if varData.enemyState then
 		if not VALID_ENEMY_STATE[varData.enemyState] then
@@ -115,23 +129,13 @@ local function inferEnemyState(varData)
 	return "encounter"
 end
 
-local function inferScope(varData, sectionScope)
-	-- Source-owned enemy predicates are per-actor even if a section default is shared.
-	if inferEnemyState(varData) == "source" then
-		return "actor"
-	end
-	if varData.scope then
-		if not VALID_SCOPE[varData.scope] then
-			error("ConfigScope: invalid scope '"..tostring(varData.scope).."' for "..tostring(varData.var))
-		end
-		return varData.scope
-	end
+-- Name/predicate hints that would pull an option off its section default.
+-- Returning nil means "use the section scope".
+local function heuristicScope(varData)
 	local var = varData.var or ""
 	if var:match("^playerCursed") then
 		return "actor"
 	end
-	-- Minion-state options (minionsCondition*, minionsUse*, ifMinionCond) describe the
-	-- viewed actor's minions, including Mercenary minions, so they stay actor-scoped.
 	if PLAYER_VARS[var] or var:match("^overrideEmpty") then
 		return "player"
 	end
@@ -143,14 +147,36 @@ local function inferScope(varData, sectionScope)
 	then
 		return "shared"
 	end
+	return nil
+end
+
+local function inferScope(varData, sectionScope)
+	-- Source-owned enemy predicates are per-actor even if a section default is shared.
+	if inferEnemyState(varData) == "source" then
+		return "actor"
+	end
+	if varData.scope then
+		if not VALID_SCOPE[varData.scope] then
+			error("ConfigScope: invalid scope '"..tostring(varData.scope).."' for "..tostring(varData.var))
+		end
+		return varData.scope
+	end
+	local guessed = heuristicScope(varData)
+	if guessed and guessed ~= sectionScope then
+		error("ConfigScope: '"..tostring(varData.var).."' needs explicit scope (heuristic '"..guessed.."' vs section '"..tostring(sectionScope).."')")
+	end
 	return sectionScope or "actor"
 end
 
 function ConfigScope.index(varList)
+	indexed = false
 	scopeByVar = { }
 	enemyStateByVar = { }
+	if varList == nil then
+		error("ConfigScope.index requires a config option list")
+	end
 	local sectionScope = "actor"
-	for _, varData in ipairs(varList or { }) do
+	for _, varData in ipairs(varList) do
 		if varData.section then
 			if not varData.scope then
 				error("ConfigScope: section '"..tostring(varData.section).."' needs explicit scope")
@@ -171,11 +197,28 @@ function ConfigScope.index(varList)
 	indexed = true
 end
 
-function ConfigScope.forVar(var)
+function ConfigScope.tryForVar(var)
+	requireIndexed()
 	if not var then
-		return "actor"
+		return nil
 	end
-	return scopeByVar[var] or "actor"
+	return scopeByVar[var]
+end
+
+function ConfigScope.tryEnemyStateForVar(var)
+	requireIndexed()
+	if not var then
+		return nil
+	end
+	return enemyStateByVar[var]
+end
+
+function ConfigScope.forVar(var)
+	local scope = ConfigScope.tryForVar(var)
+	if not scope then
+		error("ConfigScope: unknown config var '"..tostring(var).."'")
+	end
+	return scope
 end
 
 function ConfigScope.forVarData(varData)
@@ -185,14 +228,15 @@ function ConfigScope.forVarData(varData)
 	if varData and varData.var then
 		return ConfigScope.forVar(varData.var)
 	end
-	return "actor"
+	return nil
 end
 
 function ConfigScope.enemyStateForVar(var)
-	if not var then
-		return "encounter"
+	local enemyState = ConfigScope.tryEnemyStateForVar(var)
+	if not enemyState then
+		error("ConfigScope: unknown config var '"..tostring(var).."'")
 	end
-	return enemyStateByVar[var] or "encounter"
+	return enemyState
 end
 
 function ConfigScope.enemyStateForVarData(varData)
@@ -202,7 +246,7 @@ function ConfigScope.enemyStateForVarData(varData)
 	if varData and varData.var then
 		return ConfigScope.enemyStateForVar(varData.var)
 	end
-	return "encounter"
+	return nil
 end
 
 function ConfigScope.isIndexed()

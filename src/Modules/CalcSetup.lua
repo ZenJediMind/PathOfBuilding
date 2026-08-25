@@ -136,7 +136,7 @@ local function addMercenaryItem(env, mercenary, item, slotName, slotNum)
 			end
 		end
 	end
-	for _, itemMod in ipairs(item.modList or item.slotModList and item.slotModList[slotNum] or { }) do
+	for _, itemMod in ipairs(item.modList or item.slotModList[slotNum]) do
 		local key = modLib.formatMod(itemMod)
 		local presenceImplicit = (presenceImplicitCounts[key] or 0) > 0
 		if presenceImplicit then presenceImplicitCounts[key] = presenceImplicitCounts[key] - 1 end
@@ -234,9 +234,85 @@ calcs.ACTOR_LOCAL_ENV_KEYS = {
 	"minion",
 }
 
+-- Encounter/build state that a Mercenary calc env may inherit from the root.
+-- A new env field must be added here or to ACTOR_LOCAL_ENV_KEYS; unclassified
+-- fields cannot fall through to player state.
+calcs.ACTOR_SHARED_ENV_KEYS = {
+	"actorUsage",
+	"aegisItem",
+	"aegisModList",
+	"allocNodes",
+	"auxSkillList",
+	"breakdown",
+	"buffs",
+	"build",
+	"buildBreakdown",
+	"calcsInput",
+	"classId",
+	"conditionsUsed",
+	"crossLinkedSupportGroups",
+	"curseSlots",
+	"data",
+	"debuffs",
+	"enemy",
+	"enemyConditionsUsed",
+	"enemyDB",
+	"enemyLevel",
+	"enemyMultipliersUsed",
+	"enemyPerStatsUsed",
+	"explodeSources",
+	"extraRadiusNodeList",
+	"flasks",
+	"flaskSlotMap",
+	"flaskSlotOccupied",
+	"grantedPassives",
+	"grantedSkills",
+	"grantedSkillsItems",
+	"grantedSkillsNodes",
+	"initialNodeModDB",
+	"itemModDB",
+	"itemWarnings",
+	"limitedSkills",
+	"mainSocketGroup",
+	"mercenary",
+	"mercenaryBuffs",
+	"mercenaryCalculationErrors",
+	"mercenaryMinion",
+	"mercenaryMinionBuffs",
+	"minionBuffs",
+	"minionConditionsUsed",
+	"mode",
+	"mode_buffs",
+	"mode_combat",
+	"mode_effective",
+	"modsUsed",
+	"multipliersUsed",
+	"override",
+	"partyMembers",
+	"perStatsUsed",
+	"radiusJewelList",
+	"requirementsTable",
+	"requirementsTableGems",
+	"requirementsTableItems",
+	"skillsUsed",
+	"spec",
+	"tagTypesUsed",
+	"theIronMass",
+	"tinctures",
+	"weaponModList1",
+}
+
 local actorLocalEnvKeySet = { }
 for _, key in ipairs(calcs.ACTOR_LOCAL_ENV_KEYS) do
 	actorLocalEnvKeySet[key] = true
+end
+
+local actorSharedEnvKeySet = { }
+for _, key in ipairs(calcs.ACTOR_SHARED_ENV_KEYS) do
+	if actorLocalEnvKeySet[key] then
+		error("Calc env field '"..key.."' cannot be both actor-local and shared")
+	end
+	actorSharedEnvKeySet[key] = true
 end
 
 -- Build an actor-scoped calculation environment over `rootEnv`.
@@ -257,6 +333,9 @@ function calcs.createActorCalcEnv(rootEnv, actorFields)
 		__index = function(_, key)
 			if actorLocalEnvKeySet[key] then
 				error("createActorCalcEnv: actor-local field '"..key.."' is unset")
+			end
+			if not actorSharedEnvKeySet[key] and rawget(rootEnv, key) ~= nil then
+				error("createActorCalcEnv: unclassified env field '"..key.."'")
 			end
 			return rootEnv[key]
 		end,
@@ -1471,7 +1550,7 @@ function calcs.initEnv(build, mode, override, specEnv)
 			for _, slot in ipairs(build.itemsTab.orderedSlots) do
 				local slotName = slot.slotName
 				if items[slotName] then
-					local srcList = items[slotName].modList or items[slotName].slotModList and items[slotName].slotModList[slot.slotNum] or { }
+					local srcList = items[slotName].modList or items[slotName].slotModList[slot.slotNum]
 					for _, mod in ipairs(srcList) do
 						-- checks if it disables another slot
 						for _, tag in ipairs(mod) do

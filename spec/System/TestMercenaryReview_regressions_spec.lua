@@ -222,4 +222,42 @@ describe("Mercenary review regressions", function()
 		assert.are.equal("Helmet", crossSlot.slotName)
 		assert.is_nil(crossSet)
 	end)
+
+	local function mercenaryActiveSkill(possibleSupportIds)
+		local player = { }
+		return {
+			activeEffect = { grantedEffect = { modSource = "Skill:Test" } },
+			actor = { isMercenary = true, enemy = { player = player } },
+			skillTypes = { },
+			mercenaryPossibleSupportIds = possibleSupportIds,
+		}
+	end
+
+	it("accepts a listed Mercenary support and rejects an ordinary trigger support", function()
+		local skill = mercenaryActiveSkill({ "FistOfWarHigh" })
+		assert.is_true(calcLib.canGrantedEffectSupportActiveSkill({
+			mercenarySupportId = "FistOfWarHigh",
+			isTrigger = true,
+			excludeSkillTypes = { },
+			requireSkillTypes = { },
+		}, skill))
+		assert.is_false(calcLib.canGrantedEffectSupportActiveSkill({
+			mercenarySupportId = "FistOfWarHigh",
+		}, mercenaryActiveSkill({ "ArrowNovaHigh" })))
+		assert.is_false(calcLib.canGrantedEffectSupportActiveSkill({
+			isTrigger = true,
+			excludeSkillTypes = { },
+			requireSkillTypes = { },
+		}, skill))
+	end)
+
+	it("does not double-count non-stacking generic TotalDot from a Mercenary Mirage", function()
+		local calcs = require("Modules.CalcBase")
+		local source = { TotalDot = 100 }
+		local mirage = { TotalDot = 80 }
+		assert.are.equal(100, calcs.genericDotContribution(source, { }, 1))
+		assert.are.equal(0, calcs.genericDotContribution(mirage, { }, 1, source))
+		assert.are.equal(80, calcs.genericDotContribution(mirage, { }, 1, { TotalDot = 0 }))
+		assert.are.equal(160, calcs.genericDotContribution(mirage, { DotCanStack = true }, 2, source))
+	end)
 end)

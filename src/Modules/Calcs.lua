@@ -165,6 +165,18 @@ local function countSkillDamageOnce(activeSkill, modDB)
 		or (skillName:match("Holy Strike") and modDB:Flag(false, "Condition:HolyStrikeSkillDamageCountedOnce"))
 end
 
+-- Generic skill DoT for Full DPS. A Mirage copy of a non-stacking DoT is omitted
+-- when the source actor is already contributing that same TotalDot.
+function calcs.genericDotContribution(output, skillFlags, count, sourceOutput)
+	if not (output.TotalDot and output.TotalDot > 0) then
+		return 0
+	end
+	if sourceOutput and not (skillFlags.DotCanStack or (sourceOutput.TotalDot and sourceOutput.TotalDot == 0)) then
+		return 0
+	end
+	return output.TotalDot * (skillFlags.DotCanStack and count or 1)
+end
+
 function calcs.calcFullDPS(build, mode, override, specEnv)
 	local fullDPS = {
 		combinedDPS = 0,
@@ -282,9 +294,7 @@ function calcs.calcFullDPS(build, mode, override, specEnv)
 					if activeSkill.mirage.output.DecayDPS and activeSkill.mirage.output.DecayDPS > 0 then
 						fullDPS.decayDPS = fullDPS.decayDPS + activeSkill.mirage.output.DecayDPS
 					end
-					if activeSkill.mirage.output.TotalDot and activeSkill.mirage.output.TotalDot > 0 and (activeSkill.skillFlags.DotCanStack or (usedEnv.player.output.TotalDot and usedEnv.player.output.TotalDot == 0)) then
-						fullDPS.dotDPS = fullDPS.dotDPS + activeSkill.mirage.output.TotalDot * (activeSkill.skillFlags.DotCanStack and mirageCount or 1)
-					end
+					fullDPS.dotDPS = fullDPS.dotDPS + calcs.genericDotContribution(activeSkill.mirage.output, activeSkill.skillFlags, mirageCount, usedEnv.player.output)
 					if activeSkill.mirage.output.CullMultiplier and activeSkill.mirage.output.CullMultiplier > 1 and activeSkill.mirage.output.CullMultiplier > fullDPS.cullingMulti then
 						fullDPS.cullingMulti = activeSkill.mirage.output.CullMultiplier
 					end
@@ -331,9 +341,7 @@ function calcs.calcFullDPS(build, mode, override, specEnv)
 				if usedEnv.player.output.DecayDPS and usedEnv.player.output.DecayDPS > 0 then
 					fullDPS.decayDPS = fullDPS.decayDPS + usedEnv.player.output.DecayDPS
 				end
-				if usedEnv.player.output.TotalDot and usedEnv.player.output.TotalDot > 0 then
-					fullDPS.dotDPS = fullDPS.dotDPS + usedEnv.player.output.TotalDot * (activeSkill.skillFlags.DotCanStack and activeSkillCount or 1)
-				end
+				fullDPS.dotDPS = fullDPS.dotDPS + calcs.genericDotContribution(usedEnv.player.output, activeSkill.skillFlags, activeSkillCount)
 				if usedEnv.player.output.CullMultiplier and usedEnv.player.output.CullMultiplier > 1 and usedEnv.player.output.CullMultiplier > fullDPS.cullingMulti then
 					fullDPS.cullingMulti = usedEnv.player.output.CullMultiplier
 				end
@@ -449,11 +457,10 @@ function calcs.calcFullDPS(build, mode, override, specEnv)
 					fullDPS.decayDPS = fullDPS.decayDPS + actorOutput.DecayDPS
 					mercenaryTotals.decay = mercenaryTotals.decay + actorOutput.DecayDPS
 				end
-				if actorOutput.TotalDot and actorOutput.TotalDot > 0 then
-					local dot = actorOutput.TotalDot * (activeSkill.skillFlags.DotCanStack and actorCount or 1)
-					fullDPS.dotDPS = fullDPS.dotDPS + dot
-					mercenaryTotals.dot = mercenaryTotals.dot + dot
-				end
+				local sourceOutput = actorData.source == "Mercenary Mirage" and usedEnv.mercenary.output or nil
+				local dot = calcs.genericDotContribution(actorOutput, activeSkill.skillFlags, actorCount, sourceOutput)
+				fullDPS.dotDPS = fullDPS.dotDPS + dot
+				mercenaryTotals.dot = mercenaryTotals.dot + dot
 				if actorOutput.CullMultiplier and actorOutput.CullMultiplier > fullDPS.cullingMulti then
 					fullDPS.cullingMulti = actorOutput.CullMultiplier
 				end

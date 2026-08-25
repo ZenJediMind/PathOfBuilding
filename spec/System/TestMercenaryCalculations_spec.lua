@@ -2243,5 +2243,29 @@ Precise Technique
 		assert.has_error(function()
 			return proxy.minion
 		end)
+		root.unclassifiedFutureField = { leaked = true }
+		assert.has_error(function()
+			return proxy.unclassifiedFutureField
+		end)
+		local localSet = { }
+		for _, key in ipairs(calcs.ACTOR_LOCAL_ENV_KEYS) do localSet[key] = true end
+		for _, key in ipairs(calcs.ACTOR_SHARED_ENV_KEYS) do
+			assert.is_nil(localSet[key] and key)
+		end
+	end)
+
+	it("classifies every calc env field as actor-local or shared", function()
+		configure("TrapsMinesShadow", "TrapsMinesShadowLightning", "LightningTrapMercenary")
+		local env = calculate()
+		local calcs = require("Modules.CalcBase")
+		local classified = { }
+		for _, key in ipairs(calcs.ACTOR_LOCAL_ENV_KEYS) do classified[key] = true end
+		for _, key in ipairs(calcs.ACTOR_SHARED_ENV_KEYS) do classified[key] = true end
+		local missing = { }
+		for key in pairs(env) do
+			if not classified[key] then table.insert(missing, key) end
+		end
+		table.sort(missing)
+		assert.are.same({ }, missing)
 	end)
 end)

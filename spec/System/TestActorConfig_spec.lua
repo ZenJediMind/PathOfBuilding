@@ -621,7 +621,13 @@ describe("Player and mercenary configuration", function()
 	it("requires enemy-list config writes to be shared or source-owned", function()
 		local ConfigScope = require("Modules.ConfigScope")
 		local varList = LoadModule("Modules/ConfigOptions")
-		local stubControl = { SetPlaceholder = function() end, selIndex = 1 }
+		local stubControl = {
+			SetPlaceholder = function() end,
+			SelByValue = function() end,
+			selIndex = 1,
+			placeholder = 70,
+			list = { { val = "None" }, { val = "Boss" }, { val = "Pinnacle" }, { val = "Uber" } },
+		}
 		local stubBuild = {
 			configTab = {
 				input = { multiplierMapModEffect = 0 },
@@ -672,12 +678,15 @@ describe("Player and mercenary configuration", function()
 
 		local sawWithered = false
 		local failures = { }
+		local applyErrors = { }
 		for _, varData in ipairs(varList) do
 			if varData.var and type(varData.apply) == "function" then
 				local mods = spyList()
 				local enemy, enemyWrites = spyList()
-				pcall(varData.apply, dummyValue(varData), mods, enemy, stubBuild)
-				if enemyWrites() > 0 then
+				local ok, err = pcall(varData.apply, dummyValue(varData), mods, enemy, stubBuild)
+				if not ok then
+					table.insert(applyErrors, varData.var..": "..tostring(err))
+				elseif enemyWrites() > 0 then
 					if varData.var == "multiplierWitheredStackCount" then
 						sawWithered = true
 					end
@@ -689,6 +698,7 @@ describe("Player and mercenary configuration", function()
 				end
 			end
 		end
+		assert.are.same({ }, applyErrors)
 		assert.is_true(sawWithered, "apply should observe Withered stacks writing to enemyModList")
 		assert.are.same({ }, failures)
 	end)
@@ -716,6 +726,18 @@ describe("Player and mercenary configuration", function()
 			live.index({
 				{ section = "When In Combat", col = 1, scope = "actor" },
 				{ var = "enemyBrandNewEncounterFlag", type = "check" },
+			})
+		end)
+		assert.has_error(function()
+			live.index({
+				{ section = "When In Combat", col = 1, scope = "actor" },
+				{ var = "conditionEnemyChilledByYourHits", type = "check", ifEnemyCond = "ChilledByYourHits", enemyState = "source", scope = "actro" },
+			})
+		end)
+		assert.has_error(function()
+			live.index({
+				{ section = "When In Combat", col = 1, scope = "actor" },
+				{ var = "conditionEnemyChilledByYourHits", type = "check", ifEnemyCond = "ChilledByYourHits", enemyState = "source", scope = "shared" },
 			})
 		end)
 		live.index(LoadModule("Modules/ConfigOptions"))

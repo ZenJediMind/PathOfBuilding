@@ -151,14 +151,17 @@ local function heuristicScope(varData)
 end
 
 local function inferScope(varData, sectionScope)
+	if varData.scope and not VALID_SCOPE[varData.scope] then
+		error("ConfigScope: invalid scope '"..tostring(varData.scope).."' for "..tostring(varData.var))
+	end
 	-- Source-owned enemy predicates are per-actor even if a section default is shared.
 	if inferEnemyState(varData) == "source" then
+		if varData.scope and varData.scope ~= "actor" then
+			error("ConfigScope: '"..tostring(varData.var).."' is source-owned and cannot have scope '"..varData.scope.."'")
+		end
 		return "actor"
 	end
 	if varData.scope then
-		if not VALID_SCOPE[varData.scope] then
-			error("ConfigScope: invalid scope '"..tostring(varData.scope).."' for "..tostring(varData.var))
-		end
 		return varData.scope
 	end
 	local guessed = heuristicScope(varData)

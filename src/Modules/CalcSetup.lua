@@ -223,8 +223,8 @@ local function attachEnemySourceDB(env, actor, sourceModList)
 end
 
 -- Fields that must never fall through a proxy env to another actor.
--- Add new actor-local env keys here; createActorCalcEnv will refuse to
--- construct a proxy that omits them, and will error if they are read unset.
+-- Add a key here when Mercenary calculation reads it and the value is actor-owned.
+-- createActorCalcEnv refuses to construct a proxy that omits them, and errors if they are read unset.
 calcs.ACTOR_LOCAL_ENV_KEYS = {
 	"player",
 	"modDB",
@@ -232,74 +232,26 @@ calcs.ACTOR_LOCAL_ENV_KEYS = {
 	"configPlaceholder",
 	"keystonesAdded",
 	"minion",
+	"itemModDB",
+	"auxSkillList",
+	"theIronMass",
 }
 
--- Encounter/build state that a Mercenary calc env may inherit from the root.
--- A new env field must be added here or to ACTOR_LOCAL_ENV_KEYS; unclassified
--- fields cannot fall through to player state.
+-- Encounter/build state that Mercenary calculation actually reads through the proxy
+-- and that is semantically shared. Unclassified root fields error on access.
 calcs.ACTOR_SHARED_ENV_KEYS = {
-	"actorUsage",
-	"aegisItem",
-	"aegisModList",
-	"allocNodes",
-	"auxSkillList",
-	"breakdown",
-	"buffs",
 	"build",
-	"buildBreakdown",
-	"calcsInput",
-	"classId",
-	"conditionsUsed",
-	"crossLinkedSupportGroups",
-	"curseSlots",
 	"data",
-	"debuffs",
 	"enemy",
-	"enemyConditionsUsed",
-	"enemyDB",
 	"enemyLevel",
-	"enemyMultipliersUsed",
-	"enemyPerStatsUsed",
-	"explodeSources",
-	"extraRadiusNodeList",
-	"flasks",
-	"flaskSlotMap",
-	"flaskSlotOccupied",
-	"grantedPassives",
-	"grantedSkills",
-	"grantedSkillsItems",
-	"grantedSkillsNodes",
-	"initialNodeModDB",
-	"itemModDB",
-	"itemWarnings",
 	"limitedSkills",
-	"mainSocketGroup",
-	"mercenary",
-	"mercenaryBuffs",
-	"mercenaryCalculationErrors",
-	"mercenaryMinion",
-	"mercenaryMinionBuffs",
-	"minionBuffs",
-	"minionConditionsUsed",
 	"mode",
 	"mode_buffs",
 	"mode_combat",
 	"mode_effective",
-	"modsUsed",
-	"multipliersUsed",
 	"override",
 	"partyMembers",
-	"perStatsUsed",
-	"radiusJewelList",
-	"requirementsTable",
-	"requirementsTableGems",
-	"requirementsTableItems",
-	"skillsUsed",
 	"spec",
-	"tagTypesUsed",
-	"theIronMass",
-	"tinctures",
-	"weaponModList1",
 }
 
 local actorLocalEnvKeySet = { }
@@ -511,6 +463,9 @@ function calcs.initMercenary(env)
 		minion = false,
 		configInput = mercInput,
 		configPlaceholder = mercPlaceholder,
+		itemModDB = new("ModDB"):ModDB(),
+		auxSkillList = { },
+		theIronMass = false,
 	})
 	mercenary.calcEnv = mercenaryEnv
 	local function addActiveSkill(selectedSkill, grantedEffect, supports, isPrimary, sourceItem)

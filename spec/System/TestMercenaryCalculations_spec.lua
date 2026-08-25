@@ -2235,6 +2235,9 @@ Precise Technique
 			minion = false,
 			configInput = { },
 			configPlaceholder = { },
+			itemModDB = { multipliers = { } },
+			auxSkillList = { },
+			theIronMass = false,
 		})
 		assert.are.equal("merc", proxy.player.name)
 		assert.is_true(proxy.data.shared)
@@ -2254,18 +2257,16 @@ Precise Technique
 		end
 	end)
 
-	it("classifies every calc env field as actor-local or shared", function()
+	it("does not copy player flask recovery onto Mercenary output", function()
 		configure("TrapsMinesShadow", "TrapsMinesShadowLightning", "LightningTrapMercenary")
+		local lifeFlask = new("Item"):Item("Rarity: Normal\nEternal Life Flask")
+		build.itemsTab:AddItem(lifeFlask, true)
+		build.itemsTab.slots["Flask 1"].selItemId = lifeFlask.id
+		build.itemsTab.activeItemSet["Flask 1"].selItemId = lifeFlask.id
 		local env = calculate()
-		local calcs = require("Modules.CalcBase")
-		local classified = { }
-		for _, key in ipairs(calcs.ACTOR_LOCAL_ENV_KEYS) do classified[key] = true end
-		for _, key in ipairs(calcs.ACTOR_SHARED_ENV_KEYS) do classified[key] = true end
-		local missing = { }
-		for key in pairs(env) do
-			if not classified[key] then table.insert(missing, key) end
-		end
-		table.sort(missing)
-		assert.are.same({ }, missing)
+		assert.is_true((env.player.output.LifeFlaskRecovery or 0) > 0)
+		assert.are.equal(0, env.mercenary.output.LifeFlaskRecovery or 0)
+		assert.are.equal(0, env.mercenary.output.LifeFlaskCharges or 0)
+		assert.are_not.equal(env.itemModDB, env.mercenary.calcEnv.itemModDB)
 	end)
 end)

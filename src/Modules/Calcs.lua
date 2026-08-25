@@ -403,6 +403,7 @@ function calcs.calcFullDPS(build, mode, override, specEnv)
 					source = "Mercenary Mirage",
 					count = (activeSkill.mirage.count or 1) * directCount,
 					skillPart = activeSkill.mirage.skillPartName,
+					genericDotSourceOutput = usedEnv.mercenary.output,
 				})
 			end
 			for _, actorData in ipairs(actorOutputs) do
@@ -457,8 +458,7 @@ function calcs.calcFullDPS(build, mode, override, specEnv)
 					fullDPS.decayDPS = fullDPS.decayDPS + actorOutput.DecayDPS
 					mercenaryTotals.decay = mercenaryTotals.decay + actorOutput.DecayDPS
 				end
-				local sourceOutput = actorData.source == "Mercenary Mirage" and usedEnv.mercenary.output or nil
-				local dot = calcs.genericDotContribution(actorOutput, activeSkill.skillFlags, actorCount, sourceOutput)
+				local dot = calcs.genericDotContribution(actorOutput, activeSkill.skillFlags, actorCount, actorData.genericDotSourceOutput)
 				fullDPS.dotDPS = fullDPS.dotDPS + dot
 				mercenaryTotals.dot = mercenaryTotals.dot + dot
 				if actorOutput.CullMultiplier and actorOutput.CullMultiplier > fullDPS.cullingMulti then

@@ -395,6 +395,7 @@ end)
 
 describe("Generated Mercenary data", function()
 	local tools = require("Modules.MercenaryTools")
+	local export = require("Modules.MercenaryExport")
 
 	it("has deterministic orders and resolvable references", function()
 		local mercenaries = data.mercenaries
@@ -579,33 +580,53 @@ describe("Generated Mercenary data", function()
 	end)
 
 	it("derives monster speed/damage fixup from the exported stat value", function()
-		assert.are.equal(0.11, tools.monsterSpeedAndDamageFixup("MonsterSpeedAndDamageFixupSmall", {
+		assert.are.equal(0.11, export.monsterSpeedAndDamageFixup("MonsterSpeedAndDamageFixupSmall", {
 			{ id = "monster_base_type_attack_cast_speed_+%_and_damage_-%_final", value = 11 },
 		}))
-		assert.are.equal(0.33, tools.monsterSpeedAndDamageFixup("MonsterSpeedAndDamageFixupComplete", {
+		assert.are.equal(0.33, export.monsterSpeedAndDamageFixup("MonsterSpeedAndDamageFixupComplete", {
 			{ id = "monster_base_type_attack_cast_speed_+%_and_damage_-%_final", value = 33 },
 		}))
-		assert.is_nil(tools.monsterSpeedAndDamageFixup("MonsterImplicitDamage", {
+		assert.is_nil(export.monsterSpeedAndDamageFixup("MonsterImplicitDamage", {
 			{ id = "monster_base_type_attack_cast_speed_+%_and_damage_-%_final", value = 33 },
 		}))
 		assert.has_error(function()
-			tools.monsterSpeedAndDamageFixup("MonsterSpeedAndDamageFixupVeryLarge", {
+			export.monsterSpeedAndDamageFixup("MonsterSpeedAndDamageFixupVeryLarge", {
 				{ id = "some_other_stat", value = 44 },
 			})
 		end)
 	end)
 
 	it("rejects equal-rank display-name base-skill ties", function()
-		local first = tools.considerRankedCandidate(nil, "Snipe", 0)
-		local tied = tools.considerRankedCandidate(first, "AtlasEyrieArcherSnipe", 0)
+		local first = export.considerRankedCandidate(nil, "Snipe", 0)
+		local tied = export.considerRankedCandidate(first, "AtlasEyrieArcherSnipe", 0)
 		assert.are.equal("AtlasEyrieArcherSnipe", tied.id)
 		assert.has_error(function()
-			tools.requireUniqueRankedCandidate(tied, "display name 'Snipe'")
+			export.requireUniqueRankedCandidate(tied, "display name 'Snipe'")
 		end)
-		local unique = tools.considerRankedCandidate(nil, "Snipe", 0)
-		assert.are.equal("Snipe", tools.requireUniqueRankedCandidate(unique, "display name 'Snipe'").id)
-		local gem = tools.considerRankedCandidate({ id = "NpcCopy", rank = 1, ids = { "NpcCopy" } }, "Snipe", 0)
-		assert.are.equal("Snipe", tools.requireUniqueRankedCandidate(gem, "display name 'Snipe'").id)
+		local unique = export.considerRankedCandidate(nil, "Snipe", 0)
+		assert.are.equal("Snipe", export.requireUniqueRankedCandidate(unique, "display name 'Snipe'").id)
+		local gem = export.considerRankedCandidate({ id = "NpcCopy", rank = 1, ids = { "NpcCopy" } }, "Snipe", 0)
+		assert.are.equal("Snipe", export.requireUniqueRankedCandidate(gem, "display name 'Snipe'").id)
+	end)
+
+	it("rejects equal-rank ActiveSkill base-skill ties", function()
+		local first = export.considerRankedCandidate(nil, "Snipe", 0)
+		local tied = export.considerRankedCandidate(first, "AtlasEyrieArcherSnipe", 0)
+		assert.has_error(function()
+			export.requireUniqueRankedCandidate(tied, "ActiveSkill 'Snipe'")
+		end, "Ambiguous ActiveSkill 'Snipe': AtlasEyrieArcherSnipe, Snipe")
+	end)
+
+	it("keeps exporter validation helpers out of runtime Mercenary tools", function()
+		assert.is_nil(tools.monsterSpeedAndDamageFixup)
+		assert.is_nil(tools.considerRankedCandidate)
+		assert.is_nil(tools.requireUniqueRankedCandidate)
+		assert.is_nil(tools.shieldPolicyError)
+		assert.is_nil(tools.MONSTER_SPEED_DAMAGE_FIXUP_STAT)
+		assert.is_function(export.monsterSpeedAndDamageFixup)
+		assert.is_function(export.considerRankedCandidate)
+		assert.is_function(export.requireUniqueRankedCandidate)
+		assert.is_function(export.shieldPolicyError)
 	end)
 
 	it("requires an exhaustive shield policy for every shield-capable build", function()
@@ -614,24 +635,24 @@ describe("Generated Mercenary data", function()
 			OptionalShield = { weaponTypes = { "Wand", "Shield" } },
 			NoShield = { weaponTypes = { "Staff" } },
 		}
-		assert.is_nil(tools.shieldPolicyError(builds, {
+		assert.is_nil(export.shieldPolicyError(builds, {
 			RequiredShield = "required",
 			OptionalShield = "optional",
 		}))
-		assert.matches("missing shield policy", tools.shieldPolicyError(builds, {
+		assert.matches("missing shield policy", export.shieldPolicyError(builds, {
 			OptionalShield = "optional",
 		}))
-		assert.matches("unknown Mercenary build", tools.shieldPolicyError(builds, {
+		assert.matches("unknown Mercenary build", export.shieldPolicyError(builds, {
 			RequiredShield = "required",
 			OptionalShield = "optional",
 			RemovedBuild = "optional",
 		}))
-		assert.matches("does not include a Shield", tools.shieldPolicyError(builds, {
+		assert.matches("does not include a Shield", export.shieldPolicyError(builds, {
 			RequiredShield = "required",
 			OptionalShield = "optional",
 			NoShield = "required",
 		}))
-		assert.matches("unknown shield policy", tools.shieldPolicyError(builds, {
+		assert.matches("unknown shield policy", export.shieldPolicyError(builds, {
 			RequiredShield = "maybe",
 			OptionalShield = "optional",
 		}))
@@ -640,7 +661,7 @@ describe("Generated Mercenary data", function()
 	it("classifies every exported shield-capable Mercenary build", function()
 		local function stub() return { } end
 		local statMap = LoadModule("Data/MercenaryStatMap")(stub, stub, stub)
-		assert.is_nil(tools.shieldPolicyError(data.mercenaries.builds, statMap.shieldPolicy))
+		assert.is_nil(export.shieldPolicyError(data.mercenaries.builds, statMap.shieldPolicy))
 		for buildId, mercBuild in pairs(data.mercenaries.builds) do
 			local hasShield = false
 			for _, itemType in ipairs(mercBuild.weaponTypes or { }) do

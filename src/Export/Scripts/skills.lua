@@ -572,7 +572,9 @@ do
 	-- uses and by the NPC and monster copies of it, and only the gem's entry is
 	-- maintained as a player skill, so the gem is preferred. Display-name fallback
 	-- requires a unique best-rank candidate; equal-rank ties need an override.
-	local MercenaryTools = LoadModule("../Modules/MercenaryTools")
+	-- A shared ActiveSkill is stronger evidence than a shared name, but equal-rank
+	-- ActiveSkill ties are still ambiguous and also require an override.
+	local MercenaryExport = LoadModule("../Modules/MercenaryExport")
 	local baseSkillByActiveSkill = { }
 	local baseSkillByDisplayName = { }
 	local function baseRank(effect)
@@ -581,7 +583,7 @@ do
 		return gemEffect and 0 or 1
 	end
 	local function considerBase(bases, key, id, rank)
-		bases[key] = MercenaryTools.considerRankedCandidate(bases[key], id, rank)
+		bases[key] = MercenaryExport.considerRankedCandidate(bases[key], id, rank)
 	end
 	for id in pairs(emitted) do
 		local effect = dat("GrantedEffects"):GetRow("Id", id)
@@ -675,10 +677,11 @@ do
 					baseSkillOverrides[effect.Id] = nil
 					resolvedByOverride = resolvedByOverride + 1
 				elseif base == byActiveSkill and base ~= nil then
+					MercenaryExport.requireUniqueRankedCandidate(byActiveSkill, "Mercenary base skill ActiveSkill '"..effect.ActiveSkill.Id.."'")
 					resolvedByActiveSkill = resolvedByActiveSkill + 1
 				elseif base then
 					local displayName = effect.ActiveSkill.DisplayName ~= "" and effect.ActiveSkill.DisplayName or effectNames[effect.Id]
-					MercenaryTools.requireUniqueRankedCandidate(byDisplayName, "Mercenary base skill display name '"..displayName.."'")
+					MercenaryExport.requireUniqueRankedCandidate(byDisplayName, "Mercenary base skill display name '"..displayName.."'")
 					resolvedByDisplayName = resolvedByDisplayName + 1
 				else
 					table.insert(withoutBase, effect.Id)

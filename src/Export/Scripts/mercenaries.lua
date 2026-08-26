@@ -188,7 +188,7 @@ local passiveStatFormats = {
 dofile("../Data/Global.lua")
 local function stubMod() return { } end
 local mercenaryStatData = LoadModule("../Data/MercenaryStatMap.lua")(stubMod, stubMod, stubMod)
-local MercenaryTools = LoadModule("../Modules/MercenaryTools")
+local MercenaryExport = LoadModule("../Modules/MercenaryExport")
 local shieldPolicy = mercenaryStatData.shieldPolicy
 local supportCounts = mercenaryStatData.supportCounts
 for _, row in ipairs(sortedRows("MercenarySupportCounts", function(value) return value.Id end)) do
@@ -302,7 +302,7 @@ local function exportMonster(variety)
 				table.insert(modStats, { id = stat.Id, value = values[1] })
 			end
 		end
-		local fixup = MercenaryTools.monsterSpeedAndDamageFixup(modRow.Id, modStats)
+		local fixup = MercenaryExport.monsterSpeedAndDamageFixup(modRow.Id, modStats)
 		if fixup then
 			monster.damageFixup = fixup
 		end
@@ -528,7 +528,7 @@ end
 for _, class in pairs(mercenaries.classes) do
 	class.skillIds = uniqueSorted(class.skillIds)
 end
-local shieldPolicyError = MercenaryTools.shieldPolicyError(mercenaries.builds, shieldPolicy)
+local shieldPolicyError = MercenaryExport.shieldPolicyError(mercenaries.builds, shieldPolicy)
 if shieldPolicyError then
 	error(shieldPolicyError)
 end

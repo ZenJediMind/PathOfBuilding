@@ -2405,4 +2405,61 @@ Precise Technique
 		local fullDPS = calcs.calcFullDPS(build, "CALCULATOR", { })
 		assert.are.near(onePod * 2, fullDPS.dotDPS, 10 ^ -4)
 	end)
+
+	local function selectMinionSkill(skillId)
+		local group = build.skillsTab.socketGroupList[build.mainSocketGroup]
+		local activeSkill = group.displaySkillList[group.mainActiveSkill]
+		local found
+		for index, minionSkill in ipairs(activeSkill.minion.activeSkillList) do
+			if minionSkill.activeEffect.grantedEffect.id == skillId then
+				activeSkill.activeEffect.srcInstance.skillMinionSkill = index
+				activeSkill.activeEffect.srcInstance.skillMinionSkillCalcs = index
+				found = true
+				break
+			end
+		end
+		assert.is_true(found, skillId)
+	end
+
+	it("counts only the strongest Chaos Aura from a player Chaos Golem and Mercenary Scourstorm", function()
+		configure("ChaosMinionWitch", "ChaosMinionWitchDot", "SandstormChaosMercenary", { includeInFullDPS = true })
+		local staff = new("Item"):Item("Rarity: Normal\nGnarled Branch")
+		staff.id = 9110
+		build.itemsTab.items[staff.id] = staff
+		equipmentSlot("Weapon 1").selItemId = staff.id
+		build.skillsTab:PasteSocketGroup("Summon Chaos Golem 20/0  1")
+		build.skillsTab.socketGroupList[#build.skillsTab.socketGroupList].includeInFullDPS = true
+		build.mainSocketGroup = #build.skillsTab.socketGroupList
+		runCallback("OnFrame")
+		selectMinionSkill("SandstormChaosElementalSummoned")
+		local env = calculate()
+		local playerDot = env.minion.output.TotalDot or 0
+		local mercDot = env.mercenary.output.TotalDot or 0
+		assert.is_true(playerDot > 0)
+		assert.is_true(mercDot > 0)
+		assert.are.not_equal(playerDot, mercDot)
+		local fullDPS = calcs.calcFullDPS(build, "CALCULATOR", { })
+		assert.are.near(math.max(playerDot, mercDot), fullDPS.dotDPS, 10 ^ -4)
+		assert.is_true(fullDPS.dotDPS < playerDot + mercDot - 1)
+	end)
+
+	it("sums a player minion Chaos Aura with a distinct Mercenary generic DoT", function()
+		configure("ChaosMinionWitch", "ChaosMinionWitchDot", "EssenceDrainAltMercenary", { includeInFullDPS = true })
+		local staff = new("Item"):Item("Rarity: Normal\nGnarled Branch")
+		staff.id = 9111
+		build.itemsTab.items[staff.id] = staff
+		equipmentSlot("Weapon 1").selItemId = staff.id
+		build.skillsTab:PasteSocketGroup("Summon Chaos Golem 20/0  1")
+		build.skillsTab.socketGroupList[#build.skillsTab.socketGroupList].includeInFullDPS = true
+		build.mainSocketGroup = #build.skillsTab.socketGroupList
+		runCallback("OnFrame")
+		selectMinionSkill("SandstormChaosElementalSummoned")
+		local env = calculate()
+		local playerDot = env.minion.output.TotalDot or 0
+		local mercDot = env.mercenary.output.TotalDot or 0
+		assert.is_true(playerDot > 0)
+		assert.is_true(mercDot > 0)
+		local fullDPS = calcs.calcFullDPS(build, "CALCULATOR", { })
+		assert.are.near(playerDot + mercDot, fullDPS.dotDPS, 10 ^ -4)
+	end)
 end)

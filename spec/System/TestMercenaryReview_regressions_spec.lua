@@ -288,6 +288,55 @@ describe("Mercenary review regressions", function()
 		assert.are.equal(130, calcs.sumDotTotals(totals))
 	end)
 
+	local function grantedSkill(grantedEffect, flags)
+		return {
+			activeEffect = { grantedEffect = grantedEffect },
+			skillFlags = flags or { },
+		}
+	end
+
+	it("maxes a Mercenary minion generic DoT with a Mercenary source of the same identity", function()
+		local calcs = require("Modules.CalcBase")
+		local totals = { }
+		calcs.contributeSkillGenericDot(totals, grantedSkill({ inheritedFrom = "SandstormChaosElementalSummoned", id = "SandstormChaosMercenary" }), { TotalDot = 100 }, 1)
+		calcs.contributeSkillGenericDot(totals, grantedSkill({ id = "SandstormChaosElementalSummoned" }), { TotalDot = 80 }, 1)
+		assert.are.equal(100, calcs.sumDotTotals(totals))
+	end)
+
+	it("maxes a player minion generic DoT with a Mercenary minion of the same identity", function()
+		local calcs = require("Modules.CalcBase")
+		local totals = { }
+		calcs.contributeSkillGenericDot(totals, grantedSkill({ id = "SandstormChaosElementalSummoned" }), { TotalDot = 90 }, 1)
+		calcs.contributeSkillGenericDot(totals, grantedSkill({ inheritedFrom = "SandstormChaosElementalSummoned", id = "SandstormChaosMercenary" }), { TotalDot = 70 }, 1)
+		assert.are.equal(90, calcs.sumDotTotals(totals))
+	end)
+
+	it("sums distinct minion generic DoT identities", function()
+		local calcs = require("Modules.CalcBase")
+		local totals = { }
+		calcs.contributeSkillGenericDot(totals, grantedSkill({ id = "SandstormChaosElementalSummoned" }), { TotalDot = 80 }, 1)
+		calcs.contributeSkillGenericDot(totals, grantedSkill({ id = "InfernalLegion" }), { TotalDot = 40 }, 1)
+		assert.are.equal(120, calcs.sumDotTotals(totals))
+	end)
+
+	it("uses the minion skill's DotCanStack rather than the summoning skill", function()
+		local calcs = require("Modules.CalcBase")
+		local totals = { }
+		local summon = grantedSkill({ id = "SSMHolySpectresMercenary" })
+		local minion = grantedSkill({ id = "ToxicRain" }, { DotCanStack = true })
+		calcs.contributeSkillGenericDot(totals, minion, { TotalDot = 50 }, 2)
+		assert.are.equal(100, calcs.sumDotTotals(totals))
+		calcs.contributeSkillGenericDot(totals, summon, { TotalDot = 50 }, 2)
+		assert.are.equal(150, calcs.sumDotTotals(totals))
+	end)
+
+	it("errors when a generic DoT has no skill identity", function()
+		local calcs = require("Modules.CalcBase")
+		assert.has_error(function()
+			calcs.contributeSkillGenericDot({ }, nil, { TotalDot = 10 }, 1)
+		end, "Full DPS generic DoT is missing a skill identity")
+	end)
+
 	it("documents that Mercenary Full DPS is not a rotation simulator", function()
 		newBuild()
 		local tooltip = build.mercenaryTab.controls.skillFullDPS.tooltipText

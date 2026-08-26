@@ -253,11 +253,45 @@ describe("Mercenary review regressions", function()
 
 	it("does not double-count non-stacking generic TotalDot from a Mercenary Mirage", function()
 		local calcs = require("Modules.CalcBase")
-		local source = { TotalDot = 100 }
-		local mirage = { TotalDot = 80 }
-		assert.are.equal(100, calcs.genericDotContribution(source, { }, 1))
-		assert.are.equal(0, calcs.genericDotContribution(mirage, { }, 1, source))
-		assert.are.equal(80, calcs.genericDotContribution(mirage, { }, 1, { TotalDot = 0 }))
-		assert.are.equal(160, calcs.genericDotContribution(mirage, { DotCanStack = true }, 2, source))
+		local totals = { }
+		local identity = calcs.genericDotIdentity({ inheritedFrom = "EssenceDrainAltY", id = "EssenceDrainAltMercenary" })
+		calcs.contributeGenericDot(totals, identity, { TotalDot = 100 }, { }, 1)
+		calcs.contributeGenericDot(totals, identity, { TotalDot = 80 }, { }, 1)
+		assert.are.equal(100, calcs.sumDotTotals(totals))
+		calcs.contributeGenericDot(totals, identity, { TotalDot = 180 }, { }, 1)
+		assert.are.equal(180, calcs.sumDotTotals(totals))
+	end)
+
+	it("keeps the strongest non-stacking generic DoT of the same identity", function()
+		local calcs = require("Modules.CalcBase")
+		local totals = { }
+		calcs.contributeGenericDot(totals, calcs.genericDotIdentity({ id = "EssenceDrainAltY" }), { TotalDot = 80 }, { }, 1)
+		calcs.contributeGenericDot(totals, calcs.genericDotIdentity({ inheritedFrom = "EssenceDrainAltY", id = "EssenceDrainAltMercenary" }), { TotalDot = 150 }, { }, 1)
+		calcs.contributeGenericDot(totals, calcs.genericDotIdentity({ inheritedFrom = "EssenceDrainAltY", id = "EssenceDrainAltMercenaryEncounter" }), { TotalDot = 100 }, { }, 1)
+		assert.are.equal(150, calcs.sumDotTotals(totals))
+	end)
+
+	it("sums different non-stacking generic DoT identities", function()
+		local calcs = require("Modules.CalcBase")
+		local totals = { }
+		calcs.contributeGenericDot(totals, calcs.genericDotIdentity({ inheritedFrom = "EssenceDrainAltY", id = "EssenceDrainAltMercenary" }), { TotalDot = 100 }, { }, 1)
+		calcs.contributeGenericDot(totals, calcs.genericDotIdentity({ inheritedFrom = "Bane", id = "BaneMercenary" }), { TotalDot = 40 }, { }, 1)
+		assert.are.equal(140, calcs.sumDotTotals(totals))
+	end)
+
+	it("sums stackable generic DoTs of the same identity by count", function()
+		local calcs = require("Modules.CalcBase")
+		local totals = { }
+		local identity = calcs.genericDotIdentity({ inheritedFrom = "ToxicRain", id = "ToxicRainMercenary" })
+		calcs.contributeGenericDot(totals, identity, { TotalDot = 50 }, { DotCanStack = true }, 2)
+		calcs.contributeGenericDot(totals, identity, { TotalDot = 30 }, { DotCanStack = true }, 1)
+		assert.are.equal(130, calcs.sumDotTotals(totals))
+	end)
+
+	it("documents that Mercenary Full DPS is not a rotation simulator", function()
+		newBuild()
+		local tooltip = build.mercenaryTab.controls.skillFullDPS.tooltipText
+		assert.matches("simultaneously sustainable", tooltip)
+		assert.matches("does not simulate", tooltip)
 	end)
 end)

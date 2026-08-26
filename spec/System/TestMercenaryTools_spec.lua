@@ -394,8 +394,9 @@ Can be used in a personal Map Device alongside a Map to have this previously fou
 end)
 
 describe("Generated Mercenary data", function()
+	local tools = require("Modules.MercenaryTools")
+
 	it("has deterministic orders and resolvable references", function()
-		local tools = require("Modules.MercenaryTools")
 		local mercenaries = data.mercenaries
 		local classGroups = select(1, tools.classGroups(mercenaries))
 		local classLabels = { }
@@ -574,6 +575,81 @@ describe("Generated Mercenary data", function()
 		}) do
 			local mods = assert(modLib.parseMod(modLine))
 			assert.are.equal(expectedSkillId, mods[1].value.skillId, modLine)
+		end
+	end)
+
+	it("derives monster speed/damage fixup from the exported stat value", function()
+		assert.are.equal(0.11, tools.monsterSpeedAndDamageFixup("MonsterSpeedAndDamageFixupSmall", {
+			{ id = "monster_base_type_attack_cast_speed_+%_and_damage_-%_final", value = 11 },
+		}))
+		assert.are.equal(0.33, tools.monsterSpeedAndDamageFixup("MonsterSpeedAndDamageFixupComplete", {
+			{ id = "monster_base_type_attack_cast_speed_+%_and_damage_-%_final", value = 33 },
+		}))
+		assert.is_nil(tools.monsterSpeedAndDamageFixup("MonsterImplicitDamage", {
+			{ id = "monster_base_type_attack_cast_speed_+%_and_damage_-%_final", value = 33 },
+		}))
+		assert.has_error(function()
+			tools.monsterSpeedAndDamageFixup("MonsterSpeedAndDamageFixupVeryLarge", {
+				{ id = "some_other_stat", value = 44 },
+			})
+		end)
+	end)
+
+	it("rejects equal-rank display-name base-skill ties", function()
+		local first = tools.considerRankedCandidate(nil, "Snipe", 0)
+		local tied = tools.considerRankedCandidate(first, "AtlasEyrieArcherSnipe", 0)
+		assert.are.equal("AtlasEyrieArcherSnipe", tied.id)
+		assert.has_error(function()
+			tools.requireUniqueRankedCandidate(tied, "display name 'Snipe'")
+		end)
+		local unique = tools.considerRankedCandidate(nil, "Snipe", 0)
+		assert.are.equal("Snipe", tools.requireUniqueRankedCandidate(unique, "display name 'Snipe'").id)
+		local gem = tools.considerRankedCandidate({ id = "NpcCopy", rank = 1, ids = { "NpcCopy" } }, "Snipe", 0)
+		assert.are.equal("Snipe", tools.requireUniqueRankedCandidate(gem, "display name 'Snipe'").id)
+	end)
+
+	it("requires an exhaustive shield policy for every shield-capable build", function()
+		local builds = {
+			RequiredShield = { weaponTypes = { "One Handed Mace", "Shield" } },
+			OptionalShield = { weaponTypes = { "Wand", "Shield" } },
+			NoShield = { weaponTypes = { "Staff" } },
+		}
+		assert.is_nil(tools.shieldPolicyError(builds, {
+			RequiredShield = "required",
+			OptionalShield = "optional",
+		}))
+		assert.matches("missing shield policy", tools.shieldPolicyError(builds, {
+			OptionalShield = "optional",
+		}))
+		assert.matches("unknown Mercenary build", tools.shieldPolicyError(builds, {
+			RequiredShield = "required",
+			OptionalShield = "optional",
+			RemovedBuild = "optional",
+		}))
+		assert.matches("does not include a Shield", tools.shieldPolicyError(builds, {
+			RequiredShield = "required",
+			OptionalShield = "optional",
+			NoShield = "required",
+		}))
+		assert.matches("unknown shield policy", tools.shieldPolicyError(builds, {
+			RequiredShield = "maybe",
+			OptionalShield = "optional",
+		}))
+	end)
+
+	it("classifies every exported shield-capable Mercenary build", function()
+		local function stub() return { } end
+		local statMap = LoadModule("Data/MercenaryStatMap")(stub, stub, stub)
+		assert.is_nil(tools.shieldPolicyError(data.mercenaries.builds, statMap.shieldPolicy))
+		for buildId, mercBuild in pairs(data.mercenaries.builds) do
+			local hasShield = false
+			for _, itemType in ipairs(mercBuild.weaponTypes or { }) do
+				if itemType == "Shield" then hasShield = true break end
+			end
+			if hasShield then
+				local optional = statMap.shieldPolicy[buildId] == "optional"
+				assert.are.equal(not optional, mercBuild.weaponConfiguration.offHandRequired, buildId)
+			end
 		end
 	end)
 end)

@@ -1,5 +1,6 @@
 describe("Permanent Mercenary calculations", function()
 	local MercenaryTools = require("Modules.MercenaryTools")
+	local calcs = require("Modules.CalcBase")
 	local configOptions = LoadModule("Modules/ConfigOptions")
 	local configVisibility = LoadModule("Modules/ConfigVisibility")
 	local function equipmentSlot(slotName)
@@ -2268,5 +2269,140 @@ Precise Technique
 		assert.are.equal(0, env.mercenary.output.LifeFlaskRecovery or 0)
 		assert.are.equal(0, env.mercenary.output.LifeFlaskCharges or 0)
 		assert.are_not.equal(env.itemModDB, env.mercenary.calcEnv.itemModDB)
+	end)
+
+	local function namedDps(skills, name)
+		for _, row in ipairs(skills or { }) do
+			if row.name == name then return row.dps end
+		end
+		return 0
+	end
+
+	local function decayItem(baseName, id)
+		local item = new("Item"):Item("Rarity: RARE\nDecay Test\n"..baseName.."\nImplicits: 0\nYour Hits inflict Decay, dealing 700 Chaos Damage per second for 8 seconds\n")
+		item.id = id
+		build.itemsTab.items[id] = item
+		return item
+	end
+
+	local function setMercenaryFullDPS(skillIds)
+		local profile = build.mercenaryTab.profile
+		local skills = { }
+		for _, skillId in ipairs(skillIds) do
+			table.insert(skills, { id = skillId, enabled = true, includeInFullDPS = true, count = 1, supports = { } })
+		end
+		profile.skills = skills
+		profile.mainSkillId = skillIds[1]
+		build.mercenaryTab:Changed()
+	end
+
+	it("counts only the strongest Mercenary Decay in Full DPS", function()
+		configure("TrapsMinesShadow", "TrapsMinesShadowLightning", "LightningTrapMercenary", { includeInFullDPS = true })
+		local wand = decayItem("Goat's Horn", 9101)
+		equipmentSlot("Weapon 1").selItemId = wand.id
+		setMercenaryFullDPS({ "LightningTrapMercenary" })
+		local trapDecay = calcs.calcFullDPS(build, "CALCULATOR", { }).decayDPS
+		setMercenaryFullDPS({ "LightningSpireTrapMercenary" })
+		local spireDecay = calcs.calcFullDPS(build, "CALCULATOR", { }).decayDPS
+		setMercenaryFullDPS({ "LightningTrapMercenary", "LightningSpireTrapMercenary" })
+		local both = calcs.calcFullDPS(build, "CALCULATOR", { })
+		assert.is_true(trapDecay > 0)
+		assert.is_true(spireDecay > 0)
+		assert.are.near(math.max(trapDecay, spireDecay), both.decayDPS, 10 ^ -6)
+		assert.are.near(both.decayDPS, namedDps(both.mercenarySkills, "Best Decay DPS"), 10 ^ -6)
+		assert.is_true(both.decayDPS < trapDecay + spireDecay - 1)
+	end)
+
+	it("counts only the strongest Decay from a Mercenary and its Mirage", function()
+		configure("NonEleBowRanger", "NonEleBowRangerChaos", "CausticArrowMercenary", {
+			includeInFullDPS = true,
+			supports = { { id = "MirageArcherHigh", tier = 3 } },
+		})
+		local bow = decayItem("Crude Bow", 9102)
+		local quiver = new("Item"):Item("Rarity: Normal\nSerrated Arrow Quiver")
+		quiver.id = 9103
+		build.itemsTab.items[quiver.id] = quiver
+		equipmentSlot("Weapon 1").selItemId, equipmentSlot("Weapon 2").selItemId = bow.id, quiver.id
+		local env = calculate()
+		assert.is_table(env.mercenary.mainSkill.mirage)
+		local sourceDecay = env.mercenary.output.DecayDPS or 0
+		local mirageDecay = env.mercenary.mainSkill.mirage.output.DecayDPS or 0
+		assert.is_true(sourceDecay > 0)
+		assert.is_true(mirageDecay > 0)
+		local fullDPS = calcs.calcFullDPS(build, "CALCULATOR", { })
+		assert.are.near(math.max(sourceDecay, mirageDecay), fullDPS.decayDPS, 10 ^ -6)
+		assert.are.near(fullDPS.decayDPS, namedDps(fullDPS.mercenarySkills, "Best Decay DPS"), 10 ^ -6)
+	end)
+
+	it("counts only the strongest Decay across the player and Mercenary", function()
+		configure("TrapsMinesShadow", "TrapsMinesShadowLightning", "LightningTrapMercenary", { includeInFullDPS = true })
+		local mercWand = decayItem("Goat's Horn", 9104)
+		equipmentSlot("Weapon 1").selItemId = mercWand.id
+		local playerWand = new("Item"):Item("Rarity: RARE\nDecay Test\nGoat's Horn\nImplicits: 0\nYour Hits inflict Decay, dealing 700 Chaos Damage per second for 8 seconds\n")
+		build.itemsTab:AddItem(playerWand, true)
+		build.itemsTab.slots["Weapon 1"].selItemId = playerWand.id
+		build.itemsTab.activeItemSet["Weapon 1"].selItemId = playerWand.id
+		build.skillsTab:PasteSocketGroup("Lightning Trap 20/0  1")
+		build.skillsTab.socketGroupList[#build.skillsTab.socketGroupList].includeInFullDPS = true
+		build.mainSocketGroup = #build.skillsTab.socketGroupList
+		local env = calculate()
+		local playerDecay = env.player.output.DecayDPS or 0
+		local mercDecay = env.mercenary.output.DecayDPS or 0
+		assert.is_true(playerDecay > 0)
+		assert.is_true(mercDecay > 0)
+		local fullDPS = calcs.calcFullDPS(build, "CALCULATOR", { })
+		assert.are.near(math.max(playerDecay, mercDecay), fullDPS.decayDPS, 10 ^ -6)
+		assert.are.near(mercDecay, namedDps(fullDPS.mercenarySkills, "Best Decay DPS"), 10 ^ -6)
+	end)
+
+	it("counts only the strongest Essence Drain DoT from the player and Mercenary", function()
+		configure("ChaosMinionWitch", "ChaosMinionWitchDot", "EssenceDrainAltMercenary", { includeInFullDPS = true })
+		local staff = new("Item"):Item("Rarity: Normal\nGnarled Branch")
+		staff.id = 9106
+		build.itemsTab.items[staff.id] = staff
+		equipmentSlot("Weapon 1").selItemId = staff.id
+		build.skillsTab:PasteSocketGroup("Essence Drain of Wickedness 20/0  1")
+		build.skillsTab.socketGroupList[#build.skillsTab.socketGroupList].includeInFullDPS = true
+		build.mainSocketGroup = #build.skillsTab.socketGroupList
+		local env = calculate()
+		local playerDot = env.player.output.TotalDot or 0
+		local mercDot = env.mercenary.output.TotalDot or 0
+		assert.is_true(playerDot > 0)
+		assert.is_true(mercDot > 0)
+		local fullDPS = calcs.calcFullDPS(build, "CALCULATOR", { })
+		assert.are.near(math.max(playerDot, mercDot), fullDPS.dotDPS, 10 ^ -6)
+		assert.are.near(mercDot, namedDps(fullDPS.mercenarySkills, "Full DoT DPS"), 10 ^ -6)
+	end)
+
+	it("sums Mercenary Essence Drain and Bane as distinct generic DoTs", function()
+		configure("ChaosMinionWitch", "ChaosMinionWitchDot", "EssenceDrainAltMercenary", { includeInFullDPS = true })
+		local staff = new("Item"):Item("Rarity: Normal\nGnarled Branch")
+		staff.id = 9107
+		build.itemsTab.items[staff.id] = staff
+		equipmentSlot("Weapon 1").selItemId = staff.id
+		setMercenaryFullDPS({ "EssenceDrainAltMercenary" })
+		local drain = calcs.calcFullDPS(build, "CALCULATOR", { }).dotDPS
+		setMercenaryFullDPS({ "BaneMercenary" })
+		local bane = calcs.calcFullDPS(build, "CALCULATOR", { }).dotDPS
+		setMercenaryFullDPS({ "EssenceDrainAltMercenary", "BaneMercenary" })
+		local both = calcs.calcFullDPS(build, "CALCULATOR", { })
+		assert.is_true(drain > 0)
+		assert.is_true(bane > 0)
+		assert.are.near(drain + bane, both.dotDPS, 10 ^ -4)
+		assert.are.near(both.dotDPS, namedDps(both.mercenarySkills, "Full DoT DPS"), 10 ^ -6)
+	end)
+
+	it("still multiplies stackable Mercenary generic DoT by count", function()
+		configure("NonEleBowRanger", "NonEleBowRangerChaos", "ToxicRainMercenary", { includeInFullDPS = true, count = 2 })
+		local bow = new("Item"):Item("Rarity: Normal\nCrude Bow")
+		local quiver = new("Item"):Item("Rarity: Normal\nSerrated Arrow Quiver")
+		bow.id, quiver.id = 9108, 9109
+		build.itemsTab.items[bow.id], build.itemsTab.items[quiver.id] = bow, quiver
+		equipmentSlot("Weapon 1").selItemId, equipmentSlot("Weapon 2").selItemId = bow.id, quiver.id
+		local env = calculate()
+		local onePod = env.mercenary.output.TotalDot or 0
+		assert.is_true(onePod > 0)
+		local fullDPS = calcs.calcFullDPS(build, "CALCULATOR", { })
+		assert.are.near(onePod * 2, fullDPS.dotDPS, 10 ^ -4)
 	end)
 end)

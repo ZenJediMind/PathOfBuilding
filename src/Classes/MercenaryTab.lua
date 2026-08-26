@@ -234,7 +234,7 @@ function MercenaryTabClass:MercenaryTab(build)
 		local skill = self.profile.skills[self.selectedSkillIndex]
 		if skill then skill.includeInFullDPS = state end
 		self:Changed()
-	end)
+	end, "Mercenary Full DPS assumes every selected skill's damage is simultaneously sustainable.\nIt does not simulate the Mercenary's skill priority or rotation.")
 	self.controls.skillCountLabel = new("LabelControl"):LabelControl({ "TOPLEFT", self.controls.skillDetailAnchor, "TOPLEFT" }, { 287, 32, 0, 16 }, "^7Count:")
 	self.controls.skillCount = new("EditControl"):EditControl({ "TOPLEFT", self.controls.skillDetailAnchor, "TOPLEFT" }, { 335, 30, 50, 20 }, "1", nil, "%D", 2, function(buf)
 		local skill = self.profile.skills[self.selectedSkillIndex]

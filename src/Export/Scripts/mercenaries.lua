@@ -188,7 +188,8 @@ local passiveStatFormats = {
 dofile("../Data/Global.lua")
 local function stubMod() return { } end
 local mercenaryStatData = LoadModule("../Data/MercenaryStatMap.lua")(stubMod, stubMod, stubMod)
-local optionalShieldBuilds = mercenaryStatData.optionalShieldBuilds
+local MercenaryTools = LoadModule("../Modules/MercenaryTools")
+local shieldPolicy = mercenaryStatData.shieldPolicy
 local supportCounts = mercenaryStatData.supportCounts
 for _, row in ipairs(sortedRows("MercenarySupportCounts", function(value) return value.Id end)) do
 	if not supportCounts[row.Id] then
@@ -293,12 +294,17 @@ local function exportMonster(variety)
 		stats = stats,
 	}
 	for _, modRow in ipairs(variety.Mods or { }) do
-		if modRow.Id == "MonsterSpeedAndDamageFixupSmall" then
-			monster.damageFixup = 0.11
-		elseif modRow.Id == "MonsterSpeedAndDamageFixupLarge" then
-			monster.damageFixup = 0.22
-		elseif modRow.Id == "MonsterSpeedAndDamageFixupComplete" then
-			monster.damageFixup = 0.33
+		local modStats = { }
+		for index = 1, 6 do
+			local stat = modRow["Stat"..index]
+			local values = modRow["Stat"..index.."Value"]
+			if stat and values and values[1] then
+				table.insert(modStats, { id = stat.Id, value = values[1] })
+			end
+		end
+		local fixup = MercenaryTools.monsterSpeedAndDamageFixup(modRow.Id, modStats)
+		if fixup then
+			monster.damageFixup = fixup
 		end
 	end
 	return monster
@@ -468,7 +474,7 @@ for _, row in ipairs(sortedRows("MercenaryBuilds", function(value) return value.
 			table.insert(mainHandTypes, itemType)
 		end
 	end
-	local optionalShield = requiresShield and optionalShieldBuilds[row.Id] or false
+	local optionalShield = requiresShield and shieldPolicy[row.Id] == "optional"
 	local offHandTypes = requiresShield and (optionalShield and uniqueSorted({ "Shield", unpack(mainHandTypes) }) or { "Shield" }) or requiresQuiver and { "Quiver" } or mainHandTypes
 	local passiveStats = { }
 	for _, statRow in ipairs(row.BuildStats or { }) do
@@ -522,12 +528,9 @@ end
 for _, class in pairs(mercenaries.classes) do
 	class.skillIds = uniqueSorted(class.skillIds)
 end
--- The optional-shield list is keyed to build ids, so a renamed or removed build has
--- to fail rather than quietly making its shield mandatory again.
-for buildId in pairs(optionalShieldBuilds) do
-	if not mercenaries.builds[buildId] then
-		error("Optional-shield policy references missing Mercenary build: "..buildId)
-	end
+local shieldPolicyError = MercenaryTools.shieldPolicyError(mercenaries.builds, shieldPolicy)
+if shieldPolicyError then
+	error(shieldPolicyError)
 end
 for _, ids in pairs(mercenaries.skillsByHash) do
 	table.sort(ids)

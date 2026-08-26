@@ -699,21 +699,30 @@ return {
 		Medium = { maximum = 3 },
 		High = { maximum = 5 },
 	},
-	-- Builds whose weapon configuration includes a shield that the build does not
-	-- require. Nothing in MercenaryBuilds distinguishes "can hold a shield" from
-	-- "needs a shield", so this list is hand-authored from in-game observation and
-	-- read at export time to decide `weaponConfiguration.offHandRequired`.
-	optionalShieldBuilds = {
-		AurasMinionsTemplarSpectres = true,
-		AurasMinionsTemplarSpectresNoble = true,
-		Crit1HShadowPhysSpell = true,
-		Crit1HShadowPhysSpellNoble = true,
-		ElementalWitchCold = true,
-		ElementalWitchColdNoble = true,
-		ElementalWitchFire = true,
-		ElementalWitchLightning = true,
-		ElementalWitchLightningNoble = true,
-		MeleeStrikesMarauderFire = true,
+	-- Builds whose weapon configuration includes a Shield. DAT does not distinguish
+	-- "can hold a shield" from "needs a shield", so every shield-capable build is
+	-- classified here and export fails if a new one is missing.
+	shieldPolicy = {
+		AurasMinionsTemplarSmite = "required",
+		AurasMinionsTemplarSmiteNoble = "required",
+		AurasMinionsTemplarSmiteRuckusNoble = "required",
+		AurasMinionsTemplarSpectres = "optional",
+		AurasMinionsTemplarSpectresNoble = "optional",
+		ChaosMinionWitchInstability = "required",
+		ChaosMinionWitchInstabilityNoble = "required",
+		Crit1HShadowPhysSpell = "optional",
+		Crit1HShadowPhysSpellNoble = "optional",
+		ElementalWitchCold = "optional",
+		ElementalWitchColdNoble = "optional",
+		ElementalWitchFire = "optional",
+		ElementalWitchLightning = "optional",
+		ElementalWitchLightningNoble = "optional",
+		MeleeStrikesMarauderFire = "optional",
+		MiscScionWandAttacks = "required",
+		MiscScionWandAttacksNoble = "required",
+		PhysicalDuelistShields = "required",
+		PhysicalDuelistShieldsNoble = "required",
+		TrapsMinesShadowCold = "required",
 	},
 	-- Non-DAT behavior the Mercenary actor needs. The permanent damage penalty's
 	-- maximum is exported from Noble Blood's PassiveSkills row; the 3.29.1

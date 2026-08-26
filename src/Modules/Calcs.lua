@@ -165,16 +165,41 @@ local function countSkillDamageOnce(activeSkill, modDB)
 		or (skillName:match("Holy Strike") and modDB:Flag(false, "Condition:HolyStrikeSkillDamageCountedOnce"))
 end
 
--- Generic skill DoT for Full DPS. A Mirage copy of a non-stacking DoT is omitted
--- when the source actor is already contributing that same TotalDot.
-function calcs.genericDotContribution(output, skillFlags, count, sourceOutput)
+-- Generic skill DoT for Full DPS. Non-stacking DoTs of the same identity
+-- keep the strongest instance; stackable DoTs sum, multiplied by count.
+function calcs.genericDotIdentity(grantedEffect)
+	local identity = grantedEffect and (grantedEffect.inheritedFrom or grantedEffect.id)
+	if not identity then
+		error("Full DPS generic DoT is missing an identity")
+	end
+	return identity
+end
+
+function calcs.genericDotContribution(output, skillFlags, count)
 	if not (output.TotalDot and output.TotalDot > 0) then
 		return 0
 	end
-	if sourceOutput and not (skillFlags.DotCanStack or (sourceOutput.TotalDot and sourceOutput.TotalDot == 0)) then
-		return 0
-	end
 	return output.TotalDot * (skillFlags.DotCanStack and count or 1)
+end
+
+function calcs.contributeGenericDot(totals, identity, output, skillFlags, count)
+	local contribution = calcs.genericDotContribution(output, skillFlags, count)
+	if contribution <= 0 then
+		return
+	end
+	if skillFlags.DotCanStack then
+		totals[identity] = (totals[identity] or 0) + contribution
+	elseif contribution > (totals[identity] or 0) then
+		totals[identity] = contribution
+	end
+end
+
+function calcs.sumDotTotals(totals)
+	local sum = 0
+	for _, value in pairs(totals) do
+		sum = sum + value
+	end
+	return sum
 end
 
 function calcs.calcFullDPS(build, mode, override, specEnv)
@@ -215,10 +240,14 @@ function calcs.calcFullDPS(build, mode, override, specEnv)
 	local igniteSource = ""
 	local burningGroundSource = ""
 	local causticGroundSource = ""
+	local decaySource = ""
+	local genericDots = { }
+	local mercenaryGenericDots = { }
+	local minionDotDPS = 0
 	local mercenaryTotals = {
 		direct = 0, poison = 0, impale = 0, decay = 0, dot = 0,
 		bleed = 0, corruptingBlood = 0, ignite = 0, burningGround = 0, causticGround = 0, culling = 0,
-		bleedSource = "", corruptingBloodSource = "", igniteSource = "", burningGroundSource = "", causticGroundSource = "",
+		bleedSource = "", corruptingBloodSource = "", igniteSource = "", burningGroundSource = "", causticGroundSource = "", decaySource = "",
 	}
 	local function updateMercenaryMaximum(stat, value, source)
 		if value > mercenaryTotals[stat] then
@@ -255,11 +284,12 @@ function calcs.calcFullDPS(build, mode, override, specEnv)
 					if usedEnv.minion.output.ImpaleDPS and usedEnv.minion.output.ImpaleDPS > 0 then
 						fullDPS.impaleDPS = fullDPS.impaleDPS + usedEnv.minion.output.ImpaleDPS * activeSkillCount
 					end
-					if usedEnv.minion.output.DecayDPS and usedEnv.minion.output.DecayDPS > 0 then
-						fullDPS.decayDPS = fullDPS.decayDPS + usedEnv.minion.output.DecayDPS
+					if usedEnv.minion.output.DecayDPS and usedEnv.minion.output.DecayDPS > fullDPS.decayDPS then
+						fullDPS.decayDPS = usedEnv.minion.output.DecayDPS
+						decaySource = activeSkill.activeEffect.grantedEffect.name
 					end
 					if usedEnv.minion.output.TotalDot and usedEnv.minion.output.TotalDot > 0 then
-						fullDPS.dotDPS = fullDPS.dotDPS + usedEnv.minion.output.TotalDot
+						minionDotDPS = minionDotDPS + usedEnv.minion.output.TotalDot
 					end
 					if usedEnv.minion.output.CullMultiplier and usedEnv.minion.output.CullMultiplier > 1 and usedEnv.minion.output.CullMultiplier > fullDPS.cullingMulti then
 						fullDPS.cullingMulti = usedEnv.minion.output.CullMultiplier
@@ -291,10 +321,11 @@ function calcs.calcFullDPS(build, mode, override, specEnv)
 					if activeSkill.mirage.output.ImpaleDPS and activeSkill.mirage.output.ImpaleDPS > 0 then
 						fullDPS.impaleDPS = fullDPS.impaleDPS + activeSkill.mirage.output.ImpaleDPS * mirageCount
 					end
-					if activeSkill.mirage.output.DecayDPS and activeSkill.mirage.output.DecayDPS > 0 then
-						fullDPS.decayDPS = fullDPS.decayDPS + activeSkill.mirage.output.DecayDPS
+					if activeSkill.mirage.output.DecayDPS and activeSkill.mirage.output.DecayDPS > fullDPS.decayDPS then
+						fullDPS.decayDPS = activeSkill.mirage.output.DecayDPS
+						decaySource = activeSkill.activeEffect.grantedEffect.name .. " (Mirage)"
 					end
-					fullDPS.dotDPS = fullDPS.dotDPS + calcs.genericDotContribution(activeSkill.mirage.output, activeSkill.skillFlags, mirageCount, usedEnv.player.output)
+					calcs.contributeGenericDot(genericDots, calcs.genericDotIdentity(activeSkill.activeEffect.grantedEffect), activeSkill.mirage.output, activeSkill.skillFlags, mirageCount)
 					if activeSkill.mirage.output.CullMultiplier and activeSkill.mirage.output.CullMultiplier > 1 and activeSkill.mirage.output.CullMultiplier > fullDPS.cullingMulti then
 						fullDPS.cullingMulti = activeSkill.mirage.output.CullMultiplier
 					end
@@ -338,10 +369,11 @@ function calcs.calcFullDPS(build, mode, override, specEnv)
 				if usedEnv.player.output.ImpaleDPS and usedEnv.player.output.ImpaleDPS > 0 then
 					fullDPS.impaleDPS = fullDPS.impaleDPS + usedEnv.player.output.ImpaleDPS * activeSkillCount
 				end
-				if usedEnv.player.output.DecayDPS and usedEnv.player.output.DecayDPS > 0 then
-					fullDPS.decayDPS = fullDPS.decayDPS + usedEnv.player.output.DecayDPS
+				if usedEnv.player.output.DecayDPS and usedEnv.player.output.DecayDPS > fullDPS.decayDPS then
+					fullDPS.decayDPS = usedEnv.player.output.DecayDPS
+					decaySource = activeSkill.activeEffect.grantedEffect.name
 				end
-				fullDPS.dotDPS = fullDPS.dotDPS + calcs.genericDotContribution(usedEnv.player.output, activeSkill.skillFlags, activeSkillCount)
+				calcs.contributeGenericDot(genericDots, calcs.genericDotIdentity(activeSkill.activeEffect.grantedEffect), usedEnv.player.output, activeSkill.skillFlags, activeSkillCount)
 				if usedEnv.player.output.CullMultiplier and usedEnv.player.output.CullMultiplier > 1 and usedEnv.player.output.CullMultiplier > fullDPS.cullingMulti then
 					fullDPS.cullingMulti = usedEnv.player.output.CullMultiplier
 				end
@@ -403,7 +435,6 @@ function calcs.calcFullDPS(build, mode, override, specEnv)
 					source = "Mercenary Mirage",
 					count = (activeSkill.mirage.count or 1) * directCount,
 					skillPart = activeSkill.mirage.skillPartName,
-					genericDotSourceOutput = usedEnv.mercenary.output,
 				})
 			end
 			for _, actorData in ipairs(actorOutputs) do
@@ -454,13 +485,13 @@ function calcs.calcFullDPS(build, mode, override, specEnv)
 					fullDPS.impaleDPS = fullDPS.impaleDPS + impale
 					mercenaryTotals.impale = mercenaryTotals.impale + impale
 				end
-				if actorOutput.DecayDPS and actorOutput.DecayDPS > 0 then
-					fullDPS.decayDPS = fullDPS.decayDPS + actorOutput.DecayDPS
-					mercenaryTotals.decay = mercenaryTotals.decay + actorOutput.DecayDPS
+				if actorOutput.DecayDPS and actorOutput.DecayDPS > fullDPS.decayDPS then
+					fullDPS.decayDPS, decaySource = actorOutput.DecayDPS, sourceName
 				end
-				local dot = calcs.genericDotContribution(actorOutput, activeSkill.skillFlags, actorCount, actorData.genericDotSourceOutput)
-				fullDPS.dotDPS = fullDPS.dotDPS + dot
-				mercenaryTotals.dot = mercenaryTotals.dot + dot
+				updateMercenaryMaximum("decay", actorOutput.DecayDPS or 0, sourceName)
+				local identity = calcs.genericDotIdentity(activeSkill.activeEffect.grantedEffect)
+				calcs.contributeGenericDot(genericDots, identity, actorOutput, activeSkill.skillFlags, actorCount)
+				calcs.contributeGenericDot(mercenaryGenericDots, identity, actorOutput, activeSkill.skillFlags, actorCount)
 				if actorOutput.CullMultiplier and actorOutput.CullMultiplier > fullDPS.cullingMulti then
 					fullDPS.cullingMulti = actorOutput.CullMultiplier
 				end
@@ -506,9 +537,11 @@ function calcs.calcFullDPS(build, mode, override, specEnv)
 		fullDPS.combinedDPS = fullDPS.combinedDPS + fullDPS.impaleDPS
 	end
 	if fullDPS.decayDPS > 0 then
-		t_insert(fullDPS.skills, { name = "Full Decay DPS", dps = fullDPS.decayDPS, count = 1 })
+		t_insert(fullDPS.skills, { name = "Best Decay DPS", dps = fullDPS.decayDPS, count = 1, source = decaySource })
 		fullDPS.TotalDotDPS = fullDPS.TotalDotDPS + fullDPS.decayDPS
 	end
+	fullDPS.dotDPS = calcs.sumDotTotals(genericDots) + minionDotDPS
+	mercenaryTotals.dot = calcs.sumDotTotals(mercenaryGenericDots)
 	if fullDPS.dotDPS > 0 then
 		t_insert(fullDPS.skills, { name = "Full DoT DPS", dps = fullDPS.dotDPS, count = 1 })
 		fullDPS.TotalDotDPS = fullDPS.TotalDotDPS + fullDPS.dotDPS
@@ -533,7 +566,7 @@ function calcs.calcFullDPS(build, mode, override, specEnv)
 	addMercenaryDPS("Full Poison DPS", mercenaryPoison)
 	addMercenaryDPS("Best Caustic Ground DPS", mercenaryTotals.causticGround, mercenaryTotals.causticGroundSource)
 	addMercenaryDPS("Full Impale DPS", mercenaryTotals.impale)
-	addMercenaryDPS("Full Decay DPS", mercenaryTotals.decay)
+	addMercenaryDPS("Best Decay DPS", mercenaryTotals.decay, mercenaryTotals.decaySource)
 	addMercenaryDPS("Full DoT DPS", mercenaryTotals.dot)
 	fullDPS.mercenaryDotDPS = m_min(mercenaryTotals.bleed + mercenaryTotals.corruptingBlood + mercenaryTotals.ignite
 		+ mercenaryTotals.burningGround + mercenaryTotals.causticGround + mercenaryPoison + mercenaryTotals.decay + mercenaryTotals.dot, data.misc.DotDpsCap)

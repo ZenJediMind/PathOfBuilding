@@ -570,8 +570,9 @@ do
 	-- `inheritedFrom` so the runtime inherits from exactly one recorded skill.
 	-- An ActiveSkill and a display name are both shared by the skill gem the player
 	-- uses and by the NPC and monster copies of it, and only the gem's entry is
-	-- maintained as a player skill, so the gem is preferred. Among equals the lowest
-	-- id wins, keeping the choice stable across re-exports.
+	-- maintained as a player skill, so the gem is preferred. Display-name fallback
+	-- requires a unique best-rank candidate; equal-rank ties need an override.
+	local MercenaryTools = LoadModule("../Modules/MercenaryTools")
 	local baseSkillByActiveSkill = { }
 	local baseSkillByDisplayName = { }
 	local function baseRank(effect)
@@ -580,10 +581,7 @@ do
 		return gemEffect and 0 or 1
 	end
 	local function considerBase(bases, key, id, rank)
-		local current = bases[key]
-		if not current or rank < current.rank or (rank == current.rank and id < current.id) then
-			bases[key] = { id = id, rank = rank }
-		end
+		bases[key] = MercenaryTools.considerRankedCandidate(bases[key], id, rank)
 	end
 	for id in pairs(emitted) do
 		local effect = dat("GrantedEffects"):GetRow("Id", id)
@@ -679,6 +677,8 @@ do
 				elseif base == byActiveSkill and base ~= nil then
 					resolvedByActiveSkill = resolvedByActiveSkill + 1
 				elseif base then
+					local displayName = effect.ActiveSkill.DisplayName ~= "" and effect.ActiveSkill.DisplayName or effectNames[effect.Id]
+					MercenaryTools.requireUniqueRankedCandidate(byDisplayName, "Mercenary base skill display name '"..displayName.."'")
 					resolvedByDisplayName = resolvedByDisplayName + 1
 				else
 					table.insert(withoutBase, effect.Id)

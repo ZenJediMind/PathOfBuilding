@@ -94,11 +94,14 @@ end
 ---@field toggleTincture Item? Item object used as a table key.
 ---@field conditions string[]?
 ---@field extraJewelFuncs ModList?
+---@field comparisonActor string?
+---@field itemSetId integer?
 
 -- Get calculator for other changes (adding/removing nodes, items, gems, etc)
 ---@param build Build
 ---@return fun(override?: CalcOverride, useFullDPS?: boolean): Output calcFunc
 ---@return Output output
+---@return table baseOutputs
 function calcs.getMiscCalculator(build)
 	-- Run base calculation pass
 	local env, cachedPlayerDB, cachedEnemyDB, cachedMinionDB = calcs.initEnv(build, "CALCULATOR")

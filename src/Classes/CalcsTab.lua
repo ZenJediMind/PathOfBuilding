@@ -612,8 +612,8 @@ function CalcsTabClass:BuildOutput()
 	end
 	
 	-- Retrieve calculator functions
-	local miscCalcFunc, miscCalcBase = self.calcs.getMiscCalculator(self.build)
-	self.miscCalculator = { miscCalcFunc, miscCalcBase }
+	local miscCalcFunc, miscCalcBase, actorOutputs = self.calcs.getMiscCalculator(self.build)
+	self.miscCalculator = { miscCalcFunc, miscCalcBase, actorOutputs }
 end
 
 -- Controls the coroutine that calculates node power
@@ -903,7 +903,7 @@ function CalcsTabClass:CalculateCombinedOffDefStat(original, modified)
 end
 
 function CalcsTabClass:GetMiscCalculator()
-	return self.miscCalculator[1], self.miscCalculator[2]
+	return self.miscCalculator[1], self.miscCalculator[2], self.miscCalculator[3]
 end
 
 function CalcsTabClass:CreateUndoState()

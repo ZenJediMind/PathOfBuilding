@@ -395,7 +395,7 @@ end)
 
 describe("Generated Mercenary data", function()
 	local tools = require("Modules.MercenaryTools")
-	local export = require("Modules.MercenaryExport")
+	local export = require("Export.MercenaryExport")
 
 	it("has deterministic orders and resolvable references", function()
 		local mercenaries = data.mercenaries

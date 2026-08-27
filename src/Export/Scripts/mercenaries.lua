@@ -188,7 +188,7 @@ local passiveStatFormats = {
 dofile("../Data/Global.lua")
 local function stubMod() return { } end
 local mercenaryStatData = LoadModule("../Data/MercenaryStatMap.lua")(stubMod, stubMod, stubMod)
-local MercenaryExport = LoadModule("../Modules/MercenaryExport")
+local MercenaryExport = LoadModule("MercenaryExport")
 local shieldPolicy = mercenaryStatData.shieldPolicy
 local supportCounts = mercenaryStatData.supportCounts
 for _, row in ipairs(sortedRows("MercenarySupportCounts", function(value) return value.Id end)) do

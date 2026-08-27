@@ -574,7 +574,7 @@ do
 	-- requires a unique best-rank candidate; equal-rank ties need an override.
 	-- A shared ActiveSkill is stronger evidence than a shared name, but equal-rank
 	-- ActiveSkill ties are still ambiguous and also require an override.
-	local MercenaryExport = LoadModule("../Modules/MercenaryExport")
+	local MercenaryExport = LoadModule("MercenaryExport")
 	local baseSkillByActiveSkill = { }
 	local baseSkillByDisplayName = { }
 	local function baseRank(effect)

@@ -1,6 +1,6 @@
 -- Path of Building
 --
--- Module: MercenaryExport
+-- Exporter: MercenaryExport
 -- Exporter-only validation helpers for Mercenary data. The running calculator
 -- does not load this module.
 

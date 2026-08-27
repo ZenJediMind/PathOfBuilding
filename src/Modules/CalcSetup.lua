@@ -156,10 +156,10 @@ local function addMercenaryMonsterStats(env, mercenary, monster, errors)
 		end
 		rawStats[stat.id] = (rawStats[stat.id] or 0) + stat.value
 	end
-	mercenary.modDB:NewMod("MaximumRage", "BASE", rawStats.maximum_rage or 30, "Mercenary")
-	mercenary.modDB:NewMod("ActiveTrapLimit", "BASE", rawStats.base_number_of_traps_allowed or 15, "Mercenary")
-	mercenary.modDB:NewMod("ActiveMineLimit", "BASE", rawStats.base_number_of_remote_mines_allowed or 15, "Mercenary")
-	mercenary.modDB:NewMod("ActiveTotemLimit", "BASE", 1 + (rawStats.number_of_additional_totems_allowed or 0), "Mercenary")
+	mercenary.modDB:NewMod("MaximumRage", "BASE", rawStats.maximum_rage or env.data.characterConstants["maximum_rage"], "Mercenary")
+	mercenary.modDB:NewMod("ActiveTrapLimit", "BASE", rawStats.base_number_of_traps_allowed or env.data.characterConstants["base_number_of_traps_allowed"], "Mercenary")
+	mercenary.modDB:NewMod("ActiveMineLimit", "BASE", rawStats.base_number_of_remote_mines_allowed or env.data.characterConstants["base_number_of_remote_mines_allowed"], "Mercenary")
+	mercenary.modDB:NewMod("ActiveTotemLimit", "BASE", env.data.characterConstants["base_number_of_totems_allowed"] + (rawStats.number_of_additional_totems_allowed or 0), "Mercenary")
 	mercenary.modDB:NewMod("LifeRegenPercent", "BASE", (rawStats["life_regeneration_per_minute_%_for_hired_mercenary_out_of_combat_window"] or 0) / 60, "Mercenary")
 	mercenary.modDB:NewMod("ManaCost", "INC", -(rawStats["set_base_mana_cost_-%"] or 0), "Mercenary")
 	mercenary.modDB:NewMod("ManaRegen", "BASE", (rawStats.base_mana_regeneration_rate_per_minute or 0) / 60, "Mercenary")

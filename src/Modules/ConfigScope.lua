@@ -58,15 +58,27 @@ local enemyStateByVar = { }
 local indexedSourceOwned = { }
 local indexed = false
 
+local SOURCE_OWNED_TAG_TYPES = {
+	Condition = true,
+	Multiplier = true,
+	MultiplierThreshold = true,
+	ActorCondition = true,
+}
+
+local sourceOwnedNameCache = { }
+
 local function isSourceOwnedName(name)
 	if not name then
 		return false
 	end
-	if SOURCE_OWNED_ENEMY_VARS[name] or indexedSourceOwned[name] then
-		return true
+	local cached = sourceOwnedNameCache[name]
+	if cached ~= nil then
+		return cached
 	end
 	-- "ByYou" is also a prefix of "ByYour".
-	return name:find("ByYou", 1, true) ~= nil
+	local owned = SOURCE_OWNED_ENEMY_VARS[name] or indexedSourceOwned[name] or name:find("ByYou", 1, true) ~= nil
+	sourceOwnedNameCache[name] = owned
+	return owned
 end
 
 local function anySourceOwned(value)
@@ -94,14 +106,11 @@ function ConfigScope.isSourceOwnedEnemyMod(mod)
 end
 
 function ConfigScope.isSourceOwnedEnemyTag(tag)
-	if not tag then
+	if not (tag and SOURCE_OWNED_TAG_TYPES[tag.type]) then
 		return false
 	end
 	if tag.sourceOwned then
-		return tag.type == "Condition" or tag.type == "Multiplier" or tag.type == "MultiplierThreshold" or tag.type == "ActorCondition"
-	end
-	if tag.type ~= "Condition" and tag.type ~= "Multiplier" and tag.type ~= "MultiplierThreshold" and tag.type ~= "ActorCondition" then
-		return false
+		return true
 	end
 	return anySourceOwned(tag.var or tag.varList)
 end
@@ -215,6 +224,7 @@ function ConfigScope.index(varList)
 	scopeByVar = { }
 	enemyStateByVar = { }
 	indexedSourceOwned = { }
+	sourceOwnedNameCache = { }
 	if varList == nil then
 		error("ConfigScope.index requires a config option list")
 	end
@@ -242,6 +252,9 @@ function ConfigScope.index(varList)
 		end
 	end
 	indexed = true
+	-- Names registered as source-owned during this pass must not keep
+	-- a false negative from an earlier option's lookup.
+	sourceOwnedNameCache = { }
 end
 
 function ConfigScope.tryForVar(var)

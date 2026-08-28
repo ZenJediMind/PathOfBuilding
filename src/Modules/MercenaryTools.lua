@@ -2,8 +2,16 @@ local MercenaryTools = { }
 
 MercenaryTools.equipmentSlots = { "Weapon 1", "Weapon 2", "Helmet", "Body Armour", "Gloves", "Boots", "Amulet", "Ring 1", "Ring 2", "Belt" }
 
+local itemSlotNames = { }
+
 function MercenaryTools.itemSlotName(slotName)
-	return "Mercenary "..slotName
+	local cached = itemSlotNames[slotName]
+	if cached then
+		return cached
+	end
+	cached = "Mercenary "..slotName
+	itemSlotNames[slotName] = cached
+	return cached
 end
 
 function MercenaryTools.baseItemSlotName(slotName)
@@ -91,12 +99,18 @@ local MAX_WARRANT_BYTES = 256 * 1024
 local MAX_SKILLS = 6
 
 function MercenaryTools.contains(values, wanted)
-	for _, value in ipairs(values or { }) do
-		if value == wanted then
-			return true
-		end
+	if not values then
+		return false
 	end
-	return false
+	local set = values._set
+	if not set then
+		set = { }
+		for _, value in ipairs(values) do
+			set[value] = true
+		end
+		values._set = set
+	end
+	return set[wanted] == true
 end
 local contains = MercenaryTools.contains
 

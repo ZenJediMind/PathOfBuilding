@@ -214,7 +214,7 @@ local function attachEnemySourceDB(env, actor, sourceModList)
 	if actor == env.player then
 		for _, mod in ipairs(env.build.configTab.enemyModList or { }) do
 			local name = mod.name or ""
-			if name:match("^Condition:") or name:match("^Multiplier:") then
+			if name:sub(1, 10) == "Condition:" or name:sub(1, 11) == "Multiplier:" then
 				sourceDB:AddMod(mod)
 			end
 		end
@@ -281,15 +281,25 @@ function calcs.createActorCalcEnv(rootEnv, actorFields)
 			error("createActorCalcEnv: missing actor-local field '"..key.."'")
 		end
 	end
+	for _, key in ipairs(calcs.ACTOR_SHARED_ENV_KEYS) do
+		if actorFields[key] == nil then
+			local value = rootEnv[key]
+			if value ~= nil then
+				actorFields[key] = value
+			end
+		end
+	end
 	return setmetatable(actorFields, {
 		__index = function(_, key)
 			if actorLocalEnvKeySet[key] then
 				error("createActorCalcEnv: actor-local field '"..key.."' is unset")
 			end
-			if not actorSharedEnvKeySet[key] and rawget(rootEnv, key) ~= nil then
+			if actorSharedEnvKeySet[key] then
+				return rootEnv[key]
+			end
+			if rawget(rootEnv, key) ~= nil then
 				error("createActorCalcEnv: unclassified env field '"..key.."'")
 			end
-			return rootEnv[key]
 		end,
 	})
 end

@@ -1521,6 +1521,7 @@ Adds 500 to 500 Physical Damage]])
 
 		linkGroup.enabled = true
 		granite.rarity = "UNIQUE"
+		granite.title = "Unique Granite Flask"
 		env = calculate()
 		assert.is_nil(env.mercenary.modDB.conditions.UsingFlask)
 		assert.is_nil(env.mercenary.modDB.conditions.UsingGraniteFlask)

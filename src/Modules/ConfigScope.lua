@@ -11,6 +11,9 @@
 -- Options inherit their section's scope unless they set `scope` explicitly. Naming
 -- heuristics still detect likely section overrides so a new option cannot silently
 -- change actor vs encounter ownership; those cases require explicit metadata.
+-- Enemy predicates (ifEnemyCond / ifEnemyMult / ifEnemyStat) and ByYou/ByYour
+-- names likewise require explicit enemyState so a game update cannot silently
+-- share a new source-owned condition.
 --
 local ConfigScope = { }
 
@@ -52,10 +55,18 @@ local CHILL_BY_HITS_EFFECT_FLAGS = {
 
 local scopeByVar = { }
 local enemyStateByVar = { }
+local indexedSourceOwned = { }
 local indexed = false
 
 local function isSourceOwnedName(name)
-	return name and SOURCE_OWNED_ENEMY_VARS[name] or false
+	if not name then
+		return false
+	end
+	if SOURCE_OWNED_ENEMY_VARS[name] or indexedSourceOwned[name] then
+		return true
+	end
+	-- "ByYou" is also a prefix of "ByYour".
+	return name:find("ByYou", 1, true) ~= nil
 end
 
 local function anySourceOwned(value)
@@ -116,15 +127,43 @@ local function requireIndexed()
 	end
 end
 
+local function hasEnemyPredicate(varData)
+	return varData.ifEnemyCond or varData.ifEnemyMult or varData.ifEnemyStat
+end
+
+local function looksSourceOwned(varData)
+	if anySourceOwned(varData.ifEnemyCond) or anySourceOwned(varData.ifEnemyMult) then
+		return true
+	end
+	local var = varData.var or ""
+	return var:find("ByYou", 1, true) ~= nil
+end
+
+local function registerSourceOwned(value)
+	if type(value) == "table" then
+		for _, name in ipairs(value) do
+			if name then
+				indexedSourceOwned[name] = true
+			end
+		end
+	elseif value then
+		indexedSourceOwned[value] = true
+	end
+end
+
 local function inferEnemyState(varData)
+	local sourceOwned = looksSourceOwned(varData)
 	if varData.enemyState then
 		if not VALID_ENEMY_STATE[varData.enemyState] then
 			error("ConfigScope: invalid enemyState '"..tostring(varData.enemyState).."' for "..tostring(varData.var))
 		end
+		if sourceOwned and varData.enemyState ~= "source" then
+			error("ConfigScope: '"..tostring(varData.var).."' looks source-owned and cannot have enemyState '"..varData.enemyState.."'")
+		end
 		return varData.enemyState
 	end
-	if anySourceOwned(varData.ifEnemyCond) or anySourceOwned(varData.ifEnemyMult) then
-		return "source"
+	if sourceOwned or hasEnemyPredicate(varData) then
+		error("ConfigScope: '"..tostring(varData.var).."' needs explicit enemyState")
 	end
 	return "encounter"
 end
@@ -175,6 +214,7 @@ function ConfigScope.index(varList)
 	indexed = false
 	scopeByVar = { }
 	enemyStateByVar = { }
+	indexedSourceOwned = { }
 	if varList == nil then
 		error("ConfigScope.index requires a config option list")
 	end
@@ -195,6 +235,10 @@ function ConfigScope.index(varList)
 			enemyStateByVar[varData.var] = enemyState
 			varData.resolvedScope = scope
 			varData.resolvedEnemyState = enemyState
+			if enemyState == "source" then
+				registerSourceOwned(varData.ifEnemyCond)
+				registerSourceOwned(varData.ifEnemyMult)
+			end
 		end
 	end
 	indexed = true

@@ -375,13 +375,17 @@ local function addMercenaryComparison(tab, tooltip, preview, header)
 	local calcTab = tab.build.calcsTab
 	local calcFunc, _, baseOutputs = calcTab:GetMiscCalculator()
 	local baseOutput = baseOutputs and baseOutputs.MERCENARY
-	if not calcFunc or not baseOutput or not calcTab.mainEnv then return end
-	local ok, output = pcall(calcFunc, { comparisonActor = "MERCENARY" }, tab.sortGemsByDPSField == "FullDPS")
-	if ok and output then
-		tab.build:AddStatComparesToTooltip(tooltip, baseOutput, output, header, nil, "MERCENARY")
-	else
+	if not calcFunc or not calcTab.mainEnv then return end
+	if not baseOutput then
 		tooltip:AddLine(16, colorCodes.WARNING.."Mercenary comparison unavailable")
+		return
 	end
+	local output = calcFunc({ comparisonActor = "MERCENARY" }, tab.sortGemsByDPSField == "FullDPS")
+	if not output then
+		tooltip:AddLine(16, colorCodes.WARNING.."Mercenary comparison unavailable")
+		return
+	end
+	tab.build:AddStatComparesToTooltip(tooltip, baseOutput, output, header, nil, "MERCENARY")
 end
 
 function MercenaryTabClass:AddSkillTooltip(tooltip, value, preview)

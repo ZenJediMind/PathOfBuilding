@@ -743,6 +743,54 @@ describe("Player and mercenary configuration", function()
 		live.index(LoadModule("Modules/ConfigOptions"))
 	end)
 
+	it("requires an explicit ownership decision for new enemy predicates", function()
+		local ConfigScope = require("Modules.ConfigScope")
+		assert.has_error(function()
+			ConfigScope.index({
+				{ section = "For Effective DPS", col = 1, scope = "shared" },
+				{ var = "conditionEnemyFoo", type = "check", ifEnemyCond = "Foo" },
+			})
+		end)
+		assert.has_error(function()
+			ConfigScope.index({
+				{ section = "For Effective DPS", col = 1, scope = "shared" },
+				{ var = "conditionEnemyFooByYou", type = "check", ifEnemyCond = "FooByYou" },
+			})
+		end)
+		assert.has_error(function()
+			ConfigScope.index({
+				{ section = "For Effective DPS", col = 1, scope = "shared" },
+				{ var = "conditionEnemyFooByYou", type = "check", ifEnemyCond = "FooByYou", enemyState = "encounter" },
+			})
+		end)
+		assert.has_error(function()
+			ConfigScope.index({
+				{ section = "For Effective DPS", col = 1, scope = "shared" },
+				{ var = "multiplierEnemyBar", type = "count", ifEnemyMult = "Bar" },
+			})
+		end)
+		ConfigScope.index({
+			{ section = "For Effective DPS", col = 1, scope = "shared" },
+			{ var = "conditionEnemyFoo", type = "check", ifEnemyCond = "Foo", enemyState = "encounter" },
+		})
+		assert.are.equal("shared", ConfigScope.forVar("conditionEnemyFoo"))
+		assert.are.equal("encounter", ConfigScope.enemyStateForVar("conditionEnemyFoo"))
+		ConfigScope.index({
+			{ section = "For Effective DPS", col = 1, scope = "shared" },
+			{ var = "conditionEnemyFooByYou", type = "check", ifEnemyCond = "FooByYou", enemyState = "source" },
+		})
+		assert.are.equal("actor", ConfigScope.forVar("conditionEnemyFooByYou"))
+		assert.are.equal("source", ConfigScope.enemyStateForVar("conditionEnemyFooByYou"))
+		assert.is_true(ConfigScope.isSourceOwnedEnemyTag({ type = "Condition", var = "FooByYou" }))
+		ConfigScope.index({
+			{ section = "For Effective DPS", col = 1, scope = "shared" },
+			{ var = "conditionEnemyMercenaryIntimidate", type = "check", ifEnemyCond = "MercenaryIntimidate", enemyState = "source" },
+		})
+		assert.are.equal("source", ConfigScope.enemyStateForVar("conditionEnemyMercenaryIntimidate"))
+		assert.is_true(ConfigScope.isSourceOwnedEnemyTag({ type = "Condition", var = "MercenaryIntimidate" }))
+		ConfigScope.index(LoadModule("Modules/ConfigOptions"))
+	end)
+
 	it("dev tooltips report the viewed actor's condition state", function()
 		local configVisibility = require("Modules.ConfigVisibility")
 		local varData = { var = "conditionUsedRubyFlaskRecently", resolvedScope = "actor" }

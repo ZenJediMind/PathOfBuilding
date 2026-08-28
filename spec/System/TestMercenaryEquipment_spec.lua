@@ -1088,6 +1088,33 @@ Note: ~b/o 1 mirror
 		assert.same(original, skill.supports)
 	end)
 
+	it("propagates calculator exceptions from Mercenary comparison previews", function()
+		selectBuild("MeleeAOEMarauderFireSlam")
+		assert(tab:SetSkill(1, "FissureSlamMercenary"))
+		local skill = tab.profile.skills[1]
+		skill.supports = { { id = "AddedFireHigh", tier = 3 } }
+		local original = copyTable(skill.supports, true)
+		local originalGet = build.calcsTab.GetMiscCalculator
+		build.calcsTab.mainEnv = build.calcsTab.mainEnv or { }
+		build.calcsTab.GetMiscCalculator = function()
+			return function() error("calc boom") end, nil, { MERCENARY = { CombinedDPS = 1 } }
+		end
+		local tooltip = new("Tooltip"):Tooltip()
+		local support = assert(tab.data.supports.FistOfWarHigh)
+		local ok, err = pcall(tab.AddSupportTooltip, tab, tooltip, support, 1, true)
+		build.calcsTab.GetMiscCalculator = originalGet
+		assert.is_false(ok)
+		assert.matches("calc boom", tostring(err))
+		assert.same(original, skill.supports)
+		local tooltipText = { }
+		for _, line in ipairs(tooltip.lines) do
+			if line.text then
+				table.insert(tooltipText, line.text)
+			end
+		end
+		assert.does_not.match("Mercenary comparison unavailable", table.concat(tooltipText, "\n"))
+	end)
+
 	it("surfaces support-sort failures without caching them", function()
 		selectBuild("MeleeAOEMarauderFireSlam")
 		assert(tab:SetSkill(1, "FissureSlamMercenary"))

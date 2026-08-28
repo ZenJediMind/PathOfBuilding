@@ -222,6 +222,9 @@ local function attachEnemySourceDB(env, actor, sourceModList)
 	actor.enemySourceDB = sourceDB
 end
 
+-- Mercenary calculations reuse upstream actor-aware calculation functions, some of
+-- which still access env.player. Actor-local environment values therefore need
+-- explicit substitution while encounter-wide state remains shared.
 -- Fields that must never fall through a proxy env to another actor.
 -- Add a key here when Mercenary calculation reads it and the value is actor-owned.
 -- createActorCalcEnv refuses to construct a proxy that omits them, and errors if they are read unset.

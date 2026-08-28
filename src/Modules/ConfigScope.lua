@@ -2,7 +2,9 @@
 --
 -- Module: Config Scope
 -- Classifies Configuration options as shared (encounter), actor, or player-only.
--- Enemy writes are further classified as encounter state or source-owned ("by you") state.
+-- Enemy/encounter state is shared. Source attribution exists only for mechanics
+-- whose wording depends on the originating actor ("by you", "you have inflicted",
+-- source-specific hit conditions, and equivalent actor-sensitive semantics).
 --
 -- Runtime bootstrap: Classes/ConfigTab.lua calls ConfigScope.index(ConfigOptions).
 -- Querying before a successful index(), or looking up a name that was not indexed,

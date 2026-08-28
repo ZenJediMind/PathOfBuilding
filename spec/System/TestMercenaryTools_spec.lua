@@ -391,6 +391,28 @@ Can be used in a personal Map Device alongside a Map to have this previously fou
 			skills = { { id = "skill", supports = { } } },
 		}, data, 1, 1, "support_t1"))
 	end)
+
+	it("does not attach a membership cache onto generated skill lists", function()
+		local skillIds = data.builds.build.skillIds
+		local possibleSupportIds = data.skills.skill.possibleSupportIds
+		tools.validateProfile({
+			buildId = "build",
+			foundAreaLevel = 68,
+			mainSkillId = "skill",
+			skills = { { id = "skill", enabled = true, supports = { { id = "support_t1", tier = 1 } } } },
+		}, data)
+		tools.skillCandidateError({
+			buildId = "build",
+			skills = { { id = "skill", enabled = true, supports = { } } },
+		}, data, 2, "other_skill")
+		assert.is_nil(rawget(skillIds, "_set"))
+		assert.is_nil(rawget(possibleSupportIds, "_set"))
+		local keys = { }
+		for key in pairs(skillIds) do
+			keys[key] = true
+		end
+		assert.is_nil(keys._set)
+	end)
 end)
 
 describe("Generated Mercenary data", function()

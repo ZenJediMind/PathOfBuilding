@@ -98,21 +98,9 @@ end
 local MAX_WARRANT_BYTES = 256 * 1024
 local MAX_SKILLS = 6
 
-function MercenaryTools.contains(values, wanted)
-	if not values then
-		return false
-	end
-	local set = values._set
-	if not set then
-		set = { }
-		for _, value in ipairs(values) do
-			set[value] = true
-		end
-		values._set = set
-	end
-	return set[wanted] == true
+local function contains(values, wanted)
+	return values ~= nil and isValueInArray(values, wanted) ~= nil
 end
-local contains = MercenaryTools.contains
 
 function MercenaryTools.classGroups(mercenaryData)
 	local groups = { }

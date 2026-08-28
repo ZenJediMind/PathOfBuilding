@@ -1088,17 +1088,32 @@ Note: ~b/o 1 mirror
 		assert.same(original, skill.supports)
 	end)
 
+	local function stubThrowingCalculator()
+		local originalGet = build.calcsTab.GetMiscCalculator
+		build.calcsTab.mainEnv = build.calcsTab.mainEnv or { }
+		build.calcsTab.GetMiscCalculator = function()
+			return function() error("calc boom") end, nil, { MERCENARY = { CombinedDPS = 1 } }
+		end
+		return originalGet
+	end
+
+	local function tooltipUnavailableText(tooltip)
+		local tooltipText = { }
+		for _, line in ipairs(tooltip.lines) do
+			if line.text then
+				table.insert(tooltipText, line.text)
+			end
+		end
+		return table.concat(tooltipText, "\n")
+	end
+
 	it("propagates calculator exceptions from Mercenary comparison previews", function()
 		selectBuild("MeleeAOEMarauderFireSlam")
 		assert(tab:SetSkill(1, "FissureSlamMercenary"))
 		local skill = tab.profile.skills[1]
 		skill.supports = { { id = "AddedFireHigh", tier = 3 } }
 		local original = copyTable(skill.supports, true)
-		local originalGet = build.calcsTab.GetMiscCalculator
-		build.calcsTab.mainEnv = build.calcsTab.mainEnv or { }
-		build.calcsTab.GetMiscCalculator = function()
-			return function() error("calc boom") end, nil, { MERCENARY = { CombinedDPS = 1 } }
-		end
+		local originalGet = stubThrowingCalculator()
 		local tooltip = new("Tooltip"):Tooltip()
 		local support = assert(tab.data.supports.FistOfWarHigh)
 		local ok, err = pcall(tab.AddSupportTooltip, tab, tooltip, support, 1, true)
@@ -1106,13 +1121,26 @@ Note: ~b/o 1 mirror
 		assert.is_false(ok)
 		assert.matches("calc boom", tostring(err))
 		assert.same(original, skill.supports)
-		local tooltipText = { }
-		for _, line in ipairs(tooltip.lines) do
-			if line.text then
-				table.insert(tooltipText, line.text)
-			end
-		end
-		assert.does_not.match("Mercenary comparison unavailable", table.concat(tooltipText, "\n"))
+		assert.does_not.match("Mercenary comparison unavailable", tooltipUnavailableText(tooltip))
+	end)
+
+	it("propagates calculator exceptions from Mercenary skill comparison previews", function()
+		selectBuild("MeleeAOEMarauderFireSlam")
+		assert(tab:SetSkill(1, "FissureSlamMercenary"))
+		local skill = tab.profile.skills[1]
+		skill.supports = { { id = "AddedFireHigh", tier = 3 } }
+		local originalId, originalSupports = skill.id, copyTable(skill.supports, true)
+		local originalMainSkillId = tab.profile.mainSkillId
+		local originalGet = stubThrowingCalculator()
+		local tooltip = new("Tooltip"):Tooltip()
+		local ok, err = pcall(tab.AddSkillTooltip, tab, tooltip, { id = "InfernalCryMercenary" }, true)
+		build.calcsTab.GetMiscCalculator = originalGet
+		assert.is_false(ok)
+		assert.matches("calc boom", tostring(err))
+		assert.are.equal(originalId, skill.id)
+		assert.same(originalSupports, skill.supports)
+		assert.are.equal(originalMainSkillId, tab.profile.mainSkillId)
+		assert.does_not.match("Mercenary comparison unavailable", tooltipUnavailableText(tooltip))
 	end)
 
 	it("surfaces support-sort failures without caching them", function()

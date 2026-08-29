@@ -272,6 +272,13 @@ function CompareEntryClass:SetActiveItemSet(id)
 	end
 end
 
+function CompareEntryClass:SetViewItemSet(id, comparisonActor)
+	if self.itemsTab and self.itemsTab.SetViewItemSet then
+		self.itemsTab:SetViewItemSet(id, comparisonActor)
+		self:Rebuild()
+	end
+end
+
 function CompareEntryClass:SetActiveSkillSet(id)
 	if self.skillsTab and self.skillsTab.SetActiveSkillSet then
 		self.skillsTab:SetActiveSkillSet(id)

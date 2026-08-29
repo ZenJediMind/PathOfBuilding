@@ -148,4 +148,37 @@ describe("CompareTab", function()
 		assert.are.equal("Crude Bow", build.itemsTab.items[copiedItemId].name)
 		assert.are.equal(0, playerWeapon.selItemId)
 	end)
+
+	it("views an item set from the Compare dropdown without equipping the player", function()
+		newBuild()
+		allocatePermanentHire()
+		build.mercenaryTab.profile = {
+			classId = "TrapsMinesShadow",
+			buildId = "TrapsMinesShadowLightning",
+			foundAreaLevel = 68,
+			mainSkillId = "LightningTrapMercenary",
+			lifeComparison = "AUTO",
+			skills = { { id = "LightningTrapMercenary", enabled = true, supports = { } } },
+		}
+		build.mercenaryTab:Changed()
+		local itemsTab = build.itemsTab
+		local playerSetId = itemsTab.activeItemSetId
+		local mercSet = assert(build.mercenaryTab:GetItemSet(true))
+		assert.are_not.equal(playerSetId, mercSet.id)
+		itemsTab:SetViewItemSet(mercSet.id)
+		local orderList = itemsTab.itemSetOrderList
+		local playerIndex, mercIndex
+		for index, itemSetId in ipairs(orderList) do
+			if itemSetId == playerSetId then playerIndex = index end
+			if itemSetId == mercSet.id then mercIndex = index end
+		end
+		assert.is_number(playerIndex)
+		assert.is_number(mercIndex)
+		build.compareTab.controls.primaryItemSetSelect.selFunc(playerIndex, itemsTab.itemSets[playerSetId].title or "Default")
+		assert.are.equal(playerSetId, itemsTab.activeItemSetId)
+		assert.are.equal(playerSetId, itemsTab.viewItemSetId)
+		build.compareTab.controls.primaryItemSetSelect.selFunc(mercIndex, mercSet.title or "Default")
+		assert.are.equal(playerSetId, itemsTab.activeItemSetId)
+		assert.are.equal(mercSet.id, itemsTab.viewItemSetId)
+	end)
 end)

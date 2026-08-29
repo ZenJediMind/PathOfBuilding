@@ -764,6 +764,32 @@ describe("Permanent Mercenary calculations", function()
 		assert.are.near(1984.5, mercenary.output.AverageHit, 10 ^ -9)
 	end)
 
+	it("exerts Mercenary attacks from Mercenary Warcries", function()
+		configure("MeleeAOEMarauder", "MeleeAOEMarauderFireSlam", "TectonicSlamFireMercenary")
+		local profile = build.mercenaryTab.profile
+		profile.skills = {
+			{ id = "TectonicSlamFireMercenary", enabled = true, includeInFullDPS = false, count = 1, supports = { } },
+			{ id = "InfernalCryMercenary", enabled = true, includeInFullDPS = false, count = 1, supports = { } },
+		}
+		profile.mainSkillId = "TectonicSlamFireMercenary"
+		build.mercenaryTab:Changed()
+		local mace = new("Item"):Item("Rarity: Normal\nDriftwood Maul")
+		mace.id = 9060
+		build.itemsTab.items[mace.id] = mace
+		equipmentSlot("Weapon 1").selItemId = mace.id
+		local env = calculate()
+		assert.is_true(env.mercenary.modDB:Sum("BASE", nil, "NumInfernalExerts") > 0)
+		assert.is_true(env.mercenary.modDB:Sum("BASE", nil, "Multiplier:ExertingWarcryCount") > 0)
+	end)
+
+	it("does not copy player Cruelty onto the Mercenary", function()
+		configure("TrapsMinesShadow", "TrapsMinesShadowLightning", "LightningTrapMercenary")
+		build.skillsTab:PasteSocketGroup("Fireball 20/0  1\nCruelty 20/0  1\n")
+		local env = calculate()
+		assert.are.equal(40, env.player.modDB.multipliers.Cruelty)
+		assert.is_nil(env.mercenary.modDB.multipliers.Cruelty)
+	end)
+
 	it("uses the compared slot actor with separate player and Mercenary equipment", function()
 		configure("TrapsMinesShadow", "TrapsMinesShadowLightning", "LightningTrapMercenary")
 		local env = calculate()
@@ -1698,13 +1724,16 @@ Adds 500 to 500 Physical Damage]])
 		}
 		build.itemsTab.items[item.id] = item
 		equipmentSlot("Helmet").selItemId = item.id
+		build.configTab.input.enemyIsBoss = "None"
 		local mercenary = calculate().mercenary
 		assert.are.equal(baselineFireResist + 15, mercenary.output.FireResist)
-		assert.are.equal(baselineDamage + 20, mercenary.modDB:Sum("INC", nil, "Damage"))
+		assert.are.equal(baselineDamage, mercenary.modDB:Sum("INC", nil, "Damage"))
 		assert.are.equal(round(baselineMoreDamage * 1.08, 2), mercenary.modDB:More(nil, "Damage"))
 		assert.is_true(mercenary.modDB:Flag(nil, "CannotBeEvaded"))
 		assert.is_true(mercenary.modDB:Flag(nil, "NeverCrit"))
+		build.configTab.input.enemyIsBoss = "Pinnacle"
 		mercenary = calculate().mercenary
+		assert.are.equal(baselineDamage + 20, mercenary.modDB:Sum("INC", nil, "Damage"))
 		local _, _, actorBases = build.calcsTab:GetMiscCalculator()
 		assert.are.near(mercenary.output.CombinedDPS, actorBases.MERCENARY.CombinedDPS, 10 ^ -6)
 	end)
@@ -2002,7 +2031,38 @@ Gain 8% of Elemental Damage as Extra Chaos Damage
 		assert.is_true(not mercenary.mainSkill.skillCfg.skillCond.usedByMirage)
 	end)
 
-	it("uses the player Full DPS count-once option for Mercenary summoning skills", function()
+	it("does not leave Mercenary skills marked usedByMirage after a player Mirage pass", function()
+		configure("TrapsMinesShadow", "TrapsMinesShadowLightning", "LightningTrapMercenary", { includeInFullDPS = true })
+		local withoutMirage = assert(calculate().mercenary.output.CombinedDPS)
+		build.itemsTab:CreateDisplayItemFromRaw([[Rarity: NORMAL
+Crude Bow
+Sockets: G-G-G-G-G-G]])
+		build.itemsTab:AddDisplayItem()
+		build.skillsTab:PasteSocketGroup("Mirage Archer 20/0  1\nRain of Arrows 20/0  1\n")
+		local env = calculate()
+		assert.is_table(env.mercenary)
+		assert.is_true(not env.mercenary.mainSkill.skillCfg.skillCond.usedByMirage)
+		assert.are.near(withoutMirage, env.mercenary.output.CombinedDPS, 10 ^ -6)
+		local again = calculate()
+		assert.is_true(not again.mercenary.mainSkill.skillCfg.skillCond.usedByMirage)
+		assert.are.near(withoutMirage, again.mercenary.output.CombinedDPS, 10 ^ -6)
+	end)
+
+	it("uses the Mercenary Full DPS count-once option for Mercenary summoning skills", function()
+		configure("AurasMinionsTemplar", "AurasMinionsTemplarSpectres", "AbsolutionMercenary", {
+			includeInFullDPS = true,
+			count = 3,
+		})
+		local configSet = build.configTab.configSets[build.configTab.activeConfigSetId]
+		build.configTab:EnsureActorConfig(configSet)
+		configSet.actors.mercenary.input.absolutionSkillDamageCountedOnce = true
+		build.configTab:BuildModList()
+		local env = calculate()
+		assert.is_true(env.skillsUsed.Absolution)
+		assert.are.near(env.mercenary.output.TotalDPS + env.mercenaryMinion.output.TotalDPS * 3, env.mercenary.output.FullDPS, 10 ^ -6)
+	end)
+
+	it("does not apply the player's Absolution count-once option to the Mercenary", function()
 		configure("AurasMinionsTemplar", "AurasMinionsTemplarSpectres", "AbsolutionMercenary", {
 			includeInFullDPS = true,
 			count = 3,
@@ -2010,8 +2070,7 @@ Gain 8% of Elemental Damage as Extra Chaos Damage
 		build.configTab.input.absolutionSkillDamageCountedOnce = true
 		build.configTab:BuildModList()
 		local env = calculate()
-		assert.is_true(env.skillsUsed.Absolution)
-		assert.are.near(env.mercenary.output.TotalDPS + env.mercenaryMinion.output.TotalDPS * 3, env.mercenary.output.FullDPS, 10 ^ -6)
+		assert.are.near(env.mercenary.output.TotalDPS * 3 + env.mercenaryMinion.output.TotalDPS * 3, env.mercenary.output.FullDPS, 10 ^ -6)
 	end)
 
 	it("calculates Full DPS from the persisted Mercenary equipment item set", function()
@@ -2442,6 +2501,29 @@ Precise Technique
 		profile.mainSkillId = skillIds[1]
 		build.mercenaryTab:Changed()
 	end
+
+	it("counts only the strongest player Decay in Full DPS", function()
+		local wand = new("Item"):Item("Rarity: RARE\nDecay Test\nGoat's Horn\nImplicits: 0\nYour Hits inflict Decay, dealing 700 Chaos Damage per second for 8 seconds\n")
+		build.itemsTab:AddItem(wand, true)
+		build.itemsTab.slots["Weapon 1"].selItemId = wand.id
+		build.itemsTab.activeItemSet["Weapon 1"].selItemId = wand.id
+		build.skillsTab:PasteSocketGroup("Lightning Trap 20/0  1")
+		build.skillsTab.socketGroupList[#build.skillsTab.socketGroupList].includeInFullDPS = true
+		runCallback("OnFrame")
+		local trapDecay = calcs.calcFullDPS(build, "CALCULATOR", { }).decayDPS
+		build.skillsTab.socketGroupList[#build.skillsTab.socketGroupList].enabled = false
+		build.skillsTab:PasteSocketGroup("Lightning Spire Trap 20/0  1")
+		build.skillsTab.socketGroupList[#build.skillsTab.socketGroupList].includeInFullDPS = true
+		runCallback("OnFrame")
+		local spireDecay = calcs.calcFullDPS(build, "CALCULATOR", { }).decayDPS
+		build.skillsTab.socketGroupList[1].enabled = true
+		runCallback("OnFrame")
+		local both = calcs.calcFullDPS(build, "CALCULATOR", { })
+		assert.is_true(trapDecay > 0)
+		assert.is_true(spireDecay > 0)
+		assert.are.near(math.max(trapDecay, spireDecay), both.decayDPS, 10 ^ -6)
+		assert.is_true(both.decayDPS < trapDecay + spireDecay - 1)
+	end)
 
 	it("counts only the strongest Mercenary Decay in Full DPS", function()
 		configure("TrapsMinesShadow", "TrapsMinesShadowLightning", "LightningTrapMercenary", { includeInFullDPS = true })

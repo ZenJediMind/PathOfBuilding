@@ -79,6 +79,9 @@ return {
 		["attack_damage_+%_per_75_armour_or_evasion_on_shield"] = {
 			mod("Damage", "INC", nil, ModFlag.Attack, 0, { type = "PerStat", statList = { "ArmourOnWeapon 2", "EvasionOnWeapon 2" }, div = 75 }),
 		},
+		["base_maximum_mana"] = {
+			mod("Mana", "BASE", nil),
+		},
 		["base_spell_critical_strike_chance"] = {
 			mod("CritChance", "BASE", nil, ModFlag.Spell),
 			div = 100,
@@ -258,6 +261,9 @@ return {
 		["immune_to_auras_from_other_entities"] = {
 			flag("AlliesAurasCannotAffectSelf"),
 		},
+		["immune_to_curses"] = {
+			flag("CurseImmune"),
+		},
 		["lightning_arrow_maximum_number_of_extra_targets"] = {
 			skill("maximumExtraTargets", nil),
 		},
@@ -269,6 +275,10 @@ return {
 		},
 		["mana_degeneration_per_minute_%"] = {
 			skill("manaDegenerationPercentPerSecond", nil),
+			div = 60,
+		},
+		["mana_regeneration_rate_per_minute_%"] = {
+			mod("ManaRegenPercent", "BASE", nil),
 			div = 60,
 		},
 		["melee_splash"] = {
@@ -693,6 +703,23 @@ return {
 		["set_totem_life_+%_final"] = true,
 		traps_explode_on_timeout = true,
 		traps_invulnerable_for_duration_ms = true,
+	},
+	-- Summoned Mercenary minion stats that PoB does not calculate. Combat-relevant
+	-- minion stats belong in statMap instead; this list is engine/loot/AI metadata.
+	-- Overlap with knownMonsterStats is allowed by the generated-data test, so only
+	-- minion-unique exemptions live here.
+	knownUncalculatedMinionStats = {
+		cannot_be_stunned_for_ms_after_stun_finished = true,
+		cannot_be_stunned_while_stunned = true,
+		is_daemon = true,
+		is_hidden_monster = true,
+		["monster_dropped_item_quantity_+%"] = true,
+		["monster_dropped_item_rarity_+%"] = true,
+		["monster_slain_experience_+%"] = true,
+		set_monster_do_not_fracture = true,
+		set_monster_no_drops_or_experience = true,
+		set_phase_through_objects = true,
+		set_use_melee_pattern_range = true,
 	},
 	-- MercenarySkills references one of four support counts by name, and
 	-- MercenarySupportCounts holds nothing but those names — the numbers are not in

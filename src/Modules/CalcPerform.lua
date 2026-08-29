@@ -120,6 +120,26 @@ local function mergeWarcryOnRecipient(sourceStore, skillCfg, buff, recipient, de
 	mergeBuff(srcList, destination, buff.name)
 end
 
+-- Record how many attacks a Warcry exerts on its caster. The attack skill config
+-- is the caster's main skill so slam/melee tags on ExertedAttacks still match.
+local function applyWarcryExerts(actor, attackSkillCfg, modStore, buff, warcryList)
+	if not (actor and actor.modDB and attackSkillCfg) then
+		return
+	end
+	local warcryName = buff.name:gsub(" Cry", ""):gsub("'s",""):gsub(" ","")
+	local baseExerts = modStore:Sum("BASE", attackSkillCfg, warcryName.."ExertedAttacks")
+	if baseExerts <= 0 then
+		return
+	end
+	local extraExertions = modStore:Sum("BASE", nil, "ExtraExertedAttacks") or 0
+	local exertMultiplier = modStore:More(nil, "ExtraExertedAttacks")
+	actor.modDB:NewMod("Num"..warcryName.."Exerts", "BASE", m_floor((baseExerts + extraExertions) * exertMultiplier))
+	if not warcryList[buff.name] then
+		actor.modDB:NewMod("Multiplier:ExertingWarcryCount", "BASE", 1, buff.name)
+		warcryList[buff.name] = true
+	end
+end
+
 local RALLYING_DAMAGE_TYPES = { "Physical", "Lightning", "Cold", "Fire", "Chaos" }
 
 -- Warcry buff uptime is duration/cooldown unless Max Hit treats the boost as fully active.
@@ -805,7 +825,7 @@ local function doActorMisc(env, actor)
 
 	-- Add misc buffs/debuffs
 	if env.mode_combat then
-		if env.player.mainSkill.baseSkillModList:Flag(nil, "Cruelty") then
+		if actor.mainSkill and actor.mainSkill.baseSkillModList:Flag(nil, "Cruelty") then
 			modDB.multipliers["Cruelty"] = modDB:Override(nil, "Cruelty") or 40
 		end
 		-- Minimum Rage
@@ -2702,16 +2722,7 @@ function calcs.perform(env, skipEHP)
 					local skillCfg = skillCfg
 					local modStore = skillModList or modDB
 					local warcryName = buff.name:gsub(" Cry", ""):gsub("'s",""):gsub(" ","")
-					local baseExerts = modStore:Sum("BASE", env.player.mainSkill.skillCfg, warcryName.."ExertedAttacks")
-					if baseExerts > 0 then
-						local extraExertions = modStore:Sum("BASE", nil, "ExtraExertedAttacks") or 0
-						local exertMultiplier = modStore:More(nil, "ExtraExertedAttacks")
-						env.player.modDB:NewMod("Num"..warcryName.."Exerts", "BASE", m_floor((baseExerts + extraExertions) * exertMultiplier))
-						if not warcryList[buff.name] then
-							env.player.modDB:NewMod("Multiplier:ExertingWarcryCount", "BASE", 1, buff.name)
-							warcryList[buff.name] = true
-						end
-					end
+					applyWarcryExerts(env.player, env.player.mainSkill.skillCfg, modStore, buff, warcryList)
 					if not activeSkill.skillModList:Flag(nil, "CannotShareWarcryBuffs") then
 						local warcryPower = modDB:Override(nil, "WarcryPower") or m_max((modDB:Sum("BASE", nil, "WarcryPower") or 0) * (1 + (modDB:Sum("INC", nil, "WarcryPower") or 0)/100), (modDB:Sum("BASE", nil, "MinimumWarcryPower") or 0))
 						for _, warcryBuff in ipairs(buff.modList) do
@@ -3378,6 +3389,7 @@ function calcs.perform(env, skipEHP)
 		local function mergeWarcryFromSkill(activeSkill, buff, recipient, destination, sourceStats, recipientStats, uptime)
 			mergeWarcryOnRecipient(activeSkill.skillModList, activeSkill.skillCfg, buff, recipient, destination, sourceStats, recipientStats, uptime)
 		end
+		local mercenaryWarcryList = { }
 
 		for _, activeSkill in ipairs(mercenary.activeSkillList) do
 			local skillModList = activeSkill.skillModList
@@ -3453,31 +3465,34 @@ function calcs.perform(env, skipEHP)
 							exportStrongestAura(buffExports, buff.name, calcLib.mod(skillModList, skillCfg, "AuraEffect", "BuffEffect"), exported)
 						end
 					end
-				elseif buff.type == "Warcry" and env.mode_buffs and not skillModList:Flag(nil, "CannotShareWarcryBuffs") then
-					local warcryPower = mercenary.modDB:Override(nil, "WarcryPower") or m_max((mercenary.modDB:Sum("BASE", nil, "WarcryPower") or 0) * (1 + (mercenary.modDB:Sum("INC", nil, "WarcryPower") or 0) / 100), (mercenary.modDB:Sum("BASE", nil, "MinimumWarcryPower") or 0))
-					for _, warcryBuff in ipairs(buff.modList) do
-						if warcryBuff[1] and warcryBuff[1].effectType == "Warcry" and warcryBuff[1].div then
-							warcryBuff[1].warcryPowerBonus = m_floor((warcryBuff[1].limit and m_min(warcryPower, warcryBuff[1].limit) or warcryPower) / warcryBuff[1].div)
+				elseif buff.type == "Warcry" and env.mode_buffs then
+					applyWarcryExerts(mercenary, mercenary.mainSkill and mercenary.mainSkill.skillCfg, skillModList, buff, mercenaryWarcryList)
+					if not skillModList:Flag(nil, "CannotShareWarcryBuffs") then
+						local warcryPower = mercenary.modDB:Override(nil, "WarcryPower") or m_max((mercenary.modDB:Sum("BASE", nil, "WarcryPower") or 0) * (1 + (mercenary.modDB:Sum("INC", nil, "WarcryPower") or 0) / 100), (mercenary.modDB:Sum("BASE", nil, "MinimumWarcryPower") or 0))
+						for _, warcryBuff in ipairs(buff.modList) do
+							if warcryBuff[1] and warcryBuff[1].effectType == "Warcry" and warcryBuff[1].div then
+								warcryBuff[1].warcryPowerBonus = m_floor((warcryBuff[1].limit and m_min(warcryPower, warcryBuff[1].limit) or warcryPower) / warcryBuff[1].div)
+							end
 						end
-					end
-					local uptime = calcWarcryUptime(env, enemyDB, mercenary.modDB, skillModList, skillCfg, activeSkill)
-					local extraWarcryModList, rallyingMinionMultiplier = buildRallyingCryAllyMods(mercenary, activeSkill, warcryPower)
-					mergeWarcryFromSkill(activeSkill, buff, mercenary, mercenaryBuffs, { "BuffEffect", "BuffEffectOnSelf" }, { }, uptime)
-					mergeWarcryFromSkill(activeSkill, buff, env.player, buffs, { "BuffEffect" }, { "BuffEffectOnSelf" }, uptime)
-					mergeRallyingCryAllyMods(extraWarcryModList, 1, skillModList, skillCfg, env.player, buffs, buff.name, uptime)
-					if env.minion then
-						mergeWarcryFromSkill(activeSkill, buff, env.minion, minionBuffs, { "BuffEffect" }, { "BuffEffectOnSelf" }, uptime)
-						mergeRallyingCryAllyMods(extraWarcryModList, rallyingMinionMultiplier, skillModList, skillCfg, env.minion, minionBuffs, buff.name, uptime)
-					end
-					if env.mercenaryMinion then
-						mergeWarcryFromSkill(activeSkill, buff, env.mercenaryMinion, mercenaryMinionBuffs, { "BuffEffect" }, { "BuffEffectOnSelf" }, uptime)
-						mergeRallyingCryAllyMods(extraWarcryModList, rallyingMinionMultiplier, skillModList, skillCfg, env.mercenaryMinion, mercenaryMinionBuffs, buff.name, uptime)
-					end
-					if partyTabEnableExportBuffs then
-						local exported = new("ModList"):ModList()
-						exported:AddList(buff.modList)
-						exported:AddList(extraWarcryModList)
-						buffExports.Warcry[buff.name] = { effectMult = calcLib.mod(skillModList, skillCfg, "BuffEffect") * uptime, modList = exported }
+						local uptime = calcWarcryUptime(env, enemyDB, mercenary.modDB, skillModList, skillCfg, activeSkill)
+						local extraWarcryModList, rallyingMinionMultiplier = buildRallyingCryAllyMods(mercenary, activeSkill, warcryPower)
+						mergeWarcryFromSkill(activeSkill, buff, mercenary, mercenaryBuffs, { "BuffEffect", "BuffEffectOnSelf" }, { }, uptime)
+						mergeWarcryFromSkill(activeSkill, buff, env.player, buffs, { "BuffEffect" }, { "BuffEffectOnSelf" }, uptime)
+						mergeRallyingCryAllyMods(extraWarcryModList, 1, skillModList, skillCfg, env.player, buffs, buff.name, uptime)
+						if env.minion then
+							mergeWarcryFromSkill(activeSkill, buff, env.minion, minionBuffs, { "BuffEffect" }, { "BuffEffectOnSelf" }, uptime)
+							mergeRallyingCryAllyMods(extraWarcryModList, rallyingMinionMultiplier, skillModList, skillCfg, env.minion, minionBuffs, buff.name, uptime)
+						end
+						if env.mercenaryMinion then
+							mergeWarcryFromSkill(activeSkill, buff, env.mercenaryMinion, mercenaryMinionBuffs, { "BuffEffect" }, { "BuffEffectOnSelf" }, uptime)
+							mergeRallyingCryAllyMods(extraWarcryModList, rallyingMinionMultiplier, skillModList, skillCfg, env.mercenaryMinion, mercenaryMinionBuffs, buff.name, uptime)
+						end
+						if partyTabEnableExportBuffs then
+							local exported = new("ModList"):ModList()
+							exported:AddList(buff.modList)
+							exported:AddList(extraWarcryModList)
+							buffExports.Warcry[buff.name] = { effectMult = calcLib.mod(skillModList, skillCfg, "BuffEffect") * uptime, modList = exported }
+						end
 					end
 				elseif (buff.type == "Debuff" or buff.type == "AuraDebuff") and env.mode_effective then
 					local stackCount = activeSkill.skillData.stackCount or 1

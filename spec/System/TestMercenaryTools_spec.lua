@@ -81,6 +81,21 @@ describe("Mercenary tools", function()
 		assert.are.equal("PLAYER", tools.comparisonActorForSlot("Helmet", 1, shared))
 	end)
 
+	it("identifies dedicated Mercenary item sets without using the current view", function()
+		assert.is_true(tools.isDedicatedMercenaryItemSet(2, {
+			activeItemSetId = 1,
+			viewItemSetId = 1,
+			viewComparisonActor = "MERCENARY",
+			build = { mercenaryTab = { itemSetId = 2 } },
+		}))
+		assert.is_true(not tools.isDedicatedMercenaryItemSet(1, {
+			activeItemSetId = 1,
+			viewItemSetId = 1,
+			viewComparisonActor = "MERCENARY",
+			build = { mercenaryTab = { itemSetId = 1 } },
+		}))
+	end)
+
 	it("builds a comparison override for a viewed item set", function()
 		local itemsTab = {
 			activeItemSetId = 1,
@@ -504,6 +519,31 @@ describe("Generated Mercenary data", function()
 				assert.is_true(data.mercenaryStatData.knownMonsterStats[stat.id] == true, classId..": "..stat.id)
 			end
 		end
+		local seenKnownUncalculatedMinion = { }
+		local unmappedMinionStats = { }
+		for minionId, minion in pairs(mercenaries.minions or { }) do
+			for _, stat in ipairs(minion.stats or { }) do
+				local mapped = data.mercenarySupportStatMap[stat.id] ~= nil
+				local knownMinion = data.knownUncalculatedMinionStats[stat.id] == true
+				local knownMonster = data.mercenaryStatData.knownMonsterStats[stat.id] == true
+				if not (mapped or knownMinion or knownMonster) then
+					table.insert(unmappedMinionStats, minionId..": "..stat.id)
+				end
+				if knownMinion then seenKnownUncalculatedMinion[stat.id] = true end
+			end
+		end
+		table.sort(unmappedMinionStats)
+		assert.same({ }, unmappedMinionStats)
+		for statId in pairs(data.knownUncalculatedMinionStats) do
+			assert.is_true(seenKnownUncalculatedMinion[statId] == true, "stale Mercenary minion stat exemption: "..statId)
+			assert.is_true(data.mercenarySupportStatMap[statId] == nil, "mapped minion stat listed as uncalculated: "..statId)
+		end
+		local relic = assert(data.minions["Metadata/Monsters/Mercenaries/MercenaryUnholyRelic_"])
+		local curseImmune
+		for _, mod in ipairs(relic.modList) do
+			if mod.name == "CurseImmune" then curseImmune = true break end
+		end
+		assert.is_true(curseImmune)
 		for supportId, templateId in pairs(data.mercenaryStatData.supportTemplates) do
 			assert.is_table(mercenaries.supports[supportId], supportId)
 			assert.is_table(data.skills[templateId], templateId)

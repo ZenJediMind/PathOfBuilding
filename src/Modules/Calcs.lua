@@ -427,7 +427,7 @@ function calcs.calcFullDPS(build, mode, override, specEnv)
 			usedEnv = fullEnv
 			local count = selected.count or 1
 			local directCount = count
-			if activeSkill.minion and countSkillDamageOnce(activeSkill, fullEnv.modDB) then
+			if activeSkill.minion and countSkillDamageOnce(activeSkill, fullEnv.mercenary.modDB) then
 				directCount = 1
 				activeSkill.infoMessage2 = "Skill Damage"
 			end

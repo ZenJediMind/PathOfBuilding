@@ -1560,7 +1560,13 @@ function ItemsTabClass:Draw(viewPort, inputEvents)
 end
 
 function ItemsTabClass:GetPlayerItemSetOrderList()
-	return self.itemSetOrderList
+	local playerSets = { }
+	for _, itemSetId in ipairs(self.itemSetOrderList) do
+		if not MercenaryTools.isDedicatedMercenaryItemSet(itemSetId, self) then
+			t_insert(playerSets, itemSetId)
+		end
+	end
+	return playerSets
 end
 
 function ItemsTabClass:GetMinionItemSetOrderList()

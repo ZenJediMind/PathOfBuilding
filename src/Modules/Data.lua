@@ -1162,6 +1162,7 @@ for _, skillId in ipairs(orderedSkillIds) do
 end
 
 data.knownUncalculatedSkillStats = data.mercenaryStatData.knownUncalculatedStats
+data.knownUncalculatedMinionStats = data.mercenaryStatData.knownUncalculatedMinionStats
 
 -- Mercenary supports store raw stats instead of GrantedEffect references. Reuse
 -- the deterministic stat implementations already exported for skills/supports.

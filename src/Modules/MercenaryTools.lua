@@ -22,12 +22,18 @@ function MercenaryTools.comparisonActor(slotName)
 	return MercenaryTools.baseItemSlotName(slotName) and "MERCENARY" or "PLAYER"
 end
 
+function MercenaryTools.isDedicatedMercenaryItemSet(itemSetId, itemsTab)
+	local mercenaryTab = itemsTab and itemsTab.build and itemsTab.build.mercenaryTab
+	return itemSetId ~= nil and mercenaryTab ~= nil
+		and itemSetId == mercenaryTab.itemSetId
+		and itemSetId ~= itemsTab.activeItemSetId
+end
+
 function MercenaryTools.comparisonActorForItemSet(itemSetId, itemsTab)
 	if itemSetId and itemsTab and itemSetId == itemsTab.viewItemSetId and itemsTab.viewComparisonActor then
 		return itemsTab.viewComparisonActor
 	end
-	local mercenaryTab = itemsTab and itemsTab.build and itemsTab.build.mercenaryTab
-	if itemSetId and mercenaryTab and itemSetId == mercenaryTab.itemSetId and itemSetId ~= itemsTab.activeItemSetId then
+	if MercenaryTools.isDedicatedMercenaryItemSet(itemSetId, itemsTab) then
 		return "MERCENARY"
 	end
 	return "PLAYER"

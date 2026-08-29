@@ -97,21 +97,17 @@ local function recordMercenaryAuxiliarySkill(env, auxiliarySkills, statId, selec
 	if auxiliarySkillId and not auxiliarySkills[auxiliarySkillId] then auxiliarySkills[auxiliarySkillId] = selectedSkill end
 end
 
-local function mercenaryItemMod(mod, presenceImplicit)
+local function mercenaryItemMod(mod)
 	if mod.name == "ExtraSkill" or mod.name == "ExtraSupport" or mod.name == "SocketProperty" or mod.name == "GemProperty" or mod.name == "GroupProperty" then
 		return
 	end
 	local copy = copyTable(mod, true)
 	local index = 1
 	while copy[index] do
-		local tag = copy[index]
-		if tag.type == "SocketedIn" then
+		if copy[index].type == "SocketedIn" then
 			return
-		elseif presenceImplicit and tag.type == "ActorCondition" and tag.actor == "enemy" and (tag.var == "RareOrUnique" or tag.var == "PinnacleBoss") then
-			t_remove(copy, index)
-		else
-			index = index + 1
 		end
+		index = index + 1
 	end
 	return copy
 end
@@ -127,20 +123,8 @@ local function addMercenaryItem(env, mercenary, item, slotName, slotNum)
 		local multiplier = "Empty"..name.."SocketsInAnySlot"
 		mercenary.modDB.multipliers[multiplier] = (mercenary.modDB.multipliers[multiplier] or 0) + emptySockets[color]
 	end
-	local presenceImplicitCounts = { }
-	for _, modLine in ipairs(item.implicitModLines or { }) do
-		if modLine.line and modLine.line:lower():match("^while .+ in your presence") then
-			for _, implicitMod in ipairs(modLine.modList or { }) do
-				local key = modLib.formatMod(implicitMod)
-				presenceImplicitCounts[key] = (presenceImplicitCounts[key] or 0) + 1
-			end
-		end
-	end
 	for _, itemMod in ipairs(item.modList or item.slotModList[slotNum]) do
-		local key = modLib.formatMod(itemMod)
-		local presenceImplicit = (presenceImplicitCounts[key] or 0) > 0
-		if presenceImplicit then presenceImplicitCounts[key] = presenceImplicitCounts[key] - 1 end
-		local mod = mercenaryItemMod(itemMod, presenceImplicit)
+		local mod = mercenaryItemMod(itemMod)
 		if mod then mercenary.modDB:AddMod(mod) end
 	end
 	local rarity = (item.rarity == "UNIQUE" or item.rarity == "RELIC") and "UniqueItem" or item.rarity == "RARE" and "RareItem" or item.rarity == "MAGIC" and "MagicItem" or "NormalItem"

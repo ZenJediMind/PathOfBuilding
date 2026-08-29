@@ -639,15 +639,63 @@ describe("Generated Mercenary data", function()
 		end, "Ambiguous ActiveSkill 'Snipe': AtlasEyrieArcherSnipe, Snipe")
 	end)
 
+	it("resolves Mercenary bases without a previously generated mercenary.lua", function()
+		local unique = export.considerRankedCandidate(nil, "Absolution", 0)
+		local resolved = export.resolveBaseSkill({
+			effectId = "AbsolutionMercenary",
+			activeSkillId = "absolution",
+			displayName = "Absolution",
+			byActiveSkill = unique,
+		})
+		assert.are.equal("Absolution", resolved.id)
+		assert.are.equal("activeSkill", resolved.source)
+
+		local first = export.considerRankedCandidate(nil, "AfflictionMinionPhysSlamCircleBig", 1)
+		local tied = export.considerRankedCandidate(first, "OtherGeometryAttack", 1)
+		local overridden = export.resolveBaseSkill({
+			effectId = "TriggeredFireSlamMercenary",
+			activeSkillId = "geometry_attack",
+			displayName = "Triggerslam",
+			byActiveSkill = tied,
+			overrideId = "AfflictionMinionPhysSlamCircleBig",
+			isExportedSkill = function(id) return id == "AfflictionMinionPhysSlamCircleBig" end,
+		})
+		assert.are.equal("AfflictionMinionPhysSlamCircleBig", overridden.id)
+		assert.are.equal("override", overridden.source)
+
+		local src = assert(io.open("Export/Scripts/skills.lua", "r"))
+		local text = src:read("*a")
+		src:close()
+		assert.is_nil(text:match("previousInheritedFrom"))
+		assert.is_nil(text:match('io%.open%("%.%./Data/Skills/mercenary%.lua", "r"%)'))
+	end)
+
+	it("fails an unrecognized ActiveSkill tie rather than inheriting a stale generated selection", function()
+		local first = export.considerRankedCandidate(nil, "NewSpellA", 1)
+		local tied = export.considerRankedCandidate(first, "NewSpellB", 1)
+		assert.has_error(function()
+			export.resolveBaseSkill({
+				effectId = "MercenaryEffectA",
+				activeSkillId = "geometry_spell",
+				displayName = "MercenaryEffectA",
+				byActiveSkill = tied,
+			})
+		end, "Ambiguous Mercenary base skill ActiveSkill 'geometry_spell': NewSpellA, NewSpellB")
+	end)
+
 	it("keeps exporter validation helpers out of runtime Mercenary tools", function()
 		assert.is_nil(tools.monsterSpeedAndDamageFixup)
 		assert.is_nil(tools.considerRankedCandidate)
 		assert.is_nil(tools.requireUniqueRankedCandidate)
+		assert.is_nil(tools.uniqueCandidate)
+		assert.is_nil(tools.resolveBaseSkill)
 		assert.is_nil(tools.shieldPolicyError)
 		assert.is_nil(tools.MONSTER_SPEED_DAMAGE_FIXUP_STAT)
 		assert.is_function(export.monsterSpeedAndDamageFixup)
 		assert.is_function(export.considerRankedCandidate)
 		assert.is_function(export.requireUniqueRankedCandidate)
+		assert.is_function(export.uniqueCandidate)
+		assert.is_function(export.resolveBaseSkill)
 		assert.is_function(export.shieldPolicyError)
 	end)
 

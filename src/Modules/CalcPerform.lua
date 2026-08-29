@@ -844,12 +844,13 @@ local function doActorMisc(env, actor)
 		end
 		if modDB:Flag(nil, "Onslaught") then
 			local effect
-			--Loop detects if a Silver flask is used to grant Onslaught. If statement adds flask effect to calculation if one is being used
+			-- Detect whether a Silver Flask actually applied to this actor grants Onslaught.
+			-- mergeFlasks() is the authority for recipient applicability (Ceinture/Link, uniques, etc).
 			local onslaughtFromFlask
 			--This value is set to negative and not 0 or else reduced effect would not properly apply
 			local flaskEffectInc = -100
-			for item in pairs(env.flasks) do
-				if item.baseName:match("Silver Flask") then
+			for item in pairs(actor.appliedFlasks or { }) do
+				if item.baseName == "Silver Flask" then
 					onslaughtFromFlask = true
 
 					local curFlaskEffectInc = item.flaskData.effectInc + modDB:Sum("INC", { actor = "player" }, "FlaskEffect")
@@ -1936,6 +1937,21 @@ function calcs.perform(env, skipEHP)
 				and item.rarity ~= "UNIQUE" and item.rarity ~= "RELIC"
 				and not (item.base.flask.life or item.base.flask.mana)
 		end
+		local function recordAppliedFlask(actor, item)
+			if actor then
+				actor.appliedFlasks = actor.appliedFlasks or { }
+				actor.appliedFlasks[item] = true
+			end
+		end
+		if not onlyRecovery then
+			env.player.appliedFlasks = { }
+			if env.mercenary then
+				env.mercenary.appliedFlasks = { }
+			end
+			if env.minion then
+				env.minion.appliedFlasks = { }
+			end
+		end
 
 		local function calcFlaskMods(item, baseName, buffModList, modList, onlyMinion)
 			local flaskEffectInc = effectInc + item.flaskData.effectInc
@@ -2045,6 +2061,26 @@ function calcs.perform(env, skipEHP)
 				if appliesToMercenary(item) then
 					mercenaryFlaskConditions["UsingFlask"] = true
 					mercenaryFlaskConditions["Using"..item.baseName:gsub("%s+", "")] = true
+				end
+			end
+			if not onlyRecovery then
+				if not modDB:Flag(nil, "FlasksDoNotApplyToPlayer") then
+					local isUtilityFlask = not (item.base.flask.life or item.base.flask.mana)
+					if not (modDB:Flag(nil, "UtilityFlasksDoNotApplyToPlayer") and isUtilityFlask) then
+						recordAppliedFlask(env.player, item)
+					end
+				end
+				if appliesToMercenary(item) then
+					recordAppliedFlask(env.mercenary, item)
+				end
+				if env.minion then
+					if flasksApplyToMinion then
+						recordAppliedFlask(env.minion, item)
+					elseif nonUniqueFlasksApplyToMinion and item.rarity ~= "UNIQUE" and item.rarity ~= "RELIC" then
+						recordAppliedFlask(env.minion, item)
+					elseif quickSilverAppliesToAllies and item.baseName == "Quicksilver Flask" then
+						recordAppliedFlask(env.minion, item)
+					end
 				end
 			end
 			if item.baseName == "Iron Flask" then

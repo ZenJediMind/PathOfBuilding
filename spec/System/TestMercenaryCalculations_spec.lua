@@ -1537,6 +1537,101 @@ Adds 500 to 500 Physical Damage]])
 		assert.is_nil(env.mercenary.modDB.conditions.UsingEternalLifeFlask)
 	end)
 
+	it("scales Mercenary Onslaught from applied Silver Flasks only", function()
+		local function onslaughtMovementSpeed(actor)
+			local total = 0
+			for _, mod in ipairs(actor.modDB.mods["MovementSpeed"] or { }) do
+				if mod.source == "Onslaught" then
+					total = total + mod.value
+				end
+			end
+			return total
+		end
+		local function equipFlask(slotName, item)
+			build.itemsTab.items[item.id] = item
+			build.itemsTab.slots[slotName].selItemId = item.id
+			build.itemsTab.slots[slotName].active = true
+			build.itemsTab.activeItemSet[slotName].selItemId = item.id
+			build.itemsTab.activeItemSet[slotName].active = true
+		end
+		local function clearFlask(slotName)
+			build.itemsTab.slots[slotName].selItemId = 0
+			build.itemsTab.activeItemSet[slotName].selItemId = 0
+		end
+
+		build.skillsTab:PasteSocketGroup("Flame Link 20/0  1")
+		local linkGroup = build.skillsTab.socketGroupList[#build.skillsTab.socketGroupList]
+		configure("EleBowRanger", "EleBowRangerFire", "ArtilleryBallistaMercenary", {
+			supports = { { id = "ArtilleryBallistaSpecificOnslaughtHigh", tier = 3 } },
+		})
+		local bow = new("Item"):Item("Rarity: Normal\nCrude Bow")
+		local quiver = new("Item"):Item("Rarity: Normal\nSerrated Arrow Quiver")
+		bow.id, quiver.id = 9120, 9121
+		build.itemsTab.items[bow.id], build.itemsTab.items[quiver.id] = bow, quiver
+		equipmentSlot("Weapon 1").selItemId, equipmentSlot("Weapon 2").selItemId = bow.id, quiver.id
+
+		local configSet = build.configTab.configSets[build.configTab.activeConfigSetId]
+		build.configTab:EnsureActorConfig(configSet)
+		configSet.actors.mercenary.customModsList[1].text = "Flasks applied to you have 30% increased Effect"
+		build.configTab:BuildModList()
+
+		local env = calculate()
+		assert.is_true(env.mercenary.modDB:Flag(nil, "Onslaught"))
+		assert.are.equal(20, onslaughtMovementSpeed(env.mercenary))
+
+		local silver = new("Item"):Item("Rarity: Magic\nChemist's Silver Flask of Curing")
+		silver.id = 9122
+		silver.flaskData.effectInc = 20
+		equipFlask("Flask 1", silver)
+		env = calculate()
+		assert.is_true(env.player.modDB.conditions.UsingSilverFlask)
+		assert.is_nil(env.mercenary.modDB.conditions.UsingSilverFlask)
+		assert.is_nil((env.mercenary.appliedFlasks or { })[silver])
+		assert.are.equal(24, onslaughtMovementSpeed(env.player))
+		assert.are.equal(20, onslaughtMovementSpeed(env.mercenary))
+
+		local ceinture = new("Item"):Item("Rarity: Unique\nCeinture of Benevolence\nCloth Belt\nNon-Unique Utility Flasks you Use apply to Linked Targets")
+		ceinture.id = 9124
+		build.itemsTab.items[ceinture.id] = ceinture
+		build.itemsTab.slots.Belt.selItemId = ceinture.id
+		build.itemsTab.activeItemSet.Belt.selItemId = ceinture.id
+		env = calculate()
+		assert.is_true(env.mercenary.modDB.conditions.UsingSilverFlask)
+		assert.is_true(env.mercenary.appliedFlasks[silver])
+		assert.are.equal(24, onslaughtMovementSpeed(env.player))
+		assert.are.equal(30, onslaughtMovementSpeed(env.mercenary))
+
+		local cinderswallow = new("Item"):Item("Rarity: Unique\nCinderswallow Urn\nSilver Flask")
+		cinderswallow.id = 9123
+		assert.are.equal("UNIQUE", cinderswallow.rarity)
+		assert.are.equal("Silver Flask", cinderswallow.baseName)
+		cinderswallow.flaskData.effectInc = 80
+		clearFlask("Flask 1")
+		equipFlask("Flask 2", cinderswallow)
+		env = calculate()
+		assert.is_true(env.player.modDB.conditions.UsingSilverFlask)
+		assert.is_nil(env.mercenary.modDB.conditions.UsingSilverFlask)
+		assert.is_nil((env.mercenary.appliedFlasks or { })[cinderswallow])
+		assert.are.equal(36, onslaughtMovementSpeed(env.player))
+		assert.are.equal(20, onslaughtMovementSpeed(env.mercenary))
+
+		equipFlask("Flask 1", silver)
+		env = calculate()
+		assert.is_true(env.mercenary.modDB.conditions.UsingSilverFlask)
+		assert.is_true(env.mercenary.appliedFlasks[silver])
+		assert.is_nil(env.mercenary.appliedFlasks[cinderswallow])
+		assert.are.equal(36, onslaughtMovementSpeed(env.player))
+		assert.are.equal(30, onslaughtMovementSpeed(env.mercenary))
+
+		linkGroup.enabled = false
+		env = calculate()
+		assert.is_nil(env.mercenary.modDB.conditions.UsingSilverFlask)
+		assert.is_nil((env.mercenary.appliedFlasks or { })[silver])
+		assert.is_nil((env.mercenary.appliedFlasks or { })[cinderswallow])
+		assert.are.equal(36, onslaughtMovementSpeed(env.player))
+		assert.are.equal(20, onslaughtMovementSpeed(env.mercenary))
+	end)
+
 	it("uses the player as the Mercenary parent for Link defences", function()
 		build.skillsTab:PasteSocketGroup("Vampiric Link 20/0  1")
 		configure("TrapsMinesShadow", "TrapsMinesShadowLightning", "LightningTrapMercenary")

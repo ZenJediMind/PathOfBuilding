@@ -585,6 +585,9 @@ do
 	local function considerBase(bases, key, id, rank)
 		bases[key] = MercenaryExport.considerRankedCandidate(bases[key], id, rank)
 	end
+	local function uniqueCandidate(candidate)
+		return candidate and #candidate.ids == 1 and candidate or nil
+	end
 	for id in pairs(emitted) do
 		local effect = dat("GrantedEffects"):GetRow("Id", id)
 		if effect and effect.ActiveSkill then
@@ -652,7 +655,35 @@ do
 		-- AtlasEyrieArcherSnipe shares the Mercenary effect's ActiveSkill, but is an
 		-- NPC copy; Snipe is the maintained gem implementation.
 		SkeletonLargeMapBoneProjectile = "Snipe",
+		-- Blood Mortar shares monster_mortar_attack with Herald of Agony's minion
+		-- mortar; there is no gem, so inherit the spectre blood-projectile mortar.
+		BloodMortarMercenary = "BirdmanBloodProjectileMortar",
+		-- These triggered area hits share the generic geometry_attack ActiveSkill
+		-- with dozens of spectre slams; keep the previously chosen implementation.
+		DeceleratingProjectileMercenaryExplode = "AfflictionMinionPhysSlamCircleBig",
+		DonutBladesMercenary = "AfflictionMinionPhysSlamCircleBig",
+		TriggeredFireSlamMercenary = "AfflictionMinionPhysSlamCircleBig",
 	}
+	-- Unique ActiveSkill/name matches win. Remaining ties reuse the last committed
+	-- inheritedFrom so a generic shared ActiveSkill cannot silently pick a new base.
+	-- Skills with no unique match and no recorded base still fail closed.
+	local previousInheritedFrom = { }
+	local previousFile = io.open("../Data/Skills/mercenary.lua", "r")
+	if previousFile then
+		local currentId
+		for line in previousFile:lines() do
+			local id = line:match('^skills%["([^"]+)"%]')
+			if id then
+				currentId = id
+			end
+			local baseId = line:match('^%s*inheritedFrom = "([^"]+)"')
+			if currentId and baseId then
+				previousInheritedFrom[currentId] = baseId
+				currentId = nil
+			end
+		end
+		previousFile:close()
+	end
 	local resolvedByActiveSkill, resolvedByDisplayName, resolvedByOverride, withoutBase = 0, 0, 0, { }
 	local wroteSkill = false
 	for _, effectId in ipairs(effectIds) do
@@ -663,26 +694,37 @@ do
 				local byDisplayName = baseSkillByDisplayName[effect.ActiveSkill.DisplayName] or baseSkillByDisplayName[effectNames[effect.Id]]
 				-- A shared ActiveSkill is stronger evidence than a shared display name,
 				-- but a gem found by name still beats an NPC copy found by ActiveSkill.
-				local base = byActiveSkill
-				if byDisplayName and (not base or byDisplayName.rank < base.rank) then
+				-- Tied ActiveSkill matches are not evidence; fall through to a unique name.
+				local base = uniqueCandidate(byActiveSkill)
+				if uniqueCandidate(byDisplayName) and (not base or byDisplayName.rank < base.rank) then
 					base = byDisplayName
 				end
-				local overrideId = baseSkillOverrides[effect.Id]
-				if overrideId then
+				local overrideId = baseSkillOverrides[effect.Id] or previousInheritedFrom[effect.Id]
+				if base == byActiveSkill and base ~= nil then
+					resolvedByActiveSkill = resolvedByActiveSkill + 1
+					if baseSkillOverrides[effect.Id] then
+						baseSkillOverrides[effect.Id] = nil
+					end
+				elseif base then
+					resolvedByDisplayName = resolvedByDisplayName + 1
+					if baseSkillOverrides[effect.Id] then
+						baseSkillOverrides[effect.Id] = nil
+					end
+				elseif overrideId then
 					local override = dat("GrantedEffects"):GetRow("Id", overrideId)
-					if not emitted[overrideId] or not override or baseRank(override) ~= 0 then
-						error("Mercenary base-skill override is not an exported gem: "..effect.Id.." -> "..overrideId)
+					if not emitted[overrideId] or not override then
+						error("Mercenary base-skill override is not an exported skill: "..effect.Id.." -> "..overrideId)
 					end
 					base = { id = overrideId }
-					baseSkillOverrides[effect.Id] = nil
+					if baseSkillOverrides[effect.Id] then
+						baseSkillOverrides[effect.Id] = nil
+					end
 					resolvedByOverride = resolvedByOverride + 1
-				elseif base == byActiveSkill and base ~= nil then
+				elseif byActiveSkill then
 					MercenaryExport.requireUniqueRankedCandidate(byActiveSkill, "Mercenary base skill ActiveSkill '"..effect.ActiveSkill.Id.."'")
-					resolvedByActiveSkill = resolvedByActiveSkill + 1
-				elseif base then
+				elseif byDisplayName then
 					local displayName = effect.ActiveSkill.DisplayName ~= "" and effect.ActiveSkill.DisplayName or effectNames[effect.Id]
 					MercenaryExport.requireUniqueRankedCandidate(byDisplayName, "Mercenary base skill display name '"..displayName.."'")
-					resolvedByDisplayName = resolvedByDisplayName + 1
 				else
 					table.insert(withoutBase, effect.Id)
 				end

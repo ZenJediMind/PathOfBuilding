@@ -23266,6 +23266,7 @@ return {
 				[19]="IncreaseDurationLow",
 				[20]="IncreaseDurationMid"
 			},
+			secondarySkillId="ConflagrationMercenaryEncounter",
 			supportCountId="High"
 		},
 		ConsecratedPathMercenary={
@@ -23556,6 +23557,7 @@ return {
 				[20]="ShockChanceLow",
 				[21]="ShockChanceMid"
 			},
+			secondarySkillId="DivineIreMercenaryEncounter",
 			supportCountId="High"
 		},
 		DivineRetributionMercenary={
@@ -24175,6 +24177,7 @@ return {
 				[18]="MultipleProjectilesHigh",
 				[19]="MultipleProjectilesLow"
 			},
+			secondarySkillId="FireballAltMercenaryEncounter",
 			supportCountId="High"
 		},
 		FireballMercenary={
@@ -24209,6 +24212,7 @@ return {
 				[22]="MultipleProjectilesLow",
 				[23]="ProjectilesReturnHigh"
 			},
+			secondarySkillId="FireballMercenaryEncounter",
 			supportCountId="High"
 		},
 		FissureSlamMercenary={
@@ -24353,6 +24357,7 @@ return {
 				[19]="IncreaseAreaOfEffectLow",
 				[20]="IncreaseAreaOfEffectMid"
 			},
+			secondarySkillId="FlameblastMercenaryEncounter",
 			supportCountId="High"
 		},
 		FlammabilityBlasphemyMercenary={
@@ -24654,6 +24659,7 @@ return {
 				[14]="MultipleProjectilesLow",
 				[15]="ProjectilesReturnHigh"
 			},
+			secondarySkillId="FrostboltMercenaryEncounter",
 			supportCountId="High"
 		},
 		GalvanicArrowMercenary={
@@ -25325,6 +25331,7 @@ return {
 				[22]="NonDamagingAilmentEffectLow",
 				[23]="NonDamagingAilmentEffectMid"
 			},
+			secondarySkillId="IceNovaMercenaryEncounter",
 			supportCountId="High"
 		},
 		IceNovaProjectedMercenary={
@@ -25354,6 +25361,7 @@ return {
 				[18]="NonDamagingAilmentEffectLow",
 				[19]="NonDamagingAilmentEffectMid"
 			},
+			secondarySkillId="IceNovaProjectedMercenaryEncounter",
 			supportCountId="High"
 		},
 		IceShotMercenary={
@@ -25482,6 +25490,7 @@ return {
 				[19]="MultistrikeHigh",
 				[20]="MultistrikeMid"
 			},
+			secondarySkillId="InfernalBlowAltMercenaryEncounter",
 			supportCountId="High"
 		},
 		InfernalCryMercenary={
@@ -26884,6 +26893,7 @@ return {
 				[30]="ReducedProjSpeedMid",
 				[31]="RollingMagmaAOEPerProjHigh"
 			},
+			secondarySkillId="RollingMagmaMercenaryEncounter",
 			supportCountId="High"
 		},
 		SSMHolySpectresMercenary={
@@ -27310,6 +27320,7 @@ return {
 				[23]="WitherOnHitLow",
 				[24]="WitherOnHitMid"
 			},
+			secondarySkillId="SoulrendAltMercenaryEncounter",
 			supportCountId="High"
 		},
 		SparkMercenary={
@@ -27624,6 +27635,7 @@ return {
 				[21]="SpellCascadeLow",
 				[22]="StormCallSpecificResCritHigh"
 			},
+			secondarySkillId="StormCallMercenaryEncounter",
 			supportCountId="High"
 		},
 		StormRainMercenary={
@@ -33914,6 +33926,10 @@ return {
 				[1]={
 					id="withered_on_hit_chance_%",
 					value=45
+				},
+				[2]={
+					id="support_withered_base_duration_ms",
+					value=2000
 				}
 			},
 			variant=3
@@ -33928,6 +33944,10 @@ return {
 				[1]={
 					id="withered_on_hit_chance_%",
 					value=15
+				},
+				[2]={
+					id="support_withered_base_duration_ms",
+					value=2000
 				}
 			},
 			variant=1
@@ -33942,6 +33962,10 @@ return {
 				[1]={
 					id="withered_on_hit_chance_%",
 					value=30
+				},
+				[2]={
+					id="support_withered_base_duration_ms",
+					value=2000
 				}
 			},
 			variant=2

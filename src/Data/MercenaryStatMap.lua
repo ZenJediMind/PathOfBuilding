@@ -386,6 +386,10 @@ return {
 		["support_spell_cascade_number_of_cascades_per_side"] = {
 			skill("spellCascadeCountPerSide", nil),
 		},
+		-- PoB's wither model is stack-based and already assumes a 2s duration.
+		-- 3.29.3 exports that duration explicitly; do not treat it as skill duration.
+		["support_withered_base_duration_ms"] = {
+		},
 		["totem_additional_physical_damage_reduction_%"] = {
 			skill("totemPhysicalDamageReduction", nil),
 		},
@@ -563,6 +567,7 @@ return {
 		["number_of_monsters_to_summon"] = true,
 		["orb_of_storms_maximum_number_of_hits"] = true,
 		["override_turn_duration_ms"] = true,
+		["pact_of_ghorr_can_modify_damage_over_time_of_skill"] = true,
 		["phase_through_objects"] = true,
 		["projectile_angle_variance"] = true,
 		["projectile_firing_forward_distance_override"] = true,

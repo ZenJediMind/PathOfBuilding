@@ -1995,7 +1995,7 @@ function calcs.perform(env, skipEHP)
 				srcList:ScaleAddList(modList, effectMod)
 				local key
 				if item.rarity == "UNIQUE" or item.rarity == "RELIC" then
-					key = item.title or item.name or item.baseName
+					key = item.title
 				else
 					key = ""
 					for _, mod in ipairs(modList) do
@@ -2156,7 +2156,7 @@ function calcs.perform(env, skipEHP)
 				srcList:ScaleAddList(modList, effectMod)
 				local key
 				if item.rarity == "UNIQUE" or item.rarity == "RELIC" then
-					key = item.title or item.name or item.baseName
+					key = item.title
 				else
 					key = ""
 					for _, mod in ipairs(modList) do

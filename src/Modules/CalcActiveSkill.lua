@@ -186,8 +186,10 @@ function calcs.copyActiveSkill(env, mode, skill)
 	if skill.actor and skill.actor.isMercenary then
 		actor = fullEnv.mercenary
 		actorEnv = actor and actor.calcEnv
+		if not actorEnv then
+			error("copyActiveSkill: mercenary actor environment is missing")
+		end
 	end
-	if not actorEnv then return end
 	local newSkill = calcs.createActiveSkill(activeEffect, skill.supportList, actor, skill.socketGroup, skill.summonSkill)
 	calcs.buildActiveSkillModList(actorEnv, newSkill)
 	newSkill.skillModList = new("ModList"):ModList(newSkill.baseSkillModList)

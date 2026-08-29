@@ -324,7 +324,8 @@ describe("Permanent Mercenary calculations", function()
 		assert.matches("No Mercenary item set is available", table.concat(env.mercenaryCalculationErrors, "\n"))
 		assert.is_nil(build.calcsTab.calcsEnv.mercenary)
 		local _, _, actorOutputs = build.calcsTab:GetMiscCalculator()
-		assert.is_nil(actorOutputs.MERCENARY)
+		assert.is_true(not MercenaryTools.mercenaryOutputAvailable(actorOutputs.MERCENARY))
+		assert.matches("No Mercenary item set is available", actorOutputs.MERCENARY.ActorUnavailableMessage)
 	end)
 
 	it("shows and applies Configuration settings required by the Mercenary", function()
@@ -1799,6 +1800,56 @@ Adds 500 to 500 Physical Damage]])
 		assert.is_nil(calculate().mercenary)
 		assert.matches("Scion's Luminary", table.concat(build.mercenaryTab:GetErrors(), "\n"))
 		assert.are.equal("TrapsMinesShadowLightning", build.mercenaryTab.profile.buildId)
+	end)
+
+	it("keeps Mercenary item comparison outputs table-shaped when the actor is unhired", function()
+		configure("TrapsMinesShadow", "TrapsMinesShadowLightning", "LightningTrapMercenary")
+		local mercSet = assert(build.mercenaryTab:GetItemSet(true))
+		local nobleBlood
+		for _, node in pairs(build.spec.allocNodes) do
+			if node.name == "Noble Blood" then nobleBlood = node break end
+		end
+		nobleBlood = assert(nobleBlood, "Noble Blood")
+		build.spec.allocNodes[nobleBlood.id] = nil
+		nobleBlood.alloc = false
+		calculate()
+		assert(build.itemsTab:SetViewItemSet(mercSet.id))
+		local helmet = new("Item"):Item("Rarity: Normal\nLeather Cap")
+		build.itemsTab:AddItem(helmet, true)
+		build.itemsTab.displayItem = helmet
+		local calcFunc, _, actorOutputs = build.calcsTab:GetMiscCalculator()
+		assert.is_true(not MercenaryTools.mercenaryOutputAvailable(actorOutputs.MERCENARY))
+		local output = calcFunc(build.itemsTab:ItemCalculationOverride("Helmet", helmet))
+		assert.is_table(output)
+		assert.is_true(not MercenaryTools.mercenaryOutputAvailable(output))
+		assert.has_no.errors(function()
+			data.powerStatList.GetFromOutput(output, { stat = "CombinedDPS" })
+		end)
+		local tooltip = new("Tooltip"):Tooltip()
+		assert.has_no.errors(function()
+			build.itemsTab:AddModComparisonTooltip(tooltip, { "+10 to maximum Life" })
+		end)
+	end)
+
+	it("fails closed when copying a Mercenary skill without a Mercenary environment", function()
+		configure("TrapsMinesShadow", "TrapsMinesShadowLightning", "LightningTrapMercenary")
+		local nobleBlood
+		for _, node in pairs(build.spec.allocNodes) do
+			if node.name == "Noble Blood" then nobleBlood = node break end
+		end
+		nobleBlood = assert(nobleBlood, "Noble Blood")
+		build.spec.allocNodes[nobleBlood.id] = nil
+		nobleBlood.alloc = false
+		local env = calculate()
+		assert.is_nil(env.mercenary)
+		local skill = {
+			actor = { isMercenary = true },
+			activeEffect = { grantedEffect = { name = "Dummy" }, level = 1, quality = 0 },
+			supportList = { },
+		}
+		assert.has_error(function()
+			build.calcsTab.calcs.copyActiveSkill(env, "CALCULATOR", skill)
+		end, "copyActiveSkill: mercenary actor environment is missing")
 	end)
 
 	it("equips Eber's Unification without granting Void Gaze", function()

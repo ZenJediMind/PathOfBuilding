@@ -113,7 +113,14 @@ function calcs.getMiscCalculator(build)
 	end
 	local function comparisonOutput(calculationEnv, override)
 		if override and (override.comparisonActor == "MERCENARY" or MercenaryTools.baseItemSlotName(override.repSlotName)) then
-			return calculationEnv.mercenary and calculationEnv.mercenary.output
+			if calculationEnv.mercenary then
+				return calculationEnv.mercenary.output
+			end
+			local message = "The selected mercenary is unavailable for this build."
+			if calculationEnv.mercenaryCalculationErrors and calculationEnv.mercenaryCalculationErrors[1] then
+				message = table.concat(calculationEnv.mercenaryCalculationErrors, "\n")
+			end
+			return { ActorUnavailableMessage = message }
 		end
 		return calculationEnv.player.output
 	end

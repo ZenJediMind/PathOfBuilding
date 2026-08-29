@@ -371,7 +371,7 @@ function CompareTabClass:InitControls()
 		local entry = self:GetActiveCompare()
 		local itemSetOrderList = entry and getComparisonItemSetOrderList(entry.itemsTab)
 		if entry and itemSetOrderList and itemSetOrderList[index] then
-			entry:SetViewItemSet(itemSetOrderList[index])
+			entry:SetViewItemSet(itemSetOrderList[index], entry.itemsTab.viewComparisonActor)
 		end
 	end)
 	self.controls.compareItemSetSelect.enabled = setsEnabled
@@ -910,8 +910,9 @@ function CompareTabClass:InitControls()
 	self.controls.primaryItemSetSelect = new("DropDownControl"):DropDownControl(nil, {0, 0, 216, 20}, {}, function(index, value)
 		local itemSetOrderList = getComparisonItemSetOrderList(self.primaryBuild.itemsTab)
 		if itemSetOrderList and itemSetOrderList[index] then
-			self.primaryBuild.itemsTab:SetViewItemSet(itemSetOrderList[index])
-			self.primaryBuild.itemsTab:AddUndoState()
+			local itemsTab = self.primaryBuild.itemsTab
+			itemsTab:SetViewItemSet(itemSetOrderList[index], itemsTab.viewComparisonActor)
+			itemsTab:AddUndoState()
 		end
 	end)
 	self.controls.primaryItemSetSelect.enabled = itemsShown
@@ -924,7 +925,7 @@ function CompareTabClass:InitControls()
 		local entry = self:GetActiveCompare()
 		local itemSetOrderList = entry and getComparisonItemSetOrderList(entry.itemsTab)
 		if entry and itemSetOrderList and itemSetOrderList[index] then
-			entry:SetViewItemSet(itemSetOrderList[index])
+			entry:SetViewItemSet(itemSetOrderList[index], entry.itemsTab.viewComparisonActor)
 		end
 	end)
 	self.controls.compareItemSetSelect2.enabled = itemsShown

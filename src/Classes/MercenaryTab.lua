@@ -109,6 +109,7 @@ function MercenaryTabClass:MercenaryTab(build)
 	self.activeMercenarySetId = 1
 	self.profile = self.mercenarySets[1]
 	self.itemSetId = nil
+	self.auxiliaryItemSetId = nil
 	self.sortGemsByDPS = true
 	self.sortGemsByDPSField = "CombinedDPS"
 	self.supportSortRevision = 0
@@ -484,6 +485,7 @@ function MercenaryTabClass:EnsureItemSet()
 	itemSet.title = "Mercenary Equipment"
 	t_insert(itemsTab.itemSetOrderList, itemSet.id)
 	self.itemSetId = itemSet.id
+	self.auxiliaryItemSetId = itemSet.id
 	if self.build.configTab then
 		self.build.configTab:SyncActorItemSet("mercenary", itemSet.id)
 	end
@@ -984,6 +986,7 @@ function MercenaryTabClass:Load(xml)
 	self.activeMercenarySetId = nil
 	self.profile = nil
 	self.itemSetId = tonumber(xml.attrib.itemSetId)
+	self.auxiliaryItemSetId = tonumber(xml.attrib.auxiliaryItemSetId)
 	self.mercenarySets = { }
 	self.mercenarySetOrderList = { }
 	if xml.attrib.sortGemsByDPS then
@@ -1007,6 +1010,12 @@ function MercenaryTabClass:Load(xml)
 end
 
 function MercenaryTabClass:PostLoad()
+	if not self.auxiliaryItemSetId and self.itemSetId then
+		local itemSet = self.build.itemsTab and self.build.itemsTab.itemSets[self.itemSetId]
+		if itemSet and itemSet.title == "Mercenary Equipment" then
+			self.auxiliaryItemSetId = self.itemSetId
+		end
+	end
 	self:RefreshControls()
 	self.modFlag = false
 end
@@ -1015,6 +1024,7 @@ function MercenaryTabClass:Save(xml)
 	xml.attrib = {
 		activeMercenarySet = tostring(self.activeMercenarySetId),
 		itemSetId = self.itemSetId and tostring(self.itemSetId),
+		auxiliaryItemSetId = self.auxiliaryItemSetId and tostring(self.auxiliaryItemSetId),
 		sortGemsByDPS = tostring(self.sortGemsByDPS),
 		sortGemsByDPSField = self.sortGemsByDPSField,
 	}

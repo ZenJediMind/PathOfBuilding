@@ -150,6 +150,10 @@ function ItemSetListClass:OnSelDelete(index, itemSetId)
 			if self.itemsTab.build.configTab then
 				self.itemsTab.build.configTab:RemapItemSetId(itemSetId, replacementItemSetId)
 			end
+			local mercenaryTab = self.itemsTab.build.mercenaryTab
+			if mercenaryTab and mercenaryTab.auxiliaryItemSetId == itemSetId then
+				mercenaryTab.auxiliaryItemSetId = nil
+			end
 			self.itemsTab:AddUndoState()
 			self.itemsTab.build:SyncLoadouts()
 		end)

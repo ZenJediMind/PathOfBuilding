@@ -1562,7 +1562,9 @@ end
 function ItemsTabClass:GetPlayerItemSetOrderList()
 	local playerSets = { }
 	for _, itemSetId in ipairs(self.itemSetOrderList) do
-		if not MercenaryTools.isDedicatedMercenaryItemSet(itemSetId, self) then
+		-- Skip the auto-created auxiliary Mercenary equipment set, not any set
+		-- the Mercenary happens to be wearing.
+		if not MercenaryTools.isAuxiliaryMercenaryItemSet(itemSetId, self) then
 			t_insert(playerSets, itemSetId)
 		end
 	end

@@ -1283,7 +1283,9 @@ end
 function ConfigTabClass:GetVarTables(var)
 	local configSet = self.configSets[self.activeConfigSetId]
 	self:EnsureActorConfig(configSet)
-	if ConfigScope.forVar(var) == "actor" and self:GetViewActor() == "mercenary" then
+	-- Skill-option headers have a label and ifSkill but no var. Draw still
+	-- asks for their current value when deciding whether to highlight them.
+	if var and ConfigScope.forVar(var) == "actor" and self:GetViewActor() == "mercenary" then
 		return configSet.actors.mercenary.input, configSet.actors.mercenary.placeholder
 	end
 	return configSet.input, configSet.placeholder

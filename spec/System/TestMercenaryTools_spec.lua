@@ -44,10 +44,10 @@ describe("Mercenary tools", function()
 		assert.is_true(tools.mercenaryOutputAvailable(mercenaryOutput))
 	end)
 
-	it("treats a dedicated Mercenary item set as the Mercenary comparison actor", function()
+	it("treats the auto-created auxiliary Mercenary item set as the Mercenary comparison actor", function()
 		assert.are.equal("MERCENARY", tools.comparisonActorForItemSet(2, {
 			activeItemSetId = 1,
-			build = { mercenaryTab = { itemSetId = 2 } },
+			build = { mercenaryTab = { itemSetId = 2, auxiliaryItemSetId = 2 } },
 		}))
 		assert.are.equal("PLAYER", tools.comparisonActorForItemSet(1, {
 			activeItemSetId = 1,
@@ -55,11 +55,15 @@ describe("Mercenary tools", function()
 		}))
 		assert.are.equal("PLAYER", tools.comparisonActorForItemSet(3, {
 			activeItemSetId = 1,
+			build = { mercenaryTab = { itemSetId = 2, auxiliaryItemSetId = 2 } },
+		}))
+		assert.are.equal("PLAYER", tools.comparisonActorForItemSet(2, {
+			activeItemSetId = 1,
 			build = { mercenaryTab = { itemSetId = 2 } },
 		}))
 		assert.are.equal("MERCENARY", tools.comparisonActorForSlot("Helmet", 2, {
 			activeItemSetId = 1,
-			build = { mercenaryTab = { itemSetId = 2 } },
+			build = { mercenaryTab = { itemSetId = 2, auxiliaryItemSetId = 2 } },
 		}))
 		assert.are.equal("MERCENARY", tools.comparisonActorForSlot("Mercenary Helmet", 1, {
 			activeItemSetId = 1,
@@ -81,25 +85,30 @@ describe("Mercenary tools", function()
 		assert.are.equal("PLAYER", tools.comparisonActorForSlot("Helmet", 1, shared))
 	end)
 
-	it("identifies dedicated Mercenary item sets without using the current view", function()
-		assert.is_true(tools.isDedicatedMercenaryItemSet(2, {
+	it("identifies the auto-created auxiliary Mercenary item set, not a shared set the Mercenary wears", function()
+		assert.is_true(tools.isAuxiliaryMercenaryItemSet(2, {
 			activeItemSetId = 1,
 			viewItemSetId = 1,
 			viewComparisonActor = "MERCENARY",
-			build = { mercenaryTab = { itemSetId = 2 } },
+			build = { mercenaryTab = { itemSetId = 2, auxiliaryItemSetId = 2 } },
 		}))
-		assert.is_true(not tools.isDedicatedMercenaryItemSet(1, {
+		assert.is_true(not tools.isAuxiliaryMercenaryItemSet(1, {
 			activeItemSetId = 1,
 			viewItemSetId = 1,
 			viewComparisonActor = "MERCENARY",
 			build = { mercenaryTab = { itemSetId = 1 } },
+		}))
+		assert.is_true(not tools.isAuxiliaryMercenaryItemSet(2, {
+			activeItemSetId = 1,
+			viewItemSetId = 1,
+			build = { mercenaryTab = { itemSetId = 2 } },
 		}))
 	end)
 
 	it("builds a comparison override for a viewed item set", function()
 		local itemsTab = {
 			activeItemSetId = 1,
-			build = { mercenaryTab = { itemSetId = 2 } },
+			build = { mercenaryTab = { itemSetId = 2, auxiliaryItemSetId = 2 } },
 		}
 		local item = { name = "hat" }
 		local override = tools.itemCalculationOverride(2, "Helmet", item, itemsTab)

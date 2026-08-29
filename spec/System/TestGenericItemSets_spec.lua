@@ -442,7 +442,7 @@ describe("Generic item sets for player, Animate Guardian, and Mercenary", functi
 		assert.is_true(valid, reason)
 	end)
 
-	it("excludes a dedicated Mercenary item set from player loadout enumeration", function()
+	it("excludes the auto-created Mercenary equipment set from player loadout enumeration", function()
 		selectScionLuminary()
 		local itemsTab = build.itemsTab
 		local playerSetId = itemsTab.activeItemSetId
@@ -462,5 +462,29 @@ describe("Generic item sets for player, Animate Guardian, and Mercenary", functi
 		local minionSets = itemsTab:GetMinionItemSetOrderList()
 		assert.is_true(contains(minionSets, mercSet.id))
 		assert.is_true(contains(minionSets, playerSetId))
+	end)
+
+	it("keeps an inactive player item set in player loadouts when the Mercenary also uses it", function()
+		selectScionLuminary()
+		local itemsTab = build.itemsTab
+		local playerSetId = itemsTab.activeItemSetId
+		local bossingSet = itemsTab:NewItemSet()
+		bossingSet.title = "Bossing"
+		table.insert(itemsTab.itemSetOrderList, bossingSet.id)
+		build.mercenaryTab.profile.buildId = "MeleeAOEMarauderFireSlam"
+		build.mercenaryTab:Changed()
+		local mercSet = build.mercenaryTab:GetItemSet(true)
+		local function contains(list, wanted)
+			for _, itemSetId in ipairs(list) do
+				if itemSetId == wanted then return true end
+			end
+			return false
+		end
+		assert.is_true(contains(itemsTab:GetPlayerItemSetOrderList(), bossingSet.id))
+		assert(build.mercenaryTab:SetItemSet(bossingSet.id))
+		local playerSets = itemsTab:GetPlayerItemSetOrderList()
+		assert.is_true(contains(playerSets, playerSetId))
+		assert.is_true(contains(playerSets, bossingSet.id))
+		assert.is_true(not contains(playerSets, mercSet.id))
 	end)
 end)

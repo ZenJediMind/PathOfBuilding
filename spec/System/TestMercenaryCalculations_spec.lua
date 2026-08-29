@@ -1727,15 +1727,40 @@ Adds 500 to 500 Physical Damage]])
 		build.configTab.input.enemyIsBoss = "None"
 		local mercenary = calculate().mercenary
 		assert.are.equal(baselineFireResist + 15, mercenary.output.FireResist)
-		assert.are.equal(baselineDamage, mercenary.modDB:Sum("INC", nil, "Damage"))
+		-- Presence implicits are always active on hired Mercenaries, even with no Unique enemy.
+		assert.are.equal(baselineDamage + 20, mercenary.modDB:Sum("INC", nil, "Damage"))
 		assert.are.equal(round(baselineMoreDamage * 1.08, 2), mercenary.modDB:More(nil, "Damage"))
 		assert.is_true(mercenary.modDB:Flag(nil, "CannotBeEvaded"))
 		assert.is_true(mercenary.modDB:Flag(nil, "NeverCrit"))
-		build.configTab.input.enemyIsBoss = "Pinnacle"
-		mercenary = calculate().mercenary
-		assert.are.equal(baselineDamage + 20, mercenary.modDB:Sum("INC", nil, "Damage"))
 		local _, _, actorBases = build.calcsTab:GetMiscCalculator()
 		assert.are.near(mercenary.output.CombinedDPS, actorBases.MERCENARY.CombinedDPS, 10 ^ -6)
+	end)
+
+	it("keeps against-unique Mercenary mods on shared encounter Unique state", function()
+		allocate("Legendary Helmets")
+		configure("TrapsMinesShadow", "TrapsMinesShadowLightning", "LightningTrapMercenary")
+		local baselineDamage = calculate().mercenary.modDB:Sum("INC", nil, "Damage")
+		local againstUnique = {
+			name = "Damage", type = "INC", value = 15, source = "Against Unique Test", flags = 0, keywordFlags = 0,
+			{ type = "ActorCondition", actor = "enemy", var = "RareOrUnique" },
+		}
+		local item = {
+			id = 9005,
+			name = "Mercenary Against Unique Helmet",
+			type = "Helmet",
+			base = { type = "Helmet" },
+			rarity = "UNIQUE",
+			requirements = { level = 1, dex = 1 },
+			grantedSkills = { },
+			modList = { againstUnique },
+			explicitModLines = { { line = "15% increased Damage against Unique Enemies", modList = { againstUnique } } },
+		}
+		build.itemsTab.items[item.id] = item
+		equipmentSlot("Helmet").selItemId = item.id
+		build.configTab.input.enemyIsBoss = "None"
+		assert.are.equal(baselineDamage, calculate().mercenary.modDB:Sum("INC", nil, "Damage"))
+		build.configTab.input.enemyIsBoss = "Pinnacle"
+		assert.are.equal(baselineDamage + 15, calculate().mercenary.modDB:Sum("INC", nil, "Damage"))
 	end)
 
 	it("counts Mercenary equipment sockets as empty", function()

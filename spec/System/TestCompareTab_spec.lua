@@ -165,7 +165,7 @@ describe("CompareTab", function()
 		local playerSetId = itemsTab.activeItemSetId
 		local mercSet = assert(build.mercenaryTab:GetItemSet(true))
 		assert.are_not.equal(playerSetId, mercSet.id)
-		itemsTab:SetViewItemSet(mercSet.id)
+		itemsTab:SetViewItemSet(mercSet.id, "MERCENARY")
 		local orderList = itemsTab.itemSetOrderList
 		local playerIndex, mercIndex
 		for index, itemSetId in ipairs(orderList) do
@@ -177,8 +177,39 @@ describe("CompareTab", function()
 		build.compareTab.controls.primaryItemSetSelect.selFunc(playerIndex, itemsTab.itemSets[playerSetId].title or "Default")
 		assert.are.equal(playerSetId, itemsTab.activeItemSetId)
 		assert.are.equal(playerSetId, itemsTab.viewItemSetId)
+		assert.are.equal("MERCENARY", itemsTab.viewComparisonActor)
 		build.compareTab.controls.primaryItemSetSelect.selFunc(mercIndex, mercSet.title or "Default")
 		assert.are.equal(playerSetId, itemsTab.activeItemSetId)
 		assert.are.equal(mercSet.id, itemsTab.viewItemSetId)
+		assert.are.equal("MERCENARY", itemsTab.viewComparisonActor)
+	end)
+
+	it("keeps the Mercenary comparison actor when Compare views a shared player item set", function()
+		newBuild()
+		allocatePermanentHire()
+		build.mercenaryTab.profile = {
+			classId = "TrapsMinesShadow",
+			buildId = "TrapsMinesShadowLightning",
+			foundAreaLevel = 68,
+			mainSkillId = "LightningTrapMercenary",
+			lifeComparison = "AUTO",
+			skills = { { id = "LightningTrapMercenary", enabled = true, supports = { } } },
+		}
+		build.mercenaryTab:Changed()
+		local itemsTab = build.itemsTab
+		local playerSetId = itemsTab.activeItemSetId
+		assert(build.mercenaryTab:GetItemSet(true))
+		assert(build.mercenaryTab:SetItemSet(playerSetId))
+		itemsTab:SetViewItemSet(playerSetId, "MERCENARY")
+		assert.are.equal("MERCENARY", itemsTab.viewComparisonActor)
+		local playerIndex
+		for index, itemSetId in ipairs(itemsTab.itemSetOrderList) do
+			if itemSetId == playerSetId then playerIndex = index break end
+		end
+		assert.is_number(playerIndex)
+		build.compareTab.controls.primaryItemSetSelect.selFunc(playerIndex, itemsTab.itemSets[playerSetId].title or "Default")
+		assert.are.equal("MERCENARY", itemsTab.viewComparisonActor)
+		assert.are.equal(playerSetId, itemsTab.activeItemSetId)
+		assert.are.equal(playerSetId, itemsTab.viewItemSetId)
 	end)
 end)

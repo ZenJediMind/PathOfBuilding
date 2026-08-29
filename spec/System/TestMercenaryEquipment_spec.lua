@@ -288,6 +288,7 @@ describe("Mercenary equipment validation", function()
 		local mercenaryXml = { }
 		tab:Save(mercenaryXml)
 		assert.are.equal(tostring(mercSet.id), mercenaryXml.attrib.itemSetId)
+		assert.are.equal(tostring(mercSet.id), mercenaryXml.attrib.auxiliaryItemSetId)
 	end)
 
 	it("selects the Mercenary equipment item set from the Mercenary tab", function()
@@ -1201,16 +1202,27 @@ Note: ~b/o 1 mirror
 		assert.are.equal("PLAYER", itemsTab:ItemCalculationOverride("Helmet", item()).comparisonActor)
 	end)
 
-	it("compares a distinct Mercenary item set as Mercenary", function()
+	it("compares the auto-created Mercenary equipment set as Mercenary", function()
 		selectBuild("MeleeAOEMarauderFireSlam")
 		local itemsTab = build.itemsTab
-		local mercSet = itemsTab:NewItemSet()
-		mercSet.title = "Mercenary Equipment"
-		table.insert(itemsTab.itemSetOrderList, mercSet.id)
-		assert(tab:SetItemSet(mercSet.id, false))
+		local mercSet = assert(tab:GetItemSet(true))
 		assert(itemsTab:SetViewItemSet(mercSet.id))
 		assert.are_not.equal(itemsTab.activeItemSetId, mercSet.id)
 		assert.are.equal("MERCENARY", MercenaryTools.comparisonActorForItemSet(mercSet.id, itemsTab))
 		assert.are.equal("MERCENARY", itemsTab:ItemCalculationOverride("Helmet", item()).comparisonActor)
+	end)
+
+	it("does not treat a shared item set as Mercenary just because the Mercenary wears it", function()
+		selectBuild("MeleeAOEMarauderFireSlam")
+		local itemsTab = build.itemsTab
+		assert(tab:GetItemSet(true))
+		local bossingSet = itemsTab:NewItemSet()
+		bossingSet.title = "Bossing"
+		table.insert(itemsTab.itemSetOrderList, bossingSet.id)
+		assert(tab:SetItemSet(bossingSet.id, false))
+		assert(itemsTab:SetViewItemSet(bossingSet.id))
+		assert.are_not.equal(itemsTab.activeItemSetId, bossingSet.id)
+		assert.are.equal("PLAYER", MercenaryTools.comparisonActorForItemSet(bossingSet.id, itemsTab))
+		assert.are.equal("PLAYER", itemsTab:ItemCalculationOverride("Helmet", item()).comparisonActor)
 	end)
 end)

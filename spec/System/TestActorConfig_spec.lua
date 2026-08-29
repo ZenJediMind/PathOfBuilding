@@ -743,6 +743,13 @@ describe("Player and mercenary configuration", function()
 		live.index(LoadModule("Modules/ConfigOptions"))
 	end)
 
+	it("does not treat skill-option headers as unknown config vars", function()
+		assert.is_nil(build.configTab:GetConfigValue(nil))
+		assert.has_no.errors(function()
+			build.configTab:Draw({ x = 0, y = 0, width = 1920, height = 1080 }, { })
+		end)
+	end)
+
 	it("requires an explicit ownership decision for new enemy predicates", function()
 		local ConfigScope = require("Modules.ConfigScope")
 		assert.has_error(function()

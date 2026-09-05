@@ -1296,6 +1296,13 @@ function ItemsTabClass:Load(xml, dbFileName)
 	if not self.itemSetOrderList[1] then
 		local itemSet = self:NewItemSet(1)
 		itemSet.useSecondWeaponSet = xml.attrib.useSecondWeaponSet == "true"
+		-- Legacy <Slot> values lived on the UI controls; copy them into the new set.
+		for _, slot in ipairs(self.orderedSlots) do
+			if not slot.nodeId then
+				itemSet[slot.slotName].selItemId = slot.selItemId or 0
+				itemSet[slot.slotName].active = slot.active
+			end
+		end
 		t_insert(self.itemSetOrderList, itemSet.id)
 	end
 	local activeItemSetId = savedActiveItemSetId

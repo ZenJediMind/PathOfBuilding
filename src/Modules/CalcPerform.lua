@@ -1486,6 +1486,63 @@ for _, lifePools in pairs({ minionLifePoolBySkill, totemLifePoolByStat }) do
 	end
 end
 
+local function actorHasElementalEquilibrium(actor)
+	return actor and (actor.modDB:Flag(nil, "ElementalEquilibrium")
+		or (actor.mainSkill and actor.mainSkill.skillModList:Flag(actor.mainSkill.skillCfg, "ElementalEquilibrium")))
+end
+
+local function copyModArray(list)
+	if not list then
+		return nil
+	end
+	local copy = { }
+	for index = 1, #list do
+		copy[index] = list[index]
+	end
+	return copy
+end
+
+local function restoreModArray(list, cached)
+	if not list or not cached then
+		return
+	end
+	for index = #list, 1, -1 do
+		list[index] = nil
+	end
+	for index = 1, #cached do
+		list[index] = cached[index]
+	end
+end
+
+local function snapshotActorForOffence(actor)
+	if not actor then
+		return nil
+	end
+	local skill = actor.mainSkill
+	return {
+		modDB = calcs.copyModDB(actor.modDB),
+		skillMods = skill and copyModArray(skill.skillModList),
+		skillData = skill and skill.skillData and copyTable(skill.skillData),
+	}
+end
+
+local function restoreActorForOffence(actor, cached)
+	if not actor or not cached then
+		return
+	end
+	calcs.restoreModDB(actor.modDB, cached.modDB)
+	local skill = actor.mainSkill
+	if skill then
+		restoreModArray(skill.skillModList, cached.skillMods)
+		if cached.skillData and skill.skillData then
+			wipeTable(skill.skillData)
+			for key, value in pairs(cached.skillData) do
+				skill.skillData[key] = value
+			end
+		end
+	end
+end
+
 -- Finalises the environment and performs the stat calculations:
 -- 1. Merges keystone modifiers
 -- 2. Initialises minion skills
@@ -1598,6 +1655,49 @@ function calcs.perform(env, skipEHP)
 	applyEnemyModifiers(env.enemy, true)
 	local minionCounts = { }
 
+	-- Skitterbot shock/chill are guaranteed enemy ailments. Magnitude is written
+	-- onto the player modDB so the later shared-enemy ailment pass can see it.
+	local function applySkitterbotAilments(activeSkill, selfModDB)
+		if activeSkill.activeEffect.grantedEffect.name ~= "Summon Skitterbots" then
+			return false
+		end
+		local skillModList = activeSkill.skillModList
+		local source = activeSkill.activeEffect.grantedEffect.name
+		local skitterbotAilmentEffect = skillModList:Sum("INC", nil, "SkitterbotAilmentEffect")
+		if not skillModList:Flag(nil, "SkitterbotsCannotShock") then
+			local effect = data.nonDamagingAilment.Shock.default * (1 + (skillModList:Sum("INC", { source = "Skill" }, "EnemyShockEffect") + skitterbotAilmentEffect) / 100)
+			modDB:NewMod("ShockOverride", "BASE", effect, source)
+			enemyDB:NewMod("Condition:Shocked", "FLAG", true, source)
+			if skillModList:Flag(nil, "SkitterbotAffectPlayer") then
+				selfModDB:NewMod("Shock", "FLAG", true, source)
+				selfModDB:NewMod("SelfShockOverride", "BASE", effect, source)
+			end
+		end
+		if not skillModList:Flag(nil, "SkitterbotsCannotChill") then
+			local effect = data.nonDamagingAilment.Chill.default * (1 + (skillModList:Sum("INC", { source = "Skill" }, "EnemyChillEffect") + skitterbotAilmentEffect) / 100)
+			modDB:NewMod("ChillOverride", "BASE", effect, source)
+			enemyDB:NewMod("Condition:Chilled", "FLAG", true, source)
+			if skillModList:Flag(nil, "SkitterbotAffectPlayer") then
+				selfModDB:NewMod("Chill", "FLAG", true, source)
+				selfModDB:NewMod("SelfChillOverride", "BASE", effect, source)
+			end
+			if activeSkill.skillData.supportBonechill then
+				hasGuaranteedBonechill = true
+				selfModDB:NewMod("SkitterbotBonechill", "FLAG", true, source)
+			end
+		end
+		if skillModList:Flag(nil, "ScorchingSkitterbot") then
+			local effect = data.nonDamagingAilment.Scorch.default * (1 + (skillModList:Sum("INC", { source = "Skill" }, "EnemyScorchEffect") + skitterbotAilmentEffect) / 100)
+			modDB:NewMod("ScorchOverride", "BASE", effect, source)
+			enemyDB:NewMod("Condition:Scorched", "FLAG", true, source)
+			if skillModList:Flag(nil, "SkitterbotAffectPlayer") then
+				selfModDB:NewMod("Scorch", "FLAG", true, source)
+				selfModDB:NewMod("SelfScorchOverride", "BASE", effect, source)
+			end
+		end
+		return true
+	end
+
 	for _, activeSkill in ipairs(env.player.activeSkillList) do
 		if activeSkill.skillTypes[SkillType.Brand] then
 			local attachLimit = m_min(activeSkill.skillModList:Sum("BASE", activeSkill.skillCfg, "BrandsAttachedLimit"), activeSkill.skillModList:Sum("BASE", activeSkill.skillCfg, "ActiveBrandLimit"))
@@ -1637,40 +1737,7 @@ function calcs.perform(env, skipEHP)
 		if activeSkill.skillData.supportBonechill and (activeSkill.skillTypes[SkillType.ChillingArea] or activeSkill.skillTypes[SkillType.NonHitChill] or not activeSkill.skillModList:Flag(nil, "CannotChill")) then
 			output.HasBonechill = true
 		end
-		if activeSkill.activeEffect.grantedEffect.name == "Summon Skitterbots" then
-			local skitterbotAilmentEffect = activeSkill.skillModList:Sum("INC", nil, "SkitterbotAilmentEffect")
-			if not activeSkill.skillModList:Flag(nil, "SkitterbotsCannotShock") then
-				local effect = data.nonDamagingAilment.Shock.default * (1 + (activeSkill.skillModList:Sum("INC", { source = "Skill" }, "EnemyShockEffect") + skitterbotAilmentEffect) / 100)
-				modDB:NewMod("ShockOverride", "BASE", effect, activeSkill.activeEffect.grantedEffect.name)
-				enemyDB:NewMod("Condition:Shocked", "FLAG", true, activeSkill.activeEffect.grantedEffect.name)
-				if activeSkill.skillModList:Flag(nil, "SkitterbotAffectPlayer") then
-					modDB:NewMod("Shock", "FLAG", true, activeSkill.activeEffect.grantedEffect.name)
-					modDB:NewMod("SelfShockOverride", "BASE", effect, activeSkill.activeEffect.grantedEffect.name)
-				end
-			end
-			if not activeSkill.skillModList:Flag(nil, "SkitterbotsCannotChill") then
-				local effect = data.nonDamagingAilment.Chill.default * (1 + (activeSkill.skillModList:Sum("INC", { source = "Skill" }, "EnemyChillEffect") + skitterbotAilmentEffect) / 100)
-				modDB:NewMod("ChillOverride", "BASE", effect, activeSkill.activeEffect.grantedEffect.name)
-				enemyDB:NewMod("Condition:Chilled", "FLAG", true, activeSkill.activeEffect.grantedEffect.name)
-				if activeSkill.skillModList:Flag(nil, "SkitterbotAffectPlayer") then
-					modDB:NewMod("Chill", "FLAG", true, activeSkill.activeEffect.grantedEffect.name)
-					modDB:NewMod("SelfChillOverride", "BASE", effect, activeSkill.activeEffect.grantedEffect.name)
-				end
-				if activeSkill.skillData.supportBonechill then
-					hasGuaranteedBonechill = true
-					modDB:NewMod("SkitterbotBonechill", "FLAG", true, activeSkill.activeEffect.grantedEffect.name)
-				end
-			end
-			if activeSkill.skillModList:Flag(nil, "ScorchingSkitterbot") then
-				local effect = data.nonDamagingAilment.Scorch.default * (1 + (activeSkill.skillModList:Sum("INC", { source = "Skill" }, "EnemyScorchEffect") + skitterbotAilmentEffect) / 100)
-				modDB:NewMod("ScorchOverride", "BASE", effect, activeSkill.activeEffect.grantedEffect.name)
-				enemyDB:NewMod("Condition:Scorched", "FLAG", true, activeSkill.activeEffect.grantedEffect.name)
-				if activeSkill.skillModList:Flag(nil, "SkitterbotAffectPlayer") then
-					modDB:NewMod("Scorch", "FLAG", true, activeSkill.activeEffect.grantedEffect.name)
-					modDB:NewMod("SelfScorchOverride", "BASE", effect, activeSkill.activeEffect.grantedEffect.name)
-				end
-			end
-		elseif activeSkill.skillFlags.guaranteedChill or activeSkill.skillTypes[SkillType.ChillingArea] or (activeSkill.skillTypes[SkillType.NonHitChill] and not activeSkill.skillModList:Flag(nil, "CannotChill")) then
+		if not applySkitterbotAilments(activeSkill, modDB) and (activeSkill.skillFlags.guaranteedChill or activeSkill.skillTypes[SkillType.ChillingArea] or (activeSkill.skillTypes[SkillType.NonHitChill] and not activeSkill.skillModList:Flag(nil, "CannotChill"))) then
 			t_insert(guaranteedChillSkills, activeSkill)
 			enemyDB:NewMod("Condition:Chilled", "FLAG", true, activeSkill.activeEffect.grantedEffect.name)
 			if activeSkill.skillData.supportBonechill then
@@ -3420,6 +3487,7 @@ function calcs.perform(env, skipEHP)
 				enemyDB.conditions.TauntedByMercenary = true
 				mercenaryTauntedEnemy = true
 			end
+			applySkitterbotAilments(activeSkill, mercenary.modDB)
 			for _, buff in ipairs(activeSkill.buffList) do
 				if buff.cond and not skillModList:GetCondition(buff.cond, skillCfg) then
 					-- Nothing!
@@ -4645,30 +4713,16 @@ function calcs.perform(env, skipEHP)
 	end
 
 	calcs.triggers(env, env.player)
-	if not calcs.mirages(env) then
-		calcs.offence(env, env.player, env.player.mainSkill)
-	end
 
-	if env.minion then
-		calcs.defence(env, env.minion)
-		if not skipEHP then
-			calcs.buildDefenceEstimations(env, env.minion)
-		end
-		calcs.triggers(env, env.minion)
-		calcs.offence(env, env.minion, env.minion.mainSkill)
-	end
-
+	local mercEnv
 	if env.mercenary and (env.mercenary.mainSkill or (env.mercenaryMinion and env.mercenaryMinion.mainSkill)) then
-		local mercEnv = assert(env.mercenary.calcEnv, "Mercenary calculation requires Mercenary calculation environment")
+		mercEnv = assert(env.mercenary.calcEnv, "Mercenary calculation requires Mercenary calculation environment")
 		if env.mercenary.mainSkill then
 			calcs.defence(mercEnv, env.mercenary)
 			if not skipEHP then
 				calcs.buildDefenceEstimations(mercEnv, env.mercenary)
 			end
 			calcs.triggers(mercEnv, env.mercenary)
-			if not calcs.mirages(mercEnv) then
-				calcs.offence(mercEnv, env.mercenary, env.mercenary.mainSkill)
-			end
 		end
 		if env.mercenaryMinion and env.mercenaryMinion.mainSkill then
 			-- Mercenary-created minions must run in the Mercenary actor environment so
@@ -4680,14 +4734,63 @@ function calcs.perform(env, skipEHP)
 				calcs.buildDefenceEstimations(mercEnv, env.mercenaryMinion)
 			end
 			calcs.triggers(mercEnv, env.mercenaryMinion)
+		end
+	end
+
+	local function calculatePlayerOffence()
+		if not calcs.mirages(env) then
+			calcs.offence(env, env.player, env.player.mainSkill)
+		end
+	end
+	local function calculateMercenaryOffence()
+		if env.mercenary.mainSkill then
+			if not calcs.mirages(mercEnv) then
+				calcs.offence(mercEnv, env.mercenary, env.mercenary.mainSkill)
+			end
+		end
+		if env.mercenaryMinion and env.mercenaryMinion.mainSkill then
 			calcs.offence(mercEnv, env.mercenaryMinion, env.mercenaryMinion.mainSkill)
 		end
 	end
 
-	-- Hit-by-element conditions for EE are established during offence.
-	-- Empty-hire matches origin: exposure is applied once, before offence.
+	-- HitBy* is written during offence. Apply shared exposure after every EE actor has those flags, then finalize damage.
+	local playerHasEE = actorHasElementalEquilibrium(env.player)
+	local mercHasEE = actorHasElementalEquilibrium(env.mercenary)
 	if env.mercenary then
-		applyElementalExposures()
+		if playerHasEE and mercHasEE then
+			local playerSnap = snapshotActorForOffence(env.player)
+			local minionSnap = snapshotActorForOffence(env.minion)
+			local mercSnap = snapshotActorForOffence(env.mercenary)
+			local mercMinionSnap = snapshotActorForOffence(env.mercenaryMinion)
+			calculatePlayerOffence()
+			calculateMercenaryOffence()
+			applyElementalExposures()
+			restoreActorForOffence(env.player, playerSnap)
+			restoreActorForOffence(env.minion, minionSnap)
+			restoreActorForOffence(env.mercenary, mercSnap)
+			restoreActorForOffence(env.mercenaryMinion, mercMinionSnap)
+			calculatePlayerOffence()
+			calculateMercenaryOffence()
+		elseif playerHasEE then
+			calculatePlayerOffence()
+			applyElementalExposures()
+			calculateMercenaryOffence()
+		else
+			calculateMercenaryOffence()
+			applyElementalExposures()
+			calculatePlayerOffence()
+		end
+	else
+		calculatePlayerOffence()
+	end
+
+	if env.minion then
+		calcs.defence(env, env.minion)
+		if not skipEHP then
+			calcs.buildDefenceEstimations(env, env.minion)
+		end
+		calcs.triggers(env, env.minion)
+		calcs.offence(env, env.minion, env.minion.mainSkill)
 	end
 
 	 -- Export modifiers to enemy conditions and stats for party tab

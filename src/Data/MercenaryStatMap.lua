@@ -635,7 +635,6 @@ return {
 		["tornado_movement_speed_+%"] = true,
 		["total_projectile_spread_angle_override"] = true,
 		["totem_formation_radius_override"] = true,
-		["totem_ignores_cooldown"] = true,
 		["totem_placement_range_+%"] = true,
 		["totems_cannot_evade"] = true,
 		["trap_override_pvp_scaling_time_ms"] = true,

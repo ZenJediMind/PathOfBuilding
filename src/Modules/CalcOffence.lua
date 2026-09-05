@@ -869,6 +869,8 @@ function calcs.offence(env, actor, activeSkill)
 		return not skillModList:Flag(nil, "CannotRepeat") and ((activeSkillTypes[SkillType.Attack] or activeSkillTypes[SkillType.Spell]))
 	end
 	output.Repeats = 1 + (repeatSkillTypesCheck(activeSkill.skillTypes) and skillModList:Sum("BASE", skillCfg, "RepeatCount") or 0)
+	-- Totem attacks ignore recast cooldown; the cooldown remains for placement display.
+	local totemIgnoresCooldown = skillFlags.totem and skillModList:Flag(skillCfg, "TotemIgnoresCooldown")
 	if output.Repeats > 1 then
 		output.RepeatCount = output.Repeats
 		-- handle all the multipliers from Repeats
@@ -2478,7 +2480,9 @@ function calcs.offence(env, actor, activeSkill)
 			end
 			if globalOutput.Cooldown then
 				output.Cooldown = globalOutput.Cooldown
-				output.Speed = m_min(output.Speed, 1 / output.Cooldown * output.Repeats)
+				if not totemIgnoresCooldown then
+					output.Speed = m_min(output.Speed, 1 / output.Cooldown * output.Repeats)
+				end
 			end
 			if output.Cooldown and skillFlags.selfCast then
 				skillFlags.notAverage = true
@@ -2502,7 +2506,7 @@ function calcs.offence(env, actor, activeSkill)
 					{ "%.2f ^8(action speed modifier)", (skillFlags.totem and output.TotemActionSpeed) or (skillFlags.selfCast and globalOutput.ActionSpeedMod) or 1 },
 					total = s_format("= %.2f ^8casts per second", output.CastRate)
 				})
-				if output.Cooldown and (1 / output.Cooldown) < output.CastRate then
+				if output.Cooldown and not totemIgnoresCooldown and (1 / output.Cooldown) < output.CastRate then
 					t_insert(breakdown.Speed, s_format("\n"))
 					t_insert(breakdown.Speed, s_format("1 / %.2f ^8(skill cooldown)", output.Cooldown))
 					if output.Repeats > 1 then
@@ -2531,9 +2535,9 @@ function calcs.offence(env, actor, activeSkill)
 			end
 		elseif skillData.hitTimeMultiplier and output.Time and not skillData.triggeredOnDeath then
 			output.HitTime = output.Time * skillData.hitTimeMultiplier
-			if output.Cooldown and skillData.triggered then
+			if output.Cooldown and not totemIgnoresCooldown and skillData.triggered then
 				output.HitSpeed = 1 / (m_max(output.HitTime, output.Cooldown))
-			elseif output.Cooldown then
+			elseif output.Cooldown and not totemIgnoresCooldown then
 				output.HitSpeed = 1 / (output.HitTime + output.Cooldown)
 			else
 				output.HitSpeed = 1 / output.HitTime
@@ -2612,9 +2616,9 @@ function calcs.offence(env, actor, activeSkill)
 			output.HitSpeed = 1 / output.HitTime
 		elseif skillData.hitTimeMultiplier and output.Time and not skillData.triggeredOnDeath then
 			output.HitTime = output.Time * skillData.hitTimeMultiplier
-			if output.Cooldown and skillData.triggered then
+			if output.Cooldown and not totemIgnoresCooldown and skillData.triggered then
 				output.HitSpeed = 1 / (m_max(output.HitTime, output.Cooldown))
-			elseif output.Cooldown then
+			elseif output.Cooldown and not totemIgnoresCooldown then
 				output.HitSpeed = 1 / (output.HitTime + output.Cooldown)
 			else
 				output.HitSpeed = m_min(1 / output.HitTime, data.misc.ServerTickRate)
@@ -2639,9 +2643,9 @@ function calcs.offence(env, actor, activeSkill)
 			t_insert(breakdown.HitTime, s_format("x %.2f ^8(channel time multiplier)", skillData.hitTimeMultiplier))
 			t_insert(breakdown.HitTime, s_format("= %.2f", output.HitTime))
 			breakdown.HitSpeed = { }
-			if output.Cooldown and skillData.triggered then
+			if output.Cooldown and not totemIgnoresCooldown and skillData.triggered then
 				t_insert(breakdown.HitSpeed, s_format("1 / min(%.2f, %.2f) ^8min(hit time, cooldown)", output.HitTime, output.Cooldown))
-			elseif output.Cooldown then
+			elseif output.Cooldown and not totemIgnoresCooldown then
 				t_insert(breakdown.HitSpeed, s_format("1 / (%.2f + %.2f) ^8(hit time + cooldown)", output.HitTime, output.Cooldown))
 			else
 				t_insert(breakdown.HitSpeed, s_format("1 / %.2f ^8(hit time)", output.HitTime))

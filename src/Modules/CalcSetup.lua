@@ -139,7 +139,7 @@ local function mercenaryItemMod(mod, presenceImplicit)
 	return copy
 end
 
-local function addMercenaryItem(env, mercenary, item, slotName, slotNum)
+local function addMercenaryItem(env, mercenary, item, slotName, slotNum, scale)
 	mercenary.itemList[slotName] = item
 	local emptySockets = { R = 0, G = 0, B = 0, W = 0 }
 	for _, socket in ipairs(item.sockets or { }) do
@@ -164,7 +164,7 @@ local function addMercenaryItem(env, mercenary, item, slotName, slotNum)
 		local presenceImplicit = (presenceImplicitCounts[key] or 0) > 0
 		if presenceImplicit then presenceImplicitCounts[key] = presenceImplicitCounts[key] - 1 end
 		local mod = mercenaryItemMod(itemMod, presenceImplicit)
-		if mod then mercenary.modDB:AddMod(mod) end
+		if mod then mercenary.modDB:ScaleAddMod(mod, scale or 1) end
 	end
 	local rarity = (item.rarity == "UNIQUE" or item.rarity == "RELIC") and "UniqueItem" or item.rarity == "RARE" and "RareItem" or item.rarity == "MAGIC" and "MagicItem" or "NormalItem"
 	mercenary.modDB.multipliers[rarity] = (mercenary.modDB.multipliers[rarity] or 0) + 1
@@ -312,16 +312,31 @@ local function copyModDB(db)
 	return copy
 end
 
-local function parentModDB(db, cached, actor)
+-- Copy cached mods into the live database. Parenting would round MORE in each
+-- store and then multiply, which disagrees with a reconstructed actor.
+local function restoreModDB(db, cached, actor)
 	if not db then
 		return
 	end
 	wipeTable(db.mods)
 	wipeTable(db.conditions)
 	wipeTable(db.multipliers)
-	db.parent = cached
-	db.actor = actor
+	if actor then
+		db.parent = nil
+		db.actor = actor
+	end
+	if cached then
+		db:AddDB(cached)
+		for key, value in pairs(cached.conditions) do
+			db.conditions[key] = value
+		end
+		for key, value in pairs(cached.multipliers) do
+			db.multipliers[key] = value
+		end
+	end
 end
+calcs.copyModDB = copyModDB
+calcs.restoreModDB = restoreModDB
 
 local preservedSkillDataKeys = {
 	"manaReservationPercent", "cooldown", "storedUses", "CritChance",
@@ -380,12 +395,12 @@ local function restoreCachedMercenary(env)
 	if not mercenary or not env.cachedMercenaryModDB then
 		return false
 	end
-	parentModDB(mercenary.modDB, env.cachedMercenaryModDB, mercenary)
+	restoreModDB(mercenary.modDB, env.cachedMercenaryModDB, mercenary)
 	if mercenary.enemySourceDB then
-		parentModDB(mercenary.enemySourceDB, env.cachedMercenaryEnemySourceDB, mercenary)
+		restoreModDB(mercenary.enemySourceDB, env.cachedMercenaryEnemySourceDB, mercenary)
 	end
 	if mercenary.calcEnv and mercenary.calcEnv.itemModDB then
-		parentModDB(mercenary.calcEnv.itemModDB, env.cachedMercenaryItemModDB, mercenary)
+		restoreModDB(mercenary.calcEnv.itemModDB, env.cachedMercenaryItemModDB, mercenary)
 	end
 	mercenary.mainSkill = env.cachedMercenaryMainSkill
 	env.mercenaryMinion = nil
@@ -396,7 +411,7 @@ local function restoreCachedMercenary(env)
 		resetActiveSkillData(mercenary.modDB, skill)
 		local minion = skill.minion
 		if minion and minion.modDB then
-			parentModDB(minion.modDB, env.cachedMercenaryMinionModDBs and env.cachedMercenaryMinionModDBs[index], minion)
+			restoreModDB(minion.modDB, env.cachedMercenaryMinionModDBs and env.cachedMercenaryMinionModDBs[index], minion)
 			for _, minionSkill in ipairs(minion.activeSkillList or { }) do
 				resetActiveSkillData(minion.modDB, minionSkill)
 			end
@@ -646,7 +661,12 @@ function calcs.initMercenary(env)
 				local abyssalSetSlot = itemSet and itemSet[abyssalSlotName]
 				abyssalJewel = abyssalSetSlot and env.build.itemsTab.items[abyssalSetSlot.selItemId]
 			end
-			if abyssalJewel then addMercenaryItem(env, mercenary, abyssalJewel, abyssalSlotName, abyssalSocketIndex) end
+			if abyssalJewel then
+				local parentItem = mercenary.itemList[slotName]
+				if parentItem and parentItem.abyssalSocketCount >= abyssalSocketIndex then
+					addMercenaryItem(env, mercenary, abyssalJewel, abyssalSlotName, abyssalSocketIndex, parentItem.socketedJewelEffectModifier)
+				end
+			end
 		end
 	end
 	for _, passiveName in ipairs(mercenary.modDB:List(nil, "GrantedPassive")) do
@@ -722,7 +742,9 @@ function calcs.initMercenary(env)
 			sourceItem = sourceItem,
 			skillPart = skillPart,
 			skillStageCount = isPrimary and selectedSkill.skillStageCount or nil,
+			skillStageCountCalcs = isPrimary and (selectedSkill.skillStageCountCalcs or selectedSkill.skillStageCount) or nil,
 			skillMineCount = isPrimary and selectedSkill.skillMineCount or nil,
+			skillMineCountCalcs = isPrimary and (selectedSkill.skillMineCountCalcs or selectedSkill.skillMineCount) or nil,
 			skillMinionSkill = isPrimary and selectedSkill.skillMinionSkill or nil,
 			skillMinionSkillCalcs = isPrimary and (selectedSkill.skillMinionSkillCalcs or selectedSkill.skillMinionSkill) or nil,
 			mercenaryPossibleSupportIds = env.data.mercenaries.skills[grantedEffect.id] and env.data.mercenaries.skills[grantedEffect.id].possibleSupportIds,
@@ -1819,7 +1841,7 @@ function calcs.initEnv(build, mode, override, specEnv)
 			local item = items[slotName]
 			if item and item.type == "Flask" then
 				env.itemModDB.conditions["Have"..item.baseName:gsub("%s+", "")] = true
-				if slot.active then
+				if build.itemsTab.activeItemSet[slotName].active then
 					env.flasks[item] = true
 				end
 				local flaskNum = tonumber(slotName:match("Flask (%d+)"))
@@ -1835,7 +1857,7 @@ function calcs.initEnv(build, mode, override, specEnv)
 				end
 				item = nil
 			elseif item and item.type == "Tincture" then
-				if slot.active then
+				if build.itemsTab.activeItemSet[slotName].active then
 					env.tinctures[item] = true
 				end
 				item = nil

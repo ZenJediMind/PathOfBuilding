@@ -1202,4 +1202,23 @@ Note: ~b/o 1 mirror
 		assert.are.equal("PLAYER", MercenaryTools.comparisonActorForItemSet(bossingSet.id, itemsTab))
 		assert.are.equal("PLAYER", itemsTab:ItemCalculationOverride("Helmet", item()).comparisonActor)
 	end)
+
+	it("migrates legacy Slot XML into the fallback item set", function()
+		freshBuild()
+		local itemsTab = build.itemsTab
+		itemsTab:Load({
+			attrib = { useSecondWeaponSet = "false" },
+			{
+				elem = "Item",
+				attrib = { id = "1" },
+				"Rarity: Normal\nIron Hat",
+			},
+			{
+				elem = "Slot",
+				attrib = { name = "Helmet", itemId = "1" },
+			},
+		})
+		assert.are.equal(1, itemsTab.activeItemSet.Helmet.selItemId)
+		assert.are.equal(1, itemsTab.slots.Helmet.selItemId)
+	end)
 end)

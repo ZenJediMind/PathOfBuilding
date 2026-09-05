@@ -6,6 +6,7 @@ describe("Permanent Mercenary calculations", function()
 	local calcs = require("Modules.CalcBase")
 	local configOptions = LoadModule("Modules/ConfigOptions")
 	local configVisibility = LoadModule("Modules/ConfigVisibility")
+	local elementalEquilibriumMod = "Hits that deal Elemental Damage remove Exposure to those Elements and inflict Exposure to other Elements Exposure inflicted this way applies -25% to Resistances"
 	local function equipmentSlot(slotName)
 		return assert(build.mercenaryTab:GetItemSet(true))[slotName]
 	end
@@ -34,6 +35,7 @@ describe("Permanent Mercenary calculations", function()
 	end
 
 	local function configureSkill(skillId, fields)
+		build.data.ensureMercenaries()
 		for buildId, mercBuild in pairs(build.data.mercenaries.builds) do
 			for _, id in ipairs(mercBuild.skillIds or { }) do
 				if id == skillId then
@@ -2745,6 +2747,172 @@ Avatar of Fire
 		assert.is_true(mercDot > 0)
 		fullDPS = calcs.calcFullDPS(build, "CALCULATOR", { })
 		assert.are.near(playerDot + mercDot, fullDPS.dotDPS, 10 ^ -4)
+	end)
+
+	it("does not cap totem attack rate by mercenary recast cooldown", function()
+		configureSkill("VaalAncestralWarchiefMercenary")
+		local env = calculate()
+		assert.is_table(env.mercenary, table.concat(env.mercenaryCalculationErrors or { }, "\n"))
+		assert.is_true(env.mercenary.mainSkill.skillModList:Flag(env.mercenary.mainSkill.skillCfg, "TotemIgnoresCooldown"))
+		assert.is_true((env.mercenary.output.Cooldown or 0) > 0)
+		assert.is_true(env.mercenary.output.Speed > 1 / env.mercenary.output.Cooldown + 0.05)
+	end)
+
+	it("keeps player flask activation while viewing another item set", function()
+		configure("TrapsMinesShadow", "TrapsMinesShadowLightning", "LightningTrapMercenary")
+		local granite = new("Item"):Item("Rarity: Magic\nChemist's Granite Flask of the Opossum\n12% increased Movement Speed during Effect")
+		build.itemsTab:AddItem(granite, true)
+		build.itemsTab.activeItemSet["Flask 1"].selItemId = granite.id
+		build.itemsTab.activeItemSet["Flask 1"].active = true
+		build.itemsTab.slots["Flask 1"].selItemId = granite.id
+		build.itemsTab.slots["Flask 1"].active = true
+		local env = calculate()
+		assert.is_true(env.player.modDB.conditions.UsingGraniteFlask)
+		local mercSet = assert(build.mercenaryTab:GetItemSet(true))
+		assert(build.itemsTab:SetViewItemSet(mercSet.id))
+		assert.is_not_true(build.itemsTab.slots["Flask 1"].active)
+		assert.is_true(build.itemsTab.activeItemSet["Flask 1"].active)
+		env = calculate()
+		assert.is_true(env.player.modDB.conditions.UsingGraniteFlask)
+	end)
+
+	it("applies mercenary Elemental Equilibrium before player damage", function()
+		configure("MeleeAOEMarauder", "MeleeAOEMarauderFireSlam", "TectonicSlamFireMercenary")
+		build.skillsTab:PasteSocketGroup("Arc 20/0  1")
+		local env = calculate()
+		assert.is_table(env.mercenary, table.concat(env.mercenaryCalculationErrors or { }, "\n"))
+		local withoutEE = env.player.output.TotalDPS
+		local configSet = build.configTab.configSets[build.configTab.activeConfigSetId]
+		build.configTab:EnsureActorConfig(configSet)
+		configSet.actors.mercenary.customModsList[1].text = elementalEquilibriumMod
+		env = calculate()
+		assert.is_true(env.mercenary.enemySourceDB:GetCondition("HitByFireDamage"))
+		assert.is_true(env.enemyDB:Flag(nil, "Condition:HasLightningExposure") or env.enemy.modDB.conditions.HasLightningExposure)
+		assert.is_true(env.player.output.TotalDPS > withoutEE)
+	end)
+
+	it("applies player Elemental Equilibrium before mercenary damage", function()
+		configure("MeleeAOEMarauder", "MeleeAOEMarauderFireSlam", "TectonicSlamFireMercenary", { includeInFullDPS = true })
+		build.skillsTab:PasteSocketGroup("Arc 20/0  1")
+		build.skillsTab.socketGroupList[#build.skillsTab.socketGroupList].includeInFullDPS = true
+		local env = calculate()
+		assert.is_table(env.mercenary, table.concat(env.mercenaryCalculationErrors or { }, "\n"))
+		local withoutEE = env.mercenary.output.TotalDPS
+		local fullWithoutEE = env.player.output.FullDPS
+		allocate("Elemental Equilibrium")
+		env = calculate()
+		assert.is_true(env.player.enemySourceDB:GetCondition("HitByLightningDamage"))
+		assert.is_true(env.enemyDB:Flag(nil, "Condition:HasFireExposure") or env.enemy.modDB.conditions.HasFireExposure)
+		local automaticDPS = env.mercenary.output.TotalDPS
+		local automaticFull = env.player.output.FullDPS
+		local automaticFireResist = env.enemyDB:Sum("BASE", nil, "FireResist")
+		assert.is_true(automaticDPS > withoutEE)
+		assert.is_true(automaticFull > fullWithoutEE)
+		local configSet = build.configTab.configSets[build.configTab.activeConfigSetId]
+		build.configTab:EnsureActorConfig(configSet)
+		configSet.input.enemyConditionHitByLightningDamage = true
+		env = calculate()
+		assert.are.near(automaticDPS, env.mercenary.output.TotalDPS, 10 ^ -4)
+		assert.are.near(automaticFull, env.player.output.FullDPS, 10 ^ -4)
+		assert.are.equal(automaticFireResist, env.enemyDB:Sum("BASE", nil, "FireResist"))
+	end)
+
+	it("keeps minion skills when both actors have Elemental Equilibrium", function()
+		configureSkill("SSMSkeletalBossMercenary", { includeInFullDPS = true })
+		table.insert(build.mercenaryTab.profile.skills, { id = "SSMPaganBishopMercenary", enabled = true, includeInFullDPS = true, count = 1, supports = { } })
+		build.mercenaryTab:Changed()
+		build.skillsTab:PasteSocketGroup("Summon Raging Spirit 20/0  1")
+		build.skillsTab.socketGroupList[#build.skillsTab.socketGroupList].includeInFullDPS = true
+		allocate("Elemental Equilibrium")
+		local configSet = build.configTab.configSets[build.configTab.activeConfigSetId]
+		build.configTab:EnsureActorConfig(configSet)
+		configSet.actors.mercenary.customModsList[1].text = elementalEquilibriumMod
+		local env = calculate()
+		assert.is_table(env.mercenary, table.concat(env.mercenaryCalculationErrors or { }, "\n"))
+		assert.is_table(env.player.mainSkill.minion)
+		assert.are.equal(env.minion, env.player.mainSkill.minion)
+		assert.is_true(#env.player.mainSkill.minion.activeSkillList > 0)
+		assert.is_table(env.mercenary.mainSkill.minion)
+		assert.are.equal(env.mercenaryMinion, env.mercenary.mainSkill.minion)
+		assert.is_true(#env.mercenary.mainSkill.minion.activeSkillList > 0)
+		calcs.buildOutput(build, "MAIN")
+	end)
+
+	it("does not accumulate Ball Lightning hits when both actors have Elemental Equilibrium", function()
+		configure("TrapsMinesShadow", "TrapsMinesShadowLightning", "LightningTrapMercenary")
+		build.skillsTab:PasteSocketGroup("Ball Lightning 20/0  1")
+		build.skillsTab.socketGroupList[1].gemList[1].skillPart = 2
+		allocate("Elemental Equilibrium")
+		local env = calculate()
+		assert.is_table(env.mercenary, table.concat(env.mercenaryCalculationErrors or { }, "\n"))
+		local single = env.player.output.TotalDPS
+		local configSet = build.configTab.configSets[build.configTab.activeConfigSetId]
+		build.configTab:EnsureActorConfig(configSet)
+		configSet.actors.mercenary.customModsList[1].text = elementalEquilibriumMod
+		env = calculate()
+		assert.are.near(single, env.player.output.TotalDPS, 10 ^ -4)
+	end)
+
+	it("applies mercenary Skitterbot shock and chill to the shared enemy", function()
+		configure("TrapsMinesShadow", "TrapsMinesShadowLightning", "SummonSkitterbotsMercenary")
+		local env = calculate()
+		assert.is_table(env.mercenary, table.concat(env.mercenaryCalculationErrors or { }, "\n"))
+		assert.is_true(env.enemyDB:GetCondition("Shocked") or env.enemyDB:Flag(nil, "Condition:Shocked") or env.enemy.modDB.conditions.Shocked)
+		assert.is_true(env.enemyDB:GetCondition("Chilled") or env.enemyDB:Flag(nil, "Condition:Chilled") or env.enemy.modDB.conditions.Chilled)
+		assert.is_true((env.player.output.CurrentShock or 0) > 0)
+		assert.is_true((env.player.output.CurrentChill or 0) > 0)
+	end)
+
+	it("scales mercenary abyss jewels by the parent item's socketed effect", function()
+		allocate("Legendary Belts")
+		configure("TrapsMinesShadow", "TrapsMinesShadowLightning", "LightningTrapMercenary")
+		local mercSet = assert(build.mercenaryTab:GetItemSet(true))
+		local belt = new("Item"):Item([[Rarity: UNIQUE
+Darkness Enthroned
+Stygian Vise
+Has 1 Abyssal Socket
+Has 1 Abyssal Socket
+{range:1}(50-100)% increased Effect of Socketed Abyss Jewels]])
+		local jewel = new("Item"):Item([[Rarity: Rare
+Life Eye
+Ghastly Eye Jewel
++40 to maximum Life]])
+		build.itemsTab:AddItem(belt, true)
+		build.itemsTab:AddItem(jewel, true)
+		assert.are.equal(2, belt.socketedJewelEffectModifier)
+		mercSet.Belt.selItemId = belt.id
+		local env = calculate()
+		assert.is_table(env.mercenary, table.concat(env.mercenaryCalculationErrors or { }, "\n"))
+		local lifeWithoutJewel = env.mercenary.modDB:Sum("BASE", nil, "Life")
+		mercSet["Belt Abyssal Socket 1"].selItemId = jewel.id
+		env = calculate()
+		assert.are.equal(lifeWithoutJewel + 80, env.mercenary.modDB:Sum("BASE", nil, "Life"))
+		assert.is_not_nil(env.mercenary.itemList["Belt Abyssal Socket 1"])
+	end)
+
+	it("uses configured Flameblast stages in both MAIN and CALCS", function()
+		configureSkill("FlameblastMercenary")
+		build.mercenaryTab.profile.skills[1].skillStageCount = 1
+		build.mercenaryTab:Changed()
+		local env = calculate()
+		assert.is_table(env.mercenary, table.concat(env.mercenaryCalculationErrors or { }, "\n"))
+		local function stageAfterFirst(actorEnv)
+			return actorEnv.mercenary.mainSkill.skillModList:Sum("BASE", nil, "Multiplier:FlameblastStageAfterFirst")
+		end
+		assert.are.equal(0, stageAfterFirst(env))
+		assert.are.equal(0, stageAfterFirst(build.calcsTab.calcsEnv))
+	end)
+
+	it("restores cached Mercenary MORE without a parent rounding split", function()
+		configure("TrapsMinesShadow", "TrapsMinesShadowLightning", "LightningTrapMercenary", { includeInFullDPS = true })
+		local configSet = build.configTab.configSets[build.configTab.activeConfigSetId]
+		build.configTab:EnsureActorConfig(configSet)
+		configSet.actors.mercenary.customModsList[1].text = "8% more Damage\n8% more Damage"
+		build.skillsTab:PasteSocketGroup("Arc 20/0  1")
+		build.skillsTab.socketGroupList[#build.skillsTab.socketGroupList].includeInFullDPS = true
+		local env = calculate()
+		assert.is_table(env.mercenary, table.concat(env.mercenaryCalculationErrors or { }, "\n"))
+		assertCachedMercenaryFullDPSMatchesRebuild()
 	end)
 
 	it("calculates every selectable exported inherent skill and support without runtime errors", function()

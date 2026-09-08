@@ -43,8 +43,9 @@ end
 -- Reverts the current state to the previous undo state
 function UndoHandlerClass:Undo()
 	if self.undo[2] then
-		t_insert(self.redo, 1, t_remove(self.undo, 1))
-		self:RestoreUndoState(t_remove(self.undo, 1))
+		local after = t_remove(self.undo, 1)
+		t_insert(self.redo, 1, after)
+		self:RestoreUndoState(t_remove(self.undo, 1), after)
 		self:AddUndoState(true)
 	end
 end

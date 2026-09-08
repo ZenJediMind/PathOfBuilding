@@ -18,6 +18,7 @@ local m_modf = math.modf
 local buySimilar = require("Classes.CompareBuySimilar")
 local addImplicit = require("Modules.AddImplicitPopup")
 local gemTooltip = require("Classes.GemTooltip")
+local MercenaryTools = require("Modules.MercenaryTools")
 
 local rarityDropList = {
 	{ label = colorCodes.NORMAL.."Normal", rarity = "NORMAL" },
@@ -109,7 +110,7 @@ function ItemsTabClass:ItemsTab(build)
 
 	-- Set selector
 	self.controls.setSelect = new("DropDownControl"):DropDownControl({"TOPLEFT",self,"TOPLEFT"}, {96, 8, 216, 20}, nil, function(index, value)
-		self:SetActiveItemSet(self.itemSetOrderList[index])
+		self:SetViewItemSet(self.itemSetOrderList[index])
 		self:AddUndoState()
 	end)
 	self.controls.setSelect.enableDroppedWidth = true
@@ -122,7 +123,7 @@ function ItemsTabClass:ItemsTab(build)
 			self:AddItemSetTooltip(tooltip, self.itemSets[self.itemSetOrderList[index]])
 		end
 	end
-	self.controls.setLabel = new("LabelControl"):LabelControl({"RIGHT",self.controls.setSelect,"LEFT"}, {-2, 0, 0, 16}, "^7Item set:")
+	self.controls.setLabel = new("LabelControl"):LabelControl({"RIGHT",self.controls.setSelect,"LEFT"}, {-2, 0, 0, 16}, "^7View item set:")
 	self.controls.setManage = new("ButtonControl"):ButtonControl({"LEFT",self.controls.setSelect,"RIGHT"}, {4, 0, 90, 20}, "Manage...", function()
 		self:OpenItemSetManagePopup()
 	end)
@@ -157,13 +158,13 @@ function ItemsTabClass:ItemsTab(build)
 			-- Add alternate weapon slot
 			slot.weaponSet = 1
 			slot.shown = function()
-				return not self.activeItemSet.useSecondWeaponSet
+				return not self:GetVisibleItemSet().useSecondWeaponSet
 			end
 			local swapSlot = new("ItemSlotControl"):ItemSlotControl({"TOPLEFT",prevSlot,"BOTTOMLEFT"}, 0, 2, self, slotName.." Swap", slotName)
 			addSlot(swapSlot)
 			swapSlot.weaponSet = 2
 			swapSlot.shown = function()
-				return self.activeItemSet.useSecondWeaponSet
+				return self:GetVisibleItemSet().useSecondWeaponSet
 			end
 			for i = 1, 6 do
 				local abyssal = new("ItemSlotControl"):ItemSlotControl({"TOPLEFT",prevSlot,"BOTTOMLEFT"}, 0, 2, self, slotName.." Swap Abyssal Socket "..i, "Abyssal #"..i)
@@ -171,7 +172,7 @@ function ItemsTabClass:ItemsTab(build)
 				abyssal.parentSlot = swapSlot
 				abyssal.weaponSet = 2
 				abyssal.shown = function()
-					return not abyssal.inactive and self.activeItemSet.useSecondWeaponSet
+					return not abyssal.inactive and self:GetVisibleItemSet().useSecondWeaponSet
 				end
 				swapSlot.abyssalSocketList[i] = abyssal
 			end
@@ -193,7 +194,7 @@ function ItemsTabClass:ItemsTab(build)
 				if slotName:match("Weapon") then
 					abyssal.weaponSet = 1
 					abyssal.shown = function()
-						return not abyssal.inactive and not self.activeItemSet.useSecondWeaponSet
+						return not abyssal.inactive and not self:GetVisibleItemSet().useSecondWeaponSet
 					end
 				end
 				slot.abyssalSocketList[i] = abyssal
@@ -234,47 +235,20 @@ function ItemsTabClass:ItemsTab(build)
 	end
 	self.controls.slotHeader = new("LabelControl"):LabelControl({"BOTTOMLEFT",self.slotAnchor,"TOPLEFT"}, {0, -4, 0, 16}, "^7Equipped items:")
 	self.controls.weaponSwap1 = new("ButtonControl"):ButtonControl({"BOTTOMRIGHT",self.slotAnchor,"TOPRIGHT"}, {-20, -2, 18, 18}, "I", function()
-		if self.activeItemSet.useSecondWeaponSet then
-			self.activeItemSet.useSecondWeaponSet = false
-			self:AddUndoState()
-			self.build.buildFlag = true
-			local mainSocketGroup = self.build.skillsTab.socketGroupList[self.build.mainSocketGroup]
-			if mainSocketGroup and mainSocketGroup.slot and self.slots[mainSocketGroup.slot].weaponSet == 2 then
-				for index, socketGroup in ipairs(self.build.skillsTab.socketGroupList) do
-					if socketGroup.slot and self.slots[socketGroup.slot].weaponSet == 1 then
-						self.build.mainSocketGroup = index
-						break
-					end
-				end
-			end
-		end
+		self:SetVisibleWeaponSet(false)
 	end)
 	self.controls.weaponSwap1.overSizeText = 3
 	self.controls.weaponSwap1.locked = function()
-		return not self.activeItemSet.useSecondWeaponSet
+		return not self:GetVisibleItemSet().useSecondWeaponSet
 	end
 	self.controls.weaponSwap2 = new("ButtonControl"):ButtonControl({"BOTTOMRIGHT",self.slotAnchor,"TOPRIGHT"}, {0, -2, 18, 18}, "II", function()
-		if not self.activeItemSet.useSecondWeaponSet then
-			self.activeItemSet.useSecondWeaponSet = true
-			self:AddUndoState()
-			self.build.buildFlag = true
-			local mainSocketGroup = self.build.skillsTab.socketGroupList[self.build.mainSocketGroup]
-			if mainSocketGroup and mainSocketGroup.slot and self.slots[mainSocketGroup.slot].weaponSet == 1 then
-				for index, socketGroup in ipairs(self.build.skillsTab.socketGroupList) do
-					if socketGroup.slot and self.slots[socketGroup.slot].weaponSet == 2 then
-						self.build.mainSocketGroup = index
-						break
-					end
-				end
-			end
-		end
+		self:SetVisibleWeaponSet(true)
 	end)
 	self.controls.weaponSwap2.overSizeText = 3
 	self.controls.weaponSwap2.locked = function()
-		return self.activeItemSet.useSecondWeaponSet
+		return self:GetVisibleItemSet().useSecondWeaponSet
 	end
 	self.controls.weaponSwapLabel = new("LabelControl"):LabelControl({"RIGHT",self.controls.weaponSwap1,"LEFT"}, {-4, 0, 0, 14}, "^7Weapon Set:")
-
 	-- All items list
 	if main.portraitMode then
 		self.controls.itemList = new("ItemListControl"):ItemListControl({"TOPRIGHT",self.lastSlot,"BOTTOMRIGHT"}, {0, 0, 360, 308}, self, true)
@@ -1205,6 +1179,8 @@ holding Shift will put it in the second.]])
 	-- Initialise item sets
 	self.itemSets = { }
 	self.itemSetOrderList = { 1 }
+	self.nextItemSetId = 1
+	self.nextItemId = 1
 	self:NewItemSet(1)
 	self:SetActiveItemSet(1)
 
@@ -1215,8 +1191,13 @@ end
 
 function ItemsTabClass:Load(xml, dbFileName)
 	self.activeItemSetId = 0
+	self.viewItemSetId = nil
+	self.viewItemSet = nil
+	self.viewComparisonActor = nil
 	self.itemSets = { }
 	self.itemSetOrderList = { }
+	self.nextItemSetId = 1
+	self.nextItemId = 1
 	self.tradeQuery.statSortSelectionList = { }
 	for _, node in ipairs(xml) do
 		if node.elem == "Item" then
@@ -1284,10 +1265,11 @@ function ItemsTabClass:Load(xml, dbFileName)
 			for _, child in ipairs(node) do
 				if child.elem == "Slot" then
 					local slotName = child.attrib.name or ""
-					if itemSet[slotName] then
-						itemSet[slotName].selItemId = tonumber(child.attrib.itemId)
-						itemSet[slotName].active = child.attrib.active == "true"
-						itemSet[slotName].pbURL = child.attrib.itemPbURL or ""
+					local itemSlot = itemSet[slotName]
+					if itemSlot then
+						itemSlot.selItemId = tonumber(child.attrib.itemId) or 0
+						itemSlot.active = child.attrib.active == "true"
+						itemSlot.pbURL = child.attrib.itemPbURL or ""
 					end
 				elseif child.elem == "SocketIdURL" then
 					local id = tonumber(child.attrib.nodeId)
@@ -1314,15 +1296,30 @@ function ItemsTabClass:Load(xml, dbFileName)
 			end
 		end
 	end
+	local savedActiveItemSetId = tonumber(xml.attrib.activeItemSet)
 	if not self.itemSetOrderList[1] then
-		self.activeItemSet = self:NewItemSet(1)
-		self.activeItemSet.useSecondWeaponSet = xml.attrib.useSecondWeaponSet == "true"
-		self.itemSetOrderList[1] = 1
+		local itemSet = self:NewItemSet(1)
+		itemSet.useSecondWeaponSet = xml.attrib.useSecondWeaponSet == "true"
+		-- Legacy <Slot> values lived on the UI controls; copy them into the new set.
+		for _, slot in ipairs(self.orderedSlots) do
+			if not slot.nodeId then
+				itemSet[slot.slotName].selItemId = slot.selItemId or 0
+				itemSet[slot.slotName].active = slot.active
+			end
+		end
+		t_insert(self.itemSetOrderList, itemSet.id)
 	end
-	self:SetActiveItemSet(tonumber(xml.attrib.activeItemSet) or 1)
+	local activeItemSetId = savedActiveItemSetId
+	if not self.itemSets[activeItemSetId] then
+		activeItemSetId = self.itemSetOrderList[1]
+	end
+	self.skipConfigItemSetSync = true
+	self:SetActiveItemSet(activeItemSetId)
+	self.skipConfigItemSetSync = false
 	if xml.attrib.showStatDifferences then
 		self.showStatDifferences = xml.attrib.showStatDifferences == "true"
 	end
+	self:RefreshAllocIds()
 	self:ResetUndo()
 end
 
@@ -1384,13 +1381,17 @@ function ItemsTabClass:Save(xml)
 	for _, itemSetId in ipairs(self.itemSetOrderList) do
 		local itemSet = self.itemSets[itemSetId]
 		local child = { elem = "ItemSet", attrib = { id = tostring(itemSetId), title = itemSet.title, useSecondWeaponSet = tostring(itemSet.useSecondWeaponSet) } }
-		for slotName, slot in pairs(self.slots) do
+		for _, slot in ipairs(self.orderedSlots) do
 			if not slot.nodeId then
-				t_insert(child, { elem = "Slot", attrib = { name = slotName, itemId = tostring(itemSet[slotName].selItemId), itemPbURL = itemSet[slotName].pbURL or "", active = itemSet[slotName].active and "true" }})
-			else
-				if self.build.spec.allocNodes[slot.nodeId] then
-					t_insert(child, { elem = "SocketIdURL", attrib = { name = slotName, nodeId = tostring(slot.nodeId), itemPbURL = itemSet[slot.nodeId] and itemSet[slot.nodeId].pbURL or ""}})
+				local itemSlot = itemSet[slot.slotName]
+				if itemSlot then
+					t_insert(child, { elem = "Slot", attrib = { name = slot.slotName, itemId = tostring(itemSlot.selItemId), itemPbURL = itemSlot.pbURL or "", active = itemSlot.active and "true" }})
 				end
+			end
+		end
+		for _, slot in ipairs(self.orderedSlots) do
+			if slot.nodeId and self.build.spec.allocNodes[slot.nodeId] then
+				t_insert(child, { elem = "SocketIdURL", attrib = { name = slot.slotName, nodeId = tostring(slot.nodeId), itemPbURL = itemSet[slot.nodeId] and itemSet[slot.nodeId].pbURL or ""}})
 			end
 		end
 		t_insert(xml, child)
@@ -1515,8 +1516,9 @@ function ItemsTabClass:Draw(viewPort, inputEvents)
 	local newItemList = { }
 	for index, itemSetId in ipairs(self.itemSetOrderList) do
 		local itemSet = self.itemSets[itemSetId]
-		t_insert(newItemList, itemSet.title or "Default")
-		if itemSetId == self.activeItemSetId then
+		local title = itemSet.title or "Default"
+		t_insert(newItemList, title)
+		if itemSetId == self.viewItemSetId then
 			self.controls.setSelect.selIndex = index
 		end
 	end
@@ -1569,58 +1571,184 @@ function ItemsTabClass:Draw(viewPort, inputEvents)
 	self.controls.specSelect:SetList(self.build.treeTab:GetSpecList())
 end
 
+function ItemsTabClass:GetPlayerItemSetOrderList()
+	local playerSets = { }
+	for _, itemSetId in ipairs(self.itemSetOrderList) do
+		-- Skip the auto-created auxiliary Mercenary equipment set, not any set
+		-- the Mercenary happens to be wearing.
+		if not MercenaryTools.isAuxiliaryMercenaryItemSet(itemSetId, self) then
+			t_insert(playerSets, itemSetId)
+		end
+	end
+	return playerSets
+end
+
+function ItemsTabClass:GetVisibleItemSet()
+	return self.viewItemSet
+end
+
+-- Changes weapon set I/II on the currently viewed item set.
+-- The player's selected main skill only follows this change when that set is actually equipped.
+function ItemsTabClass:SetVisibleWeaponSet(useSecond)
+	local visibleItemSet = self:GetVisibleItemSet()
+	if not visibleItemSet then
+		return
+	end
+	local wantSecond = useSecond and true or false
+	if (visibleItemSet.useSecondWeaponSet and true or false) == wantSecond then
+		return
+	end
+	visibleItemSet.useSecondWeaponSet = wantSecond
+	self:AddUndoState()
+	self.build.buildFlag = true
+	if visibleItemSet ~= self.activeItemSet then
+		return
+	end
+	local fromSet = useSecond and 1 or 2
+	local toSet = useSecond and 2 or 1
+	local mainSocketGroup = self.build.skillsTab.socketGroupList[self.build.mainSocketGroup]
+	local fromSlot = mainSocketGroup and mainSocketGroup.slot and self.slots[mainSocketGroup.slot]
+	if fromSlot and fromSlot.weaponSet == fromSet then
+		for index, socketGroup in ipairs(self.build.skillsTab.socketGroupList) do
+			local toSlot = socketGroup.slot and self.slots[socketGroup.slot]
+			if toSlot and toSlot.weaponSet == toSet then
+				self.build.mainSocketGroup = index
+				break
+			end
+		end
+	end
+end
+
+function ItemsTabClass:IsItemSetReferenced(itemSetId)
+	local mercenaryTab = self.build.mercenaryTab
+	if mercenaryTab and mercenaryTab.itemSetId == itemSetId then
+		return true
+	end
+	for _, profile in pairs(mercenaryTab and mercenaryTab.mercenarySets or { }) do
+		if profile.itemSetId == itemSetId then
+			return true
+		end
+	end
+	return self.build.skillsTab and self.build.skillsTab:UsesItemSet(itemSetId) or false
+end
+
+-- Session-monotonic IDs: never reuse a deleted item or item-set ID until
+-- the tab is reloaded. Ordinary Items undo can then reinsert preserved
+-- Mercenary sets by ID without remapping references.
+local function maxNumericId(map)
+	local maxId = 0
+	for id in pairs(map) do
+		if type(id) == "number" and id > maxId then
+			maxId = id
+		end
+	end
+	return maxId
+end
+
+function ItemsTabClass:NoteItemSetId(id)
+	if type(id) == "number" and id >= (self.nextItemSetId or 1) then
+		self.nextItemSetId = id + 1
+	end
+end
+
+function ItemsTabClass:NoteItemId(id)
+	if type(id) == "number" and id >= (self.nextItemId or 1) then
+		self.nextItemId = id + 1
+	end
+end
+
+function ItemsTabClass:RefreshAllocIds()
+	self:NoteItemSetId(maxNumericId(self.itemSets))
+	self:NoteItemId(maxNumericId(self.items))
+end
+
+function ItemsTabClass:AllocItemSetId()
+	local id = self.nextItemSetId or 1
+	while self.itemSets[id] do
+		id = id + 1
+	end
+	self.nextItemSetId = id + 1
+	return id
+end
+
+function ItemsTabClass:AllocItemId()
+	local id = self.nextItemId or 1
+	while self.items[id] do
+		id = id + 1
+	end
+	self.nextItemId = id + 1
+	return id
+end
+
 -- Creates a new item set
 function ItemsTabClass:NewItemSet(itemSetId)
 	local itemSet = { id = itemSetId }
 	if not itemSetId then
-		itemSet.id = 1
-		while self.itemSets[itemSet.id] do
-			itemSet.id = itemSet.id + 1
-		end
+		itemSet.id = self:AllocItemSetId()
+	else
+		self:NoteItemSetId(itemSetId)
 	end
-	for slotName, slot in pairs(self.slots) do
+	for _, slot in ipairs(self.orderedSlots) do
 		if not slot.nodeId then
-			itemSet[slotName] = { selItemId = 0 }
+			itemSet[slot.slotName] = { selItemId = 0 }
 		end
 	end
 	self.itemSets[itemSet.id] = itemSet
 	return itemSet
 end
 
--- Changes the active item set
-function ItemsTabClass:SetActiveItemSet(itemSetId)
-	local prevSet = self.activeItemSet
-	if not self.itemSets[itemSetId] then
-		itemSetId = self.itemSetOrderList[1]
+function ItemsTabClass:ItemCalculationOverride(slotName, item)
+	return MercenaryTools.itemCalculationOverride(self.viewItemSetId, slotName, item, self)
+end
+
+function ItemsTabClass:SetViewItemSet(itemSetId, comparisonActor)
+	local itemSet = self.itemSets[itemSetId]
+	if not itemSet then
+		return false
 	end
-	self.activeItemSetId = itemSetId
-	self.activeItemSet = self.itemSets[itemSetId]
-	local curSet = self.activeItemSet
-	for slotName, slot in pairs(self.slots) do
-		if not slot.nodeId then
-			if prevSet then
-				-- Update the previous set
-				prevSet[slotName].selItemId = slot.selItemId
-				prevSet[slotName].active = slot.active
-			end
-			-- Equip the incoming set's item
-			slot.selItemId = curSet[slotName].selItemId
-			slot.active = curSet[slotName].active
-			if slot.controls.activate then
-				slot.controls.activate.state = slot.active
-			end
-		end
+	self.viewItemSetId = itemSet.id
+	self.viewItemSet = itemSet
+	if comparisonActor == "MERCENARY" or comparisonActor == "PLAYER" then
+		self.viewComparisonActor = comparisonActor
+	else
+		self.viewComparisonActor = nil
 	end
 	self.build.buildFlag = true
 	self:PopulateSlots()
+	self:UpdateSockets()
+	return true
+end
+
+-- Changes the active player item set. Missing IDs are rejected.
+-- Pass changeView == false to equip without switching the Items tab's viewed set.
+function ItemsTabClass:SetActiveItemSet(itemSetId, changeView)
+	local itemSet = self.itemSets[itemSetId]
+	if not itemSet then
+		return false
+	end
+	self.activeItemSetId = itemSetId
+	self.activeItemSet = itemSet
+	if changeView ~= false then
+		self.viewItemSetId = itemSetId
+		self.viewItemSet = itemSet
+		self.viewComparisonActor = nil
+	end
+	if self.build.configTab and not self.skipConfigItemSetSync then
+		self.build.configTab:SyncActorItemSet("player", itemSetId)
+	end
+	self.build.buildFlag = true
+	self:PopulateSlots()
+	self:UpdateSockets()
 	self.build:SyncLoadouts()
+	return true
 end
 
 -- Equips the given item in the given item set
 function ItemsTabClass:EquipItemInSet(item, itemSetId)
 	local itemSet = self.itemSets[itemSetId]
 	local slotName = item:GetPrimarySlot()
-	if self.slots[slotName].weaponSet == 1 and itemSet.useSecondWeaponSet then
+	local slot = self.slots[slotName]
+	if slot and slot.weaponSet == 1 and itemSet.useSecondWeaponSet then
 		-- Redirect to second weapon set
 		slotName = slotName .. " Swap"
 	end
@@ -1635,12 +1763,14 @@ function ItemsTabClass:EquipItemInSet(item, itemSetId)
 			slotName = altSlot
 		end
 	end
-	if itemSet == self.activeItemSet then
-		self.slots[slotName]:SetSelItemId(item.id)
+	if itemSet == self:GetVisibleItemSet() and self.slots[slotName] then
+		self.slots[slotName]:SetSelItemId(item.id, itemSet)
 	else
-		itemSet[slotName].selItemId = item.id
-		if itemSet[altSlot].selItemId ~= 0 and not self:IsItemValidForSlot(self.items[itemSet[altSlot].selItemId], altSlot, itemSet) then
-			itemSet[altSlot].selItemId = 0
+		local itemSlot = itemSet[slotName]
+		if itemSlot then itemSlot.selItemId = item.id end
+		local altItemSlot = itemSet[altSlot]
+		if altItemSlot and altItemSlot.selItemId ~= 0 and not self:IsItemValidForSlot(self.items[altItemSlot.selItemId], altSlot, itemSet) then
+			altItemSlot.selItemId = 0
 		end
 	end
 	self:PopulateSlots()
@@ -1657,6 +1787,8 @@ end
 
 -- Updates the status and position of the socket controls
 function ItemsTabClass:UpdateSockets()
+	self.lastSlot = self.slots[baseSlots[#baseSlots]]
+	if not self.build.spec then return end
 	-- Build a list of active sockets
 	local activeSocketList = { }
 	for nodeId, slot in pairs(self.sockets) do
@@ -1670,7 +1802,6 @@ function ItemsTabClass:UpdateSockets()
 	table.sort(activeSocketList)
 
 	-- Update the state of the active socket controls
-	self.lastSlot = self.slots[baseSlots[#baseSlots]]
 	for index, nodeId in ipairs(activeSocketList) do
 		self.sockets[nodeId].label = "Socket #"..index
 		self.lastSlot = self.sockets[nodeId]
@@ -1685,11 +1816,7 @@ end
 -- Adds the given item to the build's item list
 function ItemsTabClass:AddItem(item, noAutoEquip, index)
 	if not item.id then
-		-- Find an unused item ID
-		item.id = 1
-		while self.items[item.id] do
-			item.id = item.id + 1
-		end
+		item.id = self:AllocItemId()
 
 		if index then
 			t_insert(self.itemOrderList, index, item.id)
@@ -1700,13 +1827,16 @@ function ItemsTabClass:AddItem(item, noAutoEquip, index)
 
 		if not noAutoEquip then
 			-- Autoequip it
+			local visibleItemSet = self:GetVisibleItemSet()
 			for _, slot in ipairs(self.orderedSlots) do
-				if not slot.nodeId and slot.selItemId == 0 and slot:IsShown() and self:IsItemValidForSlot(item, slot.slotName) then
-					slot:SetSelItemId(item.id)
+				if not slot.nodeId and slot.selItemId == 0 and slot:IsShown() and self:IsItemValidForSlot(item, slot.slotName, visibleItemSet) then
+					slot:SetSelItemId(item.id, visibleItemSet)
 					break
 				end
 			end
 		end
+	else
+		self:NoteItemId(item.id)
 	end
 
 	-- Add it to the list
@@ -1857,13 +1987,14 @@ end
 function ItemsTabClass:DeleteItem(item, deferUndoState)
 	for slotName, slot in pairs(self.slots) do
 		if slot.selItemId == item.id then
-			slot:SetSelItemId(0)
+			slot.selItemId = 0
 			self.build.buildFlag = true
 		end
 		if not slot.nodeId then
 			for _, itemSet in pairs(self.itemSets) do
-				if itemSet[slotName].selItemId == item.id then
-					itemSet[slotName].selItemId = 0
+				local itemSlot = itemSet[slotName]
+				if itemSlot and itemSlot.selItemId == item.id then
+					itemSlot.selItemId = 0
 					self.build.buildFlag = true
 				end
 			end
@@ -1905,12 +2036,15 @@ end
 
 function ItemsTabClass:CopyAnointsAndEldritchImplicits(newItem, copyEldritchImplicits, overwrite, sourceSlotName)
 	local newItemType = sourceSlotName or (newItem.base.weapon and "Weapon 1" or newItem.base.type)
-	if self.activeItemSet[newItemType] then
-		local currentItem = self.activeItemSet[newItemType].selItemId and self.items[self.activeItemSet[newItemType].selItemId]
+	local itemSet = self:GetVisibleItemSet()
+	local itemSetSlotName = newItemType
+	local itemSetSlot = itemSet and itemSet[itemSetSlotName]
+	if itemSetSlot then
+		local currentItem = itemSetSlot.selItemId and self.items[itemSetSlot.selItemId]
 		-- if you don't have an equipped item that matches the type of the newItem, no need to do anything
 		if currentItem then
 			-- if the new item is anointable and does not have an anoint and your current respective item does, apply that anoint to the new item
-			if isAnointable(newItem) and (#newItem.enchantModLines == 0 or overwrite) and self.activeItemSet[newItemType].selItemId > 0 then
+			if isAnointable(newItem) and (#newItem.enchantModLines == 0 or overwrite) and itemSetSlot.selItemId > 0 then
 				local currentAnoint = currentItem.enchantModLines
 				if currentAnoint and #currentAnoint == 1 then -- skip if amulet has more than one anoint e.g. Stranglegasp
 					newItem.enchantModLines = currentAnoint
@@ -1935,7 +2069,7 @@ function ItemsTabClass:CopyAnointsAndEldritchImplicits(newItem, copyEldritchImpl
 			end
 
 			-- harvest and heist enchantments on modifiable body armour or weapons
-			if (newItem.base.weapon or newItem.base.type == "Body Armour") and (#newItem.enchantModLines == 0 or overwrite)	and self.activeItemSet[newItemType].selItemId > 0 and modifiableItem and currentItem.enchantModLines then
+			if (newItem.base.weapon or newItem.base.type == "Body Armour") and (#newItem.enchantModLines == 0 or overwrite)	and itemSetSlot.selItemId > 0 and modifiableItem and currentItem.enchantModLines then
 				newItem.enchantModLines = currentItem.enchantModLines
 			end
 
@@ -2349,7 +2483,7 @@ function ItemsTabClass:UpdateAffixControl(control, item, affixType, outputTable,
 				end
 				testSubject:BuildAndParseRaw()
 				power = data.powerStatList.GetFromOutput(
-					calcFunc({ repSlotName = slotName, repItem = testSubject }),
+					calcFunc(self:ItemCalculationOverride(slotName, testSubject)),
 					sortOption
 				)
 				testSubject = new("Item"):Item(originalItem)
@@ -2366,7 +2500,7 @@ function ItemsTabClass:UpdateAffixControl(control, item, affixType, outputTable,
 
 				testSubject:BuildModList()
 				power = data.powerStatList.GetFromOutput(
-					calcFunc({ repSlotName = slotName, repItem = testSubject }),
+					calcFunc(self:ItemCalculationOverride(slotName, testSubject)),
 					sortOption
 				)
 				for _ = 1, modCount do
@@ -2519,22 +2653,37 @@ function ItemsTabClass:AddModComparisonTooltip(tooltip, mod, replaceImplicits)
 	newItem:BuildAndParseRaw()
 
 	local calcFunc = self.build.calcsTab:GetMiscCalculator()
-	local outputBase = calcFunc({ repSlotName = slotName, repItem = self.displayItem })
-	local outputNew = calcFunc({ repSlotName = slotName, repItem = newItem })
+	local outputBase = calcFunc(self:ItemCalculationOverride(slotName, self.displayItem))
+	local outputNew = calcFunc(self:ItemCalculationOverride(slotName, newItem))
 	self.build:AddStatComparesToTooltip(tooltip, outputBase, outputNew, "\nAdding this mod will give: ")
 end
 
--- Returns the first slot in which the given item is equipped
+-- Returns the first slot in which the given item is equipped.
+-- Actively worn equipment returns (slot) with no item set; other sets return (slot, itemSet).
 function ItemsTabClass:GetEquippedSlotForItem(item)
 	for _, slot in ipairs(self.orderedSlots) do
 		if not slot.inactive then
-			if slot.selItemId == item.id then
-				return slot
+			if slot.nodeId then
+				if slot.selItemId == item.id then
+					return slot
+				end
+			else
+				local activeSlot = self.activeItemSet and self.activeItemSet[slot.slotName]
+				if activeSlot and activeSlot.selItemId == item.id then
+					return slot
+				end
 			end
+		end
+	end
+	for _, slot in ipairs(self.orderedSlots) do
+		if not slot.inactive and not slot.nodeId then
 			for _, itemSetId in ipairs(self.itemSetOrderList) do
-				local itemSet = self.itemSets[itemSetId]
-				if itemSetId ~= self.activeItemSetId and itemSet[slot.slotName] and itemSet[slot.slotName].selItemId == item.id then
-					return slot, itemSet
+				if itemSetId ~= self.activeItemSetId then
+					local itemSet = self.itemSets[itemSetId]
+					local itemSlot = itemSet and itemSet[slot.slotName]
+					if itemSlot and itemSlot.selItemId == item.id then
+						return slot, itemSet
+					end
 				end
 			end
 		end
@@ -2557,7 +2706,8 @@ function ItemsTabClass:GetComparisonSlotNameForItem(item)
 end
 -- Check if the given item could be equipped in the given slot, taking into account possible conflicts with currently equipped items
 -- For example, a shield is not valid for Weapon 2 if Weapon 1 is a staff, and a wand is not valid for Weapon 2 if Weapon 1 is a dagger
-function ItemsTabClass:IsItemValidForSlot(item, slotName, itemSet)
+-- equippedLookup(slotName), when provided, resolves counterpart slots (preview replacements) instead of itemSet.
+function ItemsTabClass:IsItemValidForSlot(item, slotName, itemSet, equippedLookup)
 	itemSet = itemSet or self.activeItemSet
 	local slotType, slotId = slotName:match("^([%a ]+) (%d+)$")
 	if not slotType then
@@ -2593,8 +2743,16 @@ function ItemsTabClass:IsItemValidForSlot(item, slotName, itemSet)
 	elseif slotName == "Weapon 1" or slotName == "Weapon 1 Swap" or slotName == "Weapon" then
 		return item.base.weapon ~= nil
 	elseif slotName == "Weapon 2" or slotName == "Weapon 2 Swap" then
-		local weapon1Sel = itemSet[slotName == "Weapon 2" and "Weapon 1" or "Weapon 1 Swap"].selItemId or 0
-		local weapon1Type = self.items[weapon1Sel] and self.items[weapon1Sel].base.type or "None"
+		local weapon1SlotName = slotName == "Weapon 2" and "Weapon 1" or "Weapon 1 Swap"
+		local weapon1Item
+		if equippedLookup then
+			weapon1Item = equippedLookup(weapon1SlotName)
+		else
+			local weapon1Slot = itemSet and itemSet[weapon1SlotName]
+			local weapon1Sel = weapon1Slot and weapon1Slot.selItemId or 0
+			weapon1Item = self.items[weapon1Sel]
+		end
+		local weapon1Type = weapon1Item and weapon1Item.base.type or "None"
 		if weapon1Type == "None" then
 			return item.type == "Shield" or (self.build.data.weaponTypeInfo[item.type] and self.build.data.weaponTypeInfo[item.type].oneHand)
 		elseif weapon1Type == "Bow" then
@@ -2875,7 +3033,7 @@ function ItemsTabClass:EnchantDisplayItem(enchantSlot)
 			t_insert(item.enchantModLines, self.enchantSlot, { crafted = true, line = line })
 		end
 		item:BuildAndParseRaw()
-		local output = calcFunc({ repSlotName = slotName, repItem = item }, useFullDPS)
+		local output = calcFunc(self:ItemCalculationOverride(slotName, item), useFullDPS)
 		local value = data.powerStatList.GetFromOutput(output, sortStats[stat])
 		entry.sortValues[stat] = value
 		return value
@@ -3057,8 +3215,8 @@ function ItemsTabClass:AppendAnointTooltip(tooltip, node, actionText)
 	end
 	local calcFunc = self.build.calcsTab:GetMiscCalculator()
 	local repSlotName = self.displayItem.base and self.displayItem.base.type or "Amulet"
-	local outputBase = calcFunc({ repSlotName = repSlotName, repItem = self.displayItem })
-	local outputNew = calcFunc({ repSlotName = repSlotName, repItem = self:anointItem(node) })
+	local outputBase = calcFunc(self:ItemCalculationOverride(repSlotName, self.displayItem))
+	local outputNew = calcFunc(self:ItemCalculationOverride(repSlotName, self:anointItem(node)))
 	local numChanges = self.build:AddStatComparesToTooltip(tooltip, outputBase, outputNew, header)
 	if node and numChanges == 0 then
 		tooltip:AddLine(14, "^7"..actionText.." "..node.dn.." changes nothing.")
@@ -3236,7 +3394,7 @@ function ItemsTabClass:CorruptDisplayItem()
 			end
 		end
 		item:BuildAndParseRaw()
-		local output = calcFunc({ repSlotName = slotName, repItem = item }, useFullDPS)
+		local output = calcFunc(self:ItemCalculationOverride(slotName, item), useFullDPS)
 		local value = data.powerStatList.GetFromOutput(output, sortStats[stat])
 		entry.sortValues[stat] = value
 		return value
@@ -3536,7 +3694,7 @@ function ItemsTabClass:AddCustomModifierToDisplayItem()
 			t_insert(item.explicitModLines, { line = checkLineForAllocates(line, self.build.spec.nodes), modTags = listMod.mod.modTags, [listMod.type] = true })
 		end
 		item:BuildAndParseRaw()
-		local output = calcFunc({ repSlotName = slotName, repItem = item }, useFullDPS)
+		local output = calcFunc(self:ItemCalculationOverride(slotName, item), useFullDPS)
 		local value = data.powerStatList.GetFromOutput(output, sortStats[stat])
 		listMod.sortValues[stat] = value
 		return value
@@ -3978,11 +4136,11 @@ function ItemsTabClass:AddCrucibleModifierToDisplayItem()
 	main:OpenPopup(710, 185, "Add Crucible Modifier to Item", controls, "save")
 end
 
-
 function ItemsTabClass:AddItemSetTooltip(tooltip, itemSet)
 	for _, slot in ipairs(self.orderedSlots) do
 		if not slot.nodeId then
-			local item = self.items[itemSet[slot.slotName].selItemId]
+			local itemSlot = itemSet[slot.slotName]
+			local item = itemSlot and self.items[itemSlot.selItemId]
 			if item then
 				tooltip:AddLine(16, s_format("^7%s: %s%s", slot.label, colorCodes[item.rarity], item.name))
 			end
@@ -4662,7 +4820,7 @@ end
 ---@param item Item
 ---@param base any
 function ItemsTabClass:AddItemStatDifferences(tooltip, item, base, slot)
-	local calcFunc, calcBase = self.build.calcsTab:GetMiscCalculator()
+	local calcFunc, calcBase, calcBaseByActor = self.build.calcsTab:GetMiscCalculator()
 	if base.flask then
 		-- Special handling for flasks
 		local stats = {}
@@ -4910,16 +5068,17 @@ function ItemsTabClass:AddItemStatDifferences(tooltip, item, base, slot)
 	else
 		self:UpdateSockets()
 		-- Build sorted list of slots to compare with
-		local compareSlots = {}
+		local compareSlots = { }
+		local visibleItemSet = self:GetVisibleItemSet()
 		for slotName, slot in pairs(self.slots) do
-			if self:IsItemValidForSlot(item, slotName) and not slot.inactive and (not slot.weaponSet or slot.weaponSet == (self.activeItemSet.useSecondWeaponSet and 2 or 1)) and slot.shown() then
+			if self:IsItemValidForSlot(item, slotName, visibleItemSet) and not slot.inactive and (not slot.weaponSet or slot.weaponSet == (visibleItemSet.useSecondWeaponSet and 2 or 1)) and slot.shown() then
 				t_insert(compareSlots, slot)
 			end
 		end
 
 		local function getReplacedItemAndOutput(compareSlot)
 			local selItem = self.items[compareSlot.selItemId]
-			local override = { repSlotName = compareSlot.slotName, repItem = item ~= selItem and item or nil }
+			local override = self:ItemCalculationOverride(compareSlot.slotName, item ~= selItem and item or nil)
 			if compareSlot.nodeId and (itemChangesPassiveTree(selItem) or itemChangesPassiveTree(item)) then
 				override.spec = buildSpecForJewelComparison(self, compareSlot, override.repItem)
 			end
@@ -4936,7 +5095,19 @@ function ItemsTabClass:AddItemStatDifferences(tooltip, item, base, slot)
 			else
 				header = string.format("^7Equipping this item in %s will give you:%s", compareSlot.label or compareSlot.slotName, selItem and "\n(replacing " .. colorCodes[selItem.rarity] .. selItem.name .. "^7)" or "")
 			end
-			self.build:AddStatComparesToTooltip(tooltip, calcBase, output, header)
+			local comparisonActor = MercenaryTools.comparisonActorForSlot(compareSlot.slotName, self.viewItemSetId, self)
+			if comparisonActor == "PLAYER" then
+				comparisonActor = nil
+			end
+			local compareBase = comparisonActor and calcBaseByActor.MERCENARY or calcBase
+			if comparisonActor and not MercenaryTools.mercenaryOutputAvailable(compareBase) then
+				tooltip:AddLine(16, colorCodes.WARNING.."Mercenary comparison unavailable")
+				return
+			end
+			if not output then
+				return
+			end
+			self.build:AddStatComparesToTooltip(tooltip, compareBase, output, header, nil, comparisonActor)
 		end
 
 		-- if we have a specific slot to compare to, and the user has "Show
@@ -5018,9 +5189,110 @@ function ItemsTabClass:AddItemStatDifferences(tooltip, item, base, slot)
 	end
 end
 
+-- Equipment sets the live Mercenary profile still references. Ordinary Items
+-- undos keep later Mercenary edits, including Copy/Ensure between Items stamps.
+local function copyLiveMercenaryItemSets(itemsTab)
+	local kept = { }
+	local mercenaryTab = itemsTab.build.mercenaryTab
+	if not mercenaryTab then
+		return kept
+	end
+	local function keep(itemSetId)
+		local itemSet = itemSetId and itemsTab.itemSets[itemSetId]
+		if itemSet then
+			kept[itemSetId] = itemSet
+		end
+	end
+	keep(mercenaryTab.itemSetId)
+	keep(mercenaryTab.auxiliaryItemSetId)
+	for _, profile in pairs(mercenaryTab.mercenarySets or { }) do
+		keep(profile.itemSetId)
+	end
+	local configTab = itemsTab.build.configTab
+	for _, configSet in pairs(configTab and configTab.configSets or { }) do
+		keep(configSet.actors and configSet.actors.mercenary and configSet.actors.mercenary.itemSetId)
+	end
+	return kept
+end
+
+local function mercenaryCreatedItemSetIds(itemsTab)
+	local mercenaryTab = itemsTab.build.mercenaryTab
+	return mercenaryTab and mercenaryTab:CreatedItemSetIds() or { }
+end
+
+-- Copy/Ensure sets the live Mercenary no longer references must not return from
+-- an Items undo/redo of an unrelated edit. User-created sets that were only
+-- assigned (Bossing) are not in createdIds and must not be deleted.
+local function dropResurrectedMercenaryCreatedSets(itemsTab, createdIds, keptSets, liveItemSetIds, afterItemSets)
+	if not createdIds or not liveItemSetIds then
+		return
+	end
+	keptSets = keptSets or { }
+	for itemSetId in pairs(createdIds) do
+		-- Undo of an Items-side deletion: after no longer has the set, so restore it.
+		local itemsOpKeptSet = not afterItemSets or afterItemSets[itemSetId]
+		if itemsOpKeptSet
+			and not liveItemSetIds[itemSetId]
+			and not keptSets[itemSetId]
+			and itemsTab.itemSets[itemSetId]
+			and itemsTab.activeItemSetId ~= itemSetId
+			and not itemsTab:IsItemSetReferenced(itemSetId) then
+			if itemsTab.viewItemSetId == itemSetId then
+				itemsTab:SetViewItemSet(itemsTab.activeItemSetId)
+			end
+			itemsTab.itemSets[itemSetId] = nil
+			for index, orderedId in ipairs(itemsTab.itemSetOrderList) do
+				if orderedId == itemSetId then
+					t_remove(itemsTab.itemSetOrderList, index)
+					break
+				end
+			end
+		end
+	end
+end
+
+-- Reinstall live Mercenary-referenced sets after restoring an older Items stamp.
+-- Session-monotonic IDs mean a restored historical set cannot occupy a
+-- later Mercenary allocation, so missing IDs are inserted as-is.
+local function restoreKeptItemSets(itemsTab, keptSets, liveItems)
+	if not keptSets then
+		return
+	end
+	for itemSetId, itemSet in pairs(keptSets) do
+		if not itemsTab.itemSets[itemSetId] then
+			itemsTab.itemSets[itemSetId] = itemSet
+			if not isValueInArray(itemsTab.itemSetOrderList, itemSet.id) then
+				t_insert(itemsTab.itemSetOrderList, itemSet.id)
+			end
+			for _, slot in pairs(itemSet) do
+				local itemId = type(slot) == "table" and slot.selItemId
+				if itemId and itemId ~= 0 and not itemsTab.items[itemId] and liveItems[itemId] then
+					itemsTab.items[itemId] = liveItems[itemId]
+					if not isValueInArray(itemsTab.itemOrderList, itemId) then
+						t_insert(itemsTab.itemOrderList, itemId)
+					end
+				end
+			end
+		end
+	end
+end
+
 function ItemsTabClass:CreateUndoState()
 	local state = { }
+	if self.build.mercenaryTab then
+		state.mercenary = { }
+		local modFlag = self.build.mercenaryTab.modFlag
+		self.build.mercenaryTab:Save(state.mercenary)
+		self.build.mercenaryTab.modFlag = modFlag
+	end
+	state.mercenaryChangedByItems = self.mercenaryChangedByItems
+	self.mercenaryChangedByItems = nil
+	if self.build.configTab then
+		state.configActorItemSetIds = self.build.configTab:CopyActorItemSetIds()
+	end
 	state.activeItemSetId = self.activeItemSetId
+	state.viewItemSetId = self.viewItemSetId
+	state.viewComparisonActor = self.viewComparisonActor
 	state.items = { }
 	for k, v in pairs(self.items) do
 		state.items[k] = copyTableSafe(self.items[k], true, true)
@@ -5032,24 +5304,83 @@ function ItemsTabClass:CreateUndoState()
 	end
 	state.itemSets = copyTableSafe(self.itemSets)
 	state.itemSetOrderList = copyTable(self.itemSetOrderList)
+	state.mercenaryCreatedItemSetIds = mercenaryCreatedItemSetIds(self)
 	return state
 end
 
-function ItemsTabClass:RestoreUndoState(state)
+function ItemsTabClass:RestoreUndoState(state, after)
+	-- Only rewind Mercenary when this Items stamp itself mutated it (import).
+	-- UndoHandler rebuilds the current snapshot after Undo/Redo, so the flag
+	-- lives on every stamp of that operation, not only the first transition.
+	local restoreMercenary = (after or state).mercenaryChangedByItems == true
+	local keptSets, liveItems, liveItemSetIds
+	if not restoreMercenary then
+		keptSets = copyLiveMercenaryItemSets(self)
+		liveItems = self.items
+		liveItemSetIds = { }
+		for itemSetId in pairs(self.itemSets) do
+			liveItemSetIds[itemSetId] = true
+		end
+	end
 	self.items = state.items
 	wipeTable(self.itemOrderList)
 	for k, v in pairs(state.itemOrderList) do
 		self.itemOrderList[k] = v
-	end
-	for slotName, selItemId in pairs(state.slotSelItemId) do
-		self.slots[slotName]:SetSelItemId(selItemId)
 	end
 	self.itemSets = state.itemSets
 	wipeTable(self.itemSetOrderList)
 	for k, v in pairs(state.itemSetOrderList) do
 		self.itemSetOrderList[k] = v
 	end
+	restoreKeptItemSets(self, keptSets, liveItems)
 	self.activeItemSetId = state.activeItemSetId
 	self.activeItemSet = self.itemSets[self.activeItemSetId]
+	if not restoreMercenary then
+		dropResurrectedMercenaryCreatedSets(self, state.mercenaryCreatedItemSetIds, keptSets, liveItemSetIds, after and after.itemSets)
+		self.activeItemSet = self.itemSets[self.activeItemSetId]
+	end
+	if self.build.configTab then
+		-- Restore only actor item-set refs this Items operation changed, so a later
+		-- Config/Mercenary loadout edit on another config set survives this undo.
+		local restoreConfigActorItemSetIds
+		if after then
+			restoreConfigActorItemSetIds = self.build.configTab:ChangedActorItemSetIds(state.configActorItemSetIds, after.configActorItemSetIds)
+			after.restoreConfigActorItemSetIds = self.build.configTab:ChangedActorItemSetIds(after.configActorItemSetIds, state.configActorItemSetIds)
+		else
+			restoreConfigActorItemSetIds = state.restoreConfigActorItemSetIds ~= nil and state.restoreConfigActorItemSetIds or state.configActorItemSetIds
+		end
+		self.build.configTab:RestoreActorItemSetIds(restoreConfigActorItemSetIds)
+		if not self.skipConfigItemSetSync then
+			self.build.configTab:SyncActorItemSet("player", self.activeItemSetId)
+		end
+	end
+	local viewItemSetId = state.viewItemSetId
+	if not self.itemSets[viewItemSetId] then
+		viewItemSetId = self.activeItemSetId
+	end
+	self.viewItemSetId = viewItemSetId
+	self.viewItemSet = self.itemSets[self.viewItemSetId]
+	self.viewComparisonActor = state.viewComparisonActor
+	-- Restore the Mercenary profile only when this Items operation changed it
+	-- (import, loadout swap). Ordinary item edits leave later profile edits intact.
+	if state.mercenary and self.build.mercenaryTab and restoreMercenary then
+		self.build.mercenaryTab:Load(copyTable(state.mercenary))
+		if self.build.configTab and not self.skipConfigItemSetSync then
+			self.build.configTab:SyncActorItemSet("mercenary", self.build.mercenaryTab.itemSetId)
+		end
+		-- Load already ResetUndo; do not push a Mercenary stamp for an Items-owned restore.
+		self.build.mercenaryTab.skipUndo = true
+		self.build.mercenaryTab:Changed()
+		self.build.mercenaryTab.skipUndo = false
+	elseif self.build.configTab and not self.skipConfigItemSetSync and self.build.mercenaryTab then
+		self.build.configTab:SyncActorItemSet("mercenary", self.build.mercenaryTab.itemSetId)
+	end
+	for slotName, selItemId in pairs(state.slotSelItemId) do
+		local slot = self.slots[slotName]
+		if slot and slot.nodeId then slot:SetSelItemId(selItemId) end
+	end
 	self:PopulateSlots()
+	-- UndoHandler calls AddUndoState after restore; keep import ownership on the
+	-- rebuilt current snapshot so a later Undo/Redo of this same stamp still knows.
+	self.mercenaryChangedByItems = state.mercenaryChangedByItems
 end

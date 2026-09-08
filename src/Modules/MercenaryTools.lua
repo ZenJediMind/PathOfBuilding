@@ -6,53 +6,6 @@ function MercenaryTools.baseItemSlotName(slotName)
 	return type(slotName) == "string" and slotName:match("^Mercenary (.+)$") or nil
 end
 
-function MercenaryTools.comparisonActor(slotName)
-	return MercenaryTools.baseItemSlotName(slotName) and "MERCENARY" or "PLAYER"
-end
-
--- The auto-created "Mercenary Equipment" set, not whichever set the Mercenary
--- currently wears. Mercenaries can use any shared item set.
-function MercenaryTools.isAuxiliaryMercenaryItemSet(itemSetId, itemsTab)
-	local mercenaryTab = itemsTab and itemsTab.build and itemsTab.build.mercenaryTab
-	return itemSetId ~= nil and mercenaryTab ~= nil
-		and itemSetId == mercenaryTab.auxiliaryItemSetId
-		and itemSetId ~= itemsTab.activeItemSetId
-end
-
-function MercenaryTools.comparisonActorForItemSet(itemSetId, itemsTab)
-	if itemSetId and itemsTab and itemSetId == itemsTab.viewItemSetId and itemsTab.viewComparisonActor then
-		return itemsTab.viewComparisonActor
-	end
-	if MercenaryTools.isAuxiliaryMercenaryItemSet(itemSetId, itemsTab) then
-		return "MERCENARY"
-	end
-	return "PLAYER"
-end
-
-local function isTreeJewelSlot(slotName)
-	return type(slotName) == "string" and slotName:match("^Jewel ") ~= nil
-end
-
-function MercenaryTools.comparisonActorForSlot(slotName, itemSetId, itemsTab)
-	if isTreeJewelSlot(slotName) then
-		return "PLAYER"
-	end
-	if MercenaryTools.baseItemSlotName(slotName) then
-		return "MERCENARY"
-	end
-	return MercenaryTools.comparisonActorForItemSet(itemSetId, itemsTab)
-end
-
-function MercenaryTools.itemCalculationOverride(itemSetId, slotName, item, itemsTab)
-	local isTreeJewel = isTreeJewelSlot(slotName)
-	return {
-		itemSetId = (not isTreeJewel) and itemSetId or nil,
-		comparisonActor = MercenaryTools.comparisonActorForSlot(slotName, itemSetId, itemsTab),
-		repSlotName = slotName,
-		repItem = item,
-	}
-end
-
 function MercenaryTools.overrideReplacesMercenarySlot(override, slotName, mercenaryItemSetId)
 	if not override or not override.repSlotName then
 		return false
@@ -125,11 +78,11 @@ function MercenaryTools.buildComparisonOutput(mercenaryOutput, playerOutput)
 	return output
 end
 
-function MercenaryTools.comparisonBaseOutput(playerOutput, actorOutputs, slotName)
-	if MercenaryTools.comparisonActor(slotName) == "PLAYER" then
-		return playerOutput
+function MercenaryTools.comparisonBaseOutput(playerOutput, actorOutputs, comparisonActor)
+	if comparisonActor == "MERCENARY" then
+		return MercenaryTools.buildComparisonOutput(actorOutputs and actorOutputs.MERCENARY, playerOutput)
 	end
-	return MercenaryTools.buildComparisonOutput(actorOutputs and actorOutputs.MERCENARY, playerOutput)
+	return playerOutput
 end
 
 function MercenaryTools.mercenaryOutputAvailable(output)

@@ -147,9 +147,7 @@ function ConfigTabClass:ConfigTab(build)
 	-- Initialise config sets
 	self.configSets = { }
 	self.configSetOrderList = { 1 }
-	-- ItemsTab and MercenaryTab are created after ConfigTab, so copying "live"
-	-- item sets here would read the previous build's tabs during newBuild().
-	self:NewConfigSet(1, nil, { copyLiveItemSets = false })
+	self:NewConfigSet(1)
 	self:SetActiveConfigSet(1, true)
 
 	self.enemyLevel = 1
@@ -190,26 +188,6 @@ function ConfigTabClass:ConfigTab(build)
 	}, function(_, value)
 		if value then
 			self:SetViewActor(value.id)
-		end
-	end)
-	self.controls.itemSetLabel = new("LabelControl"):LabelControl({ "LEFT", self.controls.actorSelect, "RIGHT" }, { 12, 0, 0, 16 }, "^7Equipped item set:")
-	self.controls.itemSetSelect = new("DropDownControl"):DropDownControl({ "LEFT", self.controls.itemSetLabel, "RIGHT" }, { 4, 0, 210, 20 }, { }, function(_, value)
-		if not value or not value.id then
-			return
-		end
-		if self:GetViewActor() == "mercenary" and self.build.mercenaryTab then
-			-- Equip without taking the Items tab's view/comparison context.
-			self.build.mercenaryTab:SetItemSet(value.id, false)
-		elseif self.build.itemsTab then
-			self.build.itemsTab:SetActiveItemSet(value.id, false)
-			self.build.itemsTab:AddUndoState()
-		end
-		self:AddUndoState()
-	end)
-	self.controls.itemSetSelect.enableDroppedWidth = true
-	self.controls.itemSetManage = new("ButtonControl"):ButtonControl({ "LEFT", self.controls.itemSetSelect, "RIGHT" }, { 4, 0, 90, 20 }, "Manage...", function()
-		if self.build.itemsTab then
-			self.build.itemsTab:OpenItemSetManagePopup()
 		end
 	end)
 
@@ -794,9 +772,6 @@ function ConfigTabClass:Load(xml, fileName)
 		end
 		self:EnsureActorConfig(configSet)
 		local actor = configSet.actors[actorId]
-		if actorNode.attrib.itemSetId then
-			actor.itemSetId = tonumber(actorNode.attrib.itemSetId)
-		end
 		actor.customModsList = { }
 		if actorId == "player" then
 			configSet.customModsList = actor.customModsList
@@ -819,12 +794,12 @@ function ConfigTabClass:Load(xml, fileName)
 
 	-- Catch special case of empty Config
 	if xml.empty then
-		self:NewConfigSet(1, "Default", { copyLiveItemSets = false })
+		self:NewConfigSet(1, "Default")
 	end
 	for index, node in ipairs(xml) do
 		if node.elem ~= "ConfigSet" then
 			if not self.configSets[1] then
-				self:NewConfigSet(1, "Default", { copyLiveItemSets = false })
+				self:NewConfigSet(1, "Default")
 			end
 			if node.elem == "CustomModifierBlock" then
 				local block = {
@@ -838,7 +813,7 @@ function ConfigTabClass:Load(xml, fileName)
 			end
 		else
 			local configSetId = tonumber(node.attrib.id)
-			self:NewConfigSet(configSetId, node.attrib.title or "Default", { copyLiveItemSets = false })
+			self:NewConfigSet(configSetId, node.attrib.title or "Default")
 			self.configSetOrderList[index] = configSetId
 			self.configSets[configSetId].customModsList = { }
 			for _, child in ipairs(node) do
@@ -877,20 +852,6 @@ function ConfigTabClass:Load(xml, fileName)
 end
 
 function ConfigTabClass:PostLoad()
-	local itemsTab = self.build.itemsTab
-	local livePlayerId = itemsTab and itemsTab.activeItemSetId
-	if livePlayerId and itemsTab and not itemsTab.itemSets[livePlayerId] then
-		livePlayerId = itemsTab.itemSetOrderList[1]
-	end
-	for _, configSetId in ipairs(self.configSetOrderList) do
-		local configSet = self.configSets[configSetId]
-		self:EnsureActorConfig(configSet)
-		self:SanitizeActorItemSets(configSet)
-		if not configSet.actors.player.itemSetId then
-			configSet.actors.player.itemSetId = livePlayerId
-		end
-	end
-	self:ApplyActorItemSets()
 	self:UpdateControls()
 	self:BuildModList()
 end
@@ -976,11 +937,8 @@ function ConfigTabClass:Save(xml)
 			})
 		end
 	end
-	local function writeActor(parent, actorId, input, placeholder, customModsList, itemSetId, scopePred)
+	local function writeActor(parent, actorId, input, placeholder, customModsList, scopePred)
 		local actorNode = { elem = "Actor", attrib = { id = actorId } }
-		if itemSetId then
-			actorNode.attrib.itemSetId = tostring(itemSetId)
-		end
 		writeInputs(actorNode, input, placeholder, scopePred)
 		writePlaceholders(actorNode, placeholder, scopePred)
 		writeCustomMods(actorNode, customModsList)
@@ -994,12 +952,12 @@ function ConfigTabClass:Save(xml)
 
 		writeInputs(child, configSet.input, configSet.placeholder, function(var) return ConfigScope.tryForVar(var) == "shared" end)
 		writePlaceholders(child, configSet.placeholder, function(var) return ConfigScope.tryForVar(var) == "shared" end)
-		writeActor(child, "player", configSet.input, configSet.placeholder, configSet.customModsList, configSet.actors.player.itemSetId, function(var)
+		writeActor(child, "player", configSet.input, configSet.placeholder, configSet.customModsList, function(var)
 			local scope = ConfigScope.tryForVar(var)
 			-- Unknown leftover keys stay on the player actor instead of being dropped or reclassified.
 			return scope == "actor" or scope == "player" or scope == nil
 		end)
-		writeActor(child, "mercenary", configSet.actors.mercenary.input, configSet.actors.mercenary.placeholder, configSet.actors.mercenary.customModsList, configSet.actors.mercenary.itemSetId)
+		writeActor(child, "mercenary", configSet.actors.mercenary.input, configSet.actors.mercenary.placeholder, configSet.actors.mercenary.customModsList)
 	end
 end
 
@@ -1027,7 +985,6 @@ function ConfigTabClass:UpdateControls()
 		end
 	end
 	self:UpdateCustomModsControls()
-	self:UpdateActorItemSetSelect()
 end
 
 function ConfigTabClass:Draw(viewPort, inputEvents)
@@ -1114,7 +1071,6 @@ function ConfigTabClass:Draw(viewPort, inputEvents)
 		end
 	end
 	self.controls.setSelect:SetList(newSetList)
-	self:UpdateActorItemSetSelect()
 
 	self.controls.scrollBar.height = viewPort.height
 	self.controls.scrollBar:SetContentDimension(maxColY + 58, viewPort.height)
@@ -1284,7 +1240,6 @@ function ConfigTabClass:SetViewActor(actor)
 	end
 	self:UpdateControls()
 	self:UpdateCustomModsControls()
-	self:UpdateActorItemSetSelect()
 end
 
 function ConfigTabClass:GetVarTablesForActor(var, actor)
@@ -1370,28 +1325,6 @@ function ConfigTabClass:GetActorCustomModsList(configSet)
 	return configSet.customModsList
 end
 
-function ConfigTabClass:UpdateActorItemSetSelect()
-	if not self.controls.itemSetSelect or not self.build.itemsTab then
-		return
-	end
-	local itemSetList = { }
-	for _, itemSetId in ipairs(self.build.itemsTab.itemSetOrderList) do
-		local itemSet = self.build.itemsTab.itemSets[itemSetId]
-		if itemSet then
-			t_insert(itemSetList, { id = itemSetId, label = itemSet.title or "Default" })
-		end
-	end
-	self.controls.itemSetSelect:SetList(itemSetList)
-	local selectedId
-	if self:GetViewActor() == "mercenary" and self.build.mercenaryTab then
-		selectedId = self.build.mercenaryTab.itemSetId
-	else
-		selectedId = self.build.itemsTab.activeItemSetId
-	end
-	self.controls.itemSetSelect:SelByValue(selectedId, "id")
-	self.controls.itemSetSelect.enabled = #itemSetList > 1
-end
-
 function ConfigTabClass:EnsureActorConfig(configSet)
 	if not configSet then
 		return
@@ -1401,7 +1334,6 @@ function ConfigTabClass:EnsureActorConfig(configSet)
 	end
 	if not configSet.actors.player then
 		configSet.actors.player = {
-			itemSetId = nil,
 			customModsList = configSet.customModsList,
 		}
 	end
@@ -1426,150 +1358,7 @@ function ConfigTabClass:EnsureActorConfig(configSet)
 			input = mercenaryInput,
 			placeholder = mercenaryPlaceholder,
 			customModsList = { { title = "Default", enabled = true, text = "" } },
-			itemSetId = nil,
 		}
-	end
-end
-
-function ConfigTabClass:CopyLiveItemSets(configSet)
-	self:EnsureActorConfig(configSet)
-	if self.build.itemsTab then
-		configSet.actors.player.itemSetId = self.build.itemsTab.activeItemSetId
-	end
-	if self.build.mercenaryTab then
-		configSet.actors.mercenary.itemSetId = self.build.mercenaryTab.itemSetId
-	end
-end
-
-function ConfigTabClass:SanitizeActorItemSets(configSet)
-	self:EnsureActorConfig(configSet)
-	local itemsTab = self.build.itemsTab
-	for _, actor in pairs(configSet.actors) do
-		if actor.itemSetId and itemsTab and not itemsTab.itemSets[actor.itemSetId] then
-			actor.itemSetId = nil
-		end
-	end
-end
-
-function ConfigTabClass:RemapItemSetId(oldId, newId)
-	if not oldId then
-		return
-	end
-	for _, configSet in pairs(self.configSets) do
-		self:EnsureActorConfig(configSet)
-		for _, actor in pairs(configSet.actors) do
-			if actor.itemSetId == oldId then
-				actor.itemSetId = newId
-			end
-		end
-	end
-end
-
-function ConfigTabClass:CopyActorItemSetIds()
-	local snapshot = { }
-	for configSetId, configSet in pairs(self.configSets) do
-		self:EnsureActorConfig(configSet)
-		local actors = { }
-		for actorId, actor in pairs(configSet.actors) do
-			actors[actorId] = actor.itemSetId
-		end
-		snapshot[configSetId] = actors
-	end
-	return snapshot
-end
-
--- Actor item-set ids in `from` that differ from `comparedTo`. A missing id is
--- stored as false so RestoreActorItemSetIds can clear it.
-function ConfigTabClass:ChangedActorItemSetIds(from, comparedTo)
-	from, comparedTo = from or { }, comparedTo or { }
-	local snapshot = { }
-	local configIds = { }
-	for configSetId in pairs(from) do
-		configIds[configSetId] = true
-	end
-	for configSetId in pairs(comparedTo) do
-		configIds[configSetId] = true
-	end
-	for configSetId in pairs(configIds) do
-		local fromActors, toActors = from[configSetId] or { }, comparedTo[configSetId] or { }
-		local actorIds = { }
-		for actorId in pairs(fromActors) do
-			actorIds[actorId] = true
-		end
-		for actorId in pairs(toActors) do
-			actorIds[actorId] = true
-		end
-		local actors = { }
-		for actorId in pairs(actorIds) do
-			if fromActors[actorId] ~= toActors[actorId] then
-				if fromActors[actorId] == nil then
-					actors[actorId] = false
-				else
-					actors[actorId] = fromActors[actorId]
-				end
-			end
-		end
-		if next(actors) then
-			snapshot[configSetId] = actors
-		end
-	end
-	return snapshot
-end
-
-function ConfigTabClass:RestoreActorItemSetIds(snapshot)
-	if not snapshot then
-		return
-	end
-	for configSetId, actors in pairs(snapshot) do
-		local configSet = self.configSets[configSetId]
-		if configSet then
-			self:EnsureActorConfig(configSet)
-			for actorId, itemSetId in pairs(actors) do
-				if configSet.actors[actorId] then
-					configSet.actors[actorId].itemSetId = itemSetId ~= false and itemSetId or nil
-				end
-			end
-		end
-	end
-end
-
-function ConfigTabClass:SyncActorItemSet(actor, itemSetId)
-	local configSet = self.configSets[self.activeConfigSetId]
-	if not configSet or not actor then
-		return
-	end
-	self:EnsureActorConfig(configSet)
-	if configSet.actors[actor] then
-		configSet.actors[actor].itemSetId = itemSetId
-	end
-end
-
-function ConfigTabClass:ApplyActorItemSets(opts)
-	opts = opts or { }
-	local configSet = self.configSets[self.activeConfigSetId]
-	if not configSet then
-		return
-	end
-	self:EnsureActorConfig(configSet)
-	self:SanitizeActorItemSets(configSet)
-	local itemsTab = self.build.itemsTab
-	local playerItemSetId = configSet.actors.player and configSet.actors.player.itemSetId
-	if opts.player ~= false and itemsTab and playerItemSetId and itemsTab.itemSets[playerItemSetId] then
-		-- Follow the equipped player set in the Items tab only when that set is
-		-- already what the user is viewing. Otherwise applying config (or undo)
-		-- would yank the view off Mercenary / inactive-set inspection.
-		local changeView = itemsTab.viewItemSetId == itemsTab.activeItemSetId
-			and itemsTab.viewComparisonActor ~= "MERCENARY"
-		itemsTab.skipConfigItemSetSync = true
-		itemsTab:SetActiveItemSet(playerItemSetId, changeView)
-		itemsTab.skipConfigItemSetSync = false
-	end
-	local mercenaryTab = self.build.mercenaryTab
-	local mercenaryItemSetId = configSet.actors.mercenary and configSet.actors.mercenary.itemSetId
-	if opts.mercenary ~= false and mercenaryTab and mercenaryItemSetId and itemsTab and itemsTab.itemSets[mercenaryItemSetId] then
-		mercenaryTab.skipConfigItemSetSync = true
-		mercenaryTab:SetItemSet(mercenaryItemSetId, false)
-		mercenaryTab.skipConfigItemSetSync = false
 	end
 end
 
@@ -1754,7 +1543,6 @@ function ConfigTabClass:RestoreUndoState(state)
 			configSet.input[k] = v
 		end
 	end
-	self:ApplyActorItemSets()
 	self:UpdateControls()
 	self:BuildModList()
 end
@@ -1769,8 +1557,7 @@ function ConfigTabClass:OpenConfigSetManagePopup()
 end
 
 -- Creates a new config set
-function ConfigTabClass:NewConfigSet(configSetId, title, opts)
-	opts = opts or { }
+function ConfigTabClass:NewConfigSet(configSetId, title)
 	local configSet = { id = configSetId, title = title, input = { }, placeholder = { }, customModsList = { { title = "Default", enabled = true, text = "" } } }
 	if not configSetId then
 		configSet.id = 1
@@ -1790,9 +1577,6 @@ function ConfigTabClass:NewConfigSet(configSetId, title, opts)
 	end
 	self.configSets[configSet.id] = configSet
 	self:EnsureActorConfig(configSet)
-	if opts.copyLiveItemSets ~= false then
-		self:CopyLiveItemSets(configSet)
-	end
 	return configSet
 end
 
@@ -1836,11 +1620,11 @@ function ConfigTabClass:UpdateCustomModsControls()
 	end
 end
 
-function ConfigTabClass:SetActiveConfigSet(configSetId, init, itemSetOpts)
+function ConfigTabClass:SetActiveConfigSet(configSetId, init)
 	-- Initialize config sets if needed
 	if not self.configSetOrderList[1] then
 		self.configSetOrderList[1] = 1
-		self:NewConfigSet(1, nil, { copyLiveItemSets = false })
+		self:NewConfigSet(1)
 	end
 
 	if not configSetId then
@@ -1856,7 +1640,6 @@ function ConfigTabClass:SetActiveConfigSet(configSetId, init, itemSetOpts)
 	self.activeConfigSetId = configSetId
 
 	if not init then
-		self:ApplyActorItemSets(itemSetOpts)
 		self:UpdateControls()
 		self:BuildModList()
 	end

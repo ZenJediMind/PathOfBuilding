@@ -1903,14 +1903,21 @@ Huge sets the radius to 11.
 	{ var = "multiplierChilledByYouSeconds", type = "count", label = "Seconds of chill on enemy?", ifEnemyCond = "ChilledByYou", enemyState = "source", apply = function(val, modList, enemyModList)
 		enemyModList:NewMod("Multiplier:ChilledByYouSeconds", "BASE", val, "Config", { type = "Condition", var = "Combat" })
 		enemyModList:NewMod("Condition:ChilledByYou", "FLAG", true, "Config", { type = "Condition", var = "Effective" })
+		-- Source-owned "Chilled by you" item wording queries Chilled on this overlay.
+		local chilled = modLib.createMod("Condition:Chilled", "FLAG", true, "Config", { type = "Condition", var = "Effective" })
+		chilled.sourceOwned = true
+		enemyModList:AddMod(chilled)
 	end },
 	{ var = "conditionEnemyChilledEffect", scope = "shared", type = "count", label = "Effect of ^x3F6DB3Chill:", ifOption = "conditionEnemyChilled", apply = function(val, modList, enemyModList)
 		enemyModList:NewMod("ChillVal", "BASE", val, "Chill", { type = "Condition", var = "ChilledConfig" })
 		enemyModList:NewMod("DesiredChillVal", "BASE", val, "Chill", { type = "Condition", var = "ChilledConfig", neg = true })
 	end },
 	{ var = "conditionEnemyChilledByYourHits", type = "check", ifEnemyCond = "ChilledByYourHits", enemyState = "source", label = "Is the enemy ^x3F6DB3Chilled ^7by your Hits?", apply = function(val, modList, enemyModList)
-		enemyModList:NewMod("Condition:Chilled", "FLAG", true, "Config", { type = "Condition", var = "Effective" })
 		enemyModList:NewMod("Condition:ChilledByYourHits", "FLAG", true, "Config", { type = "Condition", var = "Effective" })
+		-- Source-owned "Chilled by you" item wording queries Chilled on this overlay.
+		local chilled = modLib.createMod("Condition:Chilled", "FLAG", true, "Config", { type = "Condition", var = "Effective" })
+		chilled.sourceOwned = true
+		enemyModList:AddMod(chilled)
 	end },
 	{ var = "HoarfrostStacks", type = "count", label = "^x3F6DB3Hoarfrost ^7Stacks", ifFlag = "HitsCanInflictHoarfrost", scope = "shared", tooltip = "Amount of stacks of ^x3F6DB3Hoarfrost ^7applied to the enemy.", apply = function(val, modList, enemyModList)
 		enemyModList:NewMod("HoarfrostFreezeDuration", "INC", val * 20, "Config", { type = "Condition", var = "Effective" })
@@ -1927,6 +1934,10 @@ Huge sets the radius to 11.
 	{ var = "multiplierFrozenByYouSeconds", type = "count", label = "Seconds of freeze on enemy?", ifEnemyCond = "FrozenByYou", enemyState = "source", apply = function(val, modList, enemyModList)
 		enemyModList:NewMod("Multiplier:FrozenByYouSeconds", "BASE", val, "Config", { type = "Condition", var = "Combat" })
 		enemyModList:NewMod("Condition:FrozenByYou", "FLAG", true, "Config", { type = "Condition", var = "Effective" })
+		-- Source-owned "Frozen by you" item wording queries Frozen on this overlay.
+		local frozen = modLib.createMod("Condition:Frozen", "FLAG", true, "Config", { type = "Condition", var = "Effective" })
+		frozen.sourceOwned = true
+		enemyModList:AddMod(frozen)
 	end },
 	{ var = "conditionEnemyBrittle", scope = "shared", type = "check", ifFlag = "inflictBrittle", label = "Is the enemy ^x3F6DB3Brittle?", tooltip = "Hits against ^x3F6DB3Brittle ^7enemies have up to +6% Critical Strike Chance.\nThis option will also allow you to input the effect of ^x3F6DB3Brittle.", apply = function(val, modList, enemyModList)
 		enemyModList:NewMod("Condition:Brittle", "FLAG", true, "Config", { type = "Condition", var = "Effective" })

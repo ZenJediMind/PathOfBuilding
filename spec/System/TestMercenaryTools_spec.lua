@@ -26,14 +26,14 @@ describe("Mercenary tools", function()
 
 		local playerOutput = { CombinedDPS = 100, FullDPS = 1000, FullDotDPS = 10 }
 		local mercenaryOutput = { CombinedDPS = 50, FullDPS = 50, FullDotDPS = 1 }
-		assert.is_nil(tools.comparisonBaseOutput(playerOutput, { PLAYER = playerOutput }, "Mercenary Helmet"))
-		assert.are.equal(playerOutput, tools.comparisonBaseOutput(playerOutput, { PLAYER = playerOutput }, "Helmet"))
+		assert.are.equal(playerOutput, tools.comparisonBaseOutput(playerOutput, { PLAYER = playerOutput }, "PLAYER"))
+		assert.is_nil(tools.comparisonBaseOutput(playerOutput, { PLAYER = playerOutput }, "MERCENARY"))
 		assert.is_true(not tools.mercenaryOutputAvailable(nil))
 		assert.is_true(not tools.mercenaryOutputAvailable({ ActorUnavailableMessage = "missing" }))
 		local routed = tools.comparisonBaseOutput(playerOutput, {
 			PLAYER = playerOutput,
 			MERCENARY = mercenaryOutput,
-		}, "Mercenary Helmet")
+		}, "MERCENARY")
 		assert.are.equal(50, routed.CombinedDPS)
 		assert.are.equal(1000, routed.FullDPS)
 		assert.are.equal(10, routed.FullDotDPS)
@@ -43,73 +43,6 @@ describe("Mercenary tools", function()
 		assert.are.equal(mercenaryOutput, tools.buildComparisonOutput(mercenaryOutput, nil))
 		local unavailable = { ActorUnavailableMessage = "missing" }
 		assert.are.equal(unavailable, tools.buildComparisonOutput(unavailable, playerOutput))
-
-		local auxiliary = {
-			activeItemSetId = 1,
-			build = { mercenaryTab = { itemSetId = 2, auxiliaryItemSetId = 2 } },
-		}
-		assert.are.equal("MERCENARY", tools.comparisonActorForItemSet(2, auxiliary))
-		assert.are.equal("PLAYER", tools.comparisonActorForItemSet(1, {
-			activeItemSetId = 1,
-			build = { mercenaryTab = { itemSetId = 1 } },
-		}))
-		assert.are.equal("PLAYER", tools.comparisonActorForItemSet(3, auxiliary))
-		assert.are.equal("PLAYER", tools.comparisonActorForItemSet(2, {
-			activeItemSetId = 1,
-			build = { mercenaryTab = { itemSetId = 2 } },
-		}))
-		assert.are.equal("MERCENARY", tools.comparisonActorForSlot("Helmet", 2, auxiliary))
-		assert.are.equal("MERCENARY", tools.comparisonActorForSlot("Mercenary Helmet", 1, {
-			activeItemSetId = 1,
-			build = { mercenaryTab = { itemSetId = 2 } },
-		}))
-
-		local shared = {
-			activeItemSetId = 1,
-			viewItemSetId = 1,
-			viewComparisonActor = "MERCENARY",
-			build = { mercenaryTab = { itemSetId = 1 } },
-		}
-		assert.are.equal("MERCENARY", tools.comparisonActorForItemSet(1, shared))
-		assert.are.equal("MERCENARY", tools.comparisonActorForSlot("Helmet", 1, shared))
-		shared.viewComparisonActor = "PLAYER"
-		assert.are.equal("PLAYER", tools.comparisonActorForItemSet(1, shared))
-		assert.are.equal("PLAYER", tools.comparisonActorForSlot("Helmet", 1, shared))
-
-		assert.is_true(tools.isAuxiliaryMercenaryItemSet(2, {
-			activeItemSetId = 1,
-			viewItemSetId = 1,
-			viewComparisonActor = "MERCENARY",
-			build = { mercenaryTab = { itemSetId = 2, auxiliaryItemSetId = 2 } },
-		}))
-		assert.is_true(not tools.isAuxiliaryMercenaryItemSet(1, {
-			activeItemSetId = 1,
-			viewItemSetId = 1,
-			viewComparisonActor = "MERCENARY",
-			build = { mercenaryTab = { itemSetId = 1 } },
-		}))
-		assert.is_true(not tools.isAuxiliaryMercenaryItemSet(2, {
-			activeItemSetId = 1,
-			viewItemSetId = 1,
-			build = { mercenaryTab = { itemSetId = 2 } },
-		}))
-
-		local item = { name = "hat" }
-		local override = tools.itemCalculationOverride(2, "Helmet", item, auxiliary)
-		assert.are.equal(2, override.itemSetId)
-		assert.are.equal("MERCENARY", override.comparisonActor)
-		assert.are.equal("Helmet", override.repSlotName)
-		assert.are.equal(item, override.repItem)
-
-		local jewelTab = {
-			activeItemSetId = 1,
-			viewItemSetId = 2,
-			build = { mercenaryTab = { itemSetId = 2 } },
-		}
-		assert.are.equal("PLAYER", tools.comparisonActorForSlot("Jewel 12345", 2, jewelTab))
-		local jewelOverride = tools.itemCalculationOverride(2, "Jewel 12345", { name = "jewel" }, jewelTab)
-		assert.is_nil(jewelOverride.itemSetId)
-		assert.are.equal("PLAYER", jewelOverride.comparisonActor)
 
 		local playerOverride = { itemSetId = 1, comparisonActor = "PLAYER", repSlotName = "Helmet", repItem = { } }
 		assert.is_true(tools.overrideReplacesPlayerItem(playerOverride, 1))
@@ -530,6 +463,9 @@ describe("Generated Mercenary data", function()
 				for _, stat in ipairs(mercenaries.supports[supportId].stats) do
 					assert.is_true(grantedEffect.statMap[stat.id] ~= nil or data.mercenarySupportStatMap[stat.id] ~= nil, skillId.." + "..supportId..": "..stat.id)
 				end
+				local supportEffect = assert(data.mercenarySupportGrantedEffect(supportId, skillId), skillId.." + "..supportId)
+				assert.are.equal(supportId, supportEffect.mercenarySupportId)
+				assert.is_nil(supportEffect.unsupportedMercenaryStats)
 			end
 		end
 		local seenKnownUncalculated = { }
@@ -580,6 +516,11 @@ describe("Generated Mercenary data", function()
 		for supportId, templateId in pairs(data.mercenaryStatData.supportTemplates) do
 			assert.is_table(mercenaries.supports[supportId], supportId)
 			assert.is_table(data.skills[templateId], templateId)
+			local grantedEffect = assert(data.mercenarySupportGrantedEffect(supportId), supportId)
+			assert.is_true(grantedEffect.support, supportId)
+			assert.are.equal(supportId, grantedEffect.mercenarySupportId)
+			assert.are.equal("MercenarySupport:"..supportId, grantedEffect.id)
+			assert.are.equal("Mercenary Support:"..supportId, grantedEffect.modSource)
 		end
 		assert.are.equal(5, mercenaries.supportCounts.High.maximum)
 		assert.are.equal(0, mercenaries.supportCounts.None.maximum)

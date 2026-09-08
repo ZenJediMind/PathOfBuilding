@@ -62,7 +62,6 @@ describe("Generic item sets for player, Animate Guardian, and Mercenary", functi
 		assert.are.equal(playerSetId, itemsTab.activeItemSetId)
 		assert.are.equal(secondSet.id, itemsTab.viewItemSetId)
 		assert.are.equal(otherHelmet.id, itemsTab.slots.Helmet.selItemId)
-		assert.are.equal(playerSetId, build.configTab.configSets[build.configTab.activeConfigSetId].actors.player.itemSetId)
 
 		secondSet.title = "Inspected"
 		assert(itemsTab:SetViewItemSet(secondSet.id))
@@ -128,7 +127,7 @@ describe("Generic item sets for player, Animate Guardian, and Mercenary", functi
 		assert.are.equal(2, build.mainSocketGroup)
 	end)
 
-	it("lets any actor wear any item set and excludes the auto Mercenary set from player loadouts", function()
+	it("lets any actor wear any generic item set", function()
 		selectScionLuminary()
 		local itemsTab = build.itemsTab
 		local playerSet = itemsTab.activeItemSet
@@ -137,7 +136,7 @@ describe("Generic item sets for player, Animate Guardian, and Mercenary", functi
 		local mercSet = build.mercenaryTab:GetItemSet(true)
 		assert.are_not.equal(playerSet.id, mercSet.id)
 		assert(build.mercenaryTab:SetItemSet(playerSet.id))
-		assert.are.equal(playerSet.id, build.mercenaryTab.itemSetId)
+		assert.are.equal(playerSet.id, itemsTab:GetActorItemSetId("MERCENARY"))
 		build.skillsTab:PasteSocketGroup("Animate Guardian 20/0  1")
 		local gem = assert(findGuardianGem())
 		gem.skillMinionItemSet = playerSet.id
@@ -162,19 +161,16 @@ describe("Generic item sets for player, Animate Guardian, and Mercenary", functi
 			end
 			return false
 		end
-		local playerSets = itemsTab:GetPlayerItemSetOrderList()
-		assert.is_true(contains(playerSets, playerSet.id))
-		assert.is_true(not contains(playerSets, mercSet.id))
+		assert.is_true(contains(itemsTab.itemSetOrderList, playerSet.id))
 		assert.is_true(contains(itemsTab.itemSetOrderList, mercSet.id))
 
 		local bossingSet = itemsTab:NewItemSet()
 		bossingSet.title = "Bossing"
 		table.insert(itemsTab.itemSetOrderList, bossingSet.id)
 		assert(build.mercenaryTab:SetItemSet(bossingSet.id))
-		playerSets = itemsTab:GetPlayerItemSetOrderList()
-		assert.is_true(contains(playerSets, playerSet.id))
-		assert.is_true(contains(playerSets, bossingSet.id))
-		assert.is_true(not contains(playerSets, mercSet.id))
+		assert.is_true(contains(itemsTab.itemSetOrderList, playerSet.id))
+		assert.is_true(contains(itemsTab.itemSetOrderList, bossingSet.id))
+		assert.is_true(contains(itemsTab.itemSetOrderList, mercSet.id))
 
 		local xml = { }
 		build.itemsTab:Save(xml)
@@ -394,214 +390,6 @@ describe("Generic item sets for player, Animate Guardian, and Mercenary", functi
 		calcs.perform(preview)
 		assert.are.equal(guardianSet.id, preview.player.mainSkill.minion.itemSet.id)
 		assert.are.equal(base.minion.output.Life, preview.minion.output.Life)
-	end)
-
-	it("undoing an item-set deletion restores inactive config references", function()
-		local itemsTab = build.itemsTab
-		local removed = itemsTab:NewItemSet()
-		removed.title = "Bossing"
-		table.insert(itemsTab.itemSetOrderList, removed.id)
-		local config = build.configTab:NewConfigSet(nil, "Bossing", { copyLiveItemSets = false })
-		table.insert(build.configTab.configSetOrderList, config.id)
-		config.actors.player.itemSetId = removed.id
-		itemsTab:ResetUndo()
-		local control = new("ItemSetListControl"):ItemSetListControl(nil, {0,0,350,200}, itemsTab)
-		local oldPopup = main.OpenConfirmPopup
-		main.OpenConfirmPopup = function(_, _, _, _, callback) callback() end
-		local ok, err = pcall(control.OnSelDelete, control, 2, removed.id)
-		main.OpenConfirmPopup = oldPopup
-		assert(ok, err)
-		itemsTab:Undo()
-		assert.are.equal(removed.id, config.actors.player.itemSetId)
-		assert.is_not_nil(itemsTab.itemSets[removed.id])
-	end)
-
-	it("Items undo does not revert another config's later Mercenary item set", function()
-		selectScionLuminary()
-		build.mercenaryTab.profile.buildId = "MeleeAOEMarauderFireSlam"
-		build.mercenaryTab:Changed()
-		local itemsTab = build.itemsTab
-		local configTab = build.configTab
-		local originalMercSet = assert(build.mercenaryTab:GetItemSet(true))
-		local otherMercSet = itemsTab:NewItemSet()
-		otherMercSet.title = "Merc Bossing"
-		table.insert(itemsTab.itemSetOrderList, otherMercSet.id)
-		local otherConfig = configTab:NewConfigSet(nil, "Bossing", { copyLiveItemSets = true })
-		table.insert(configTab.configSetOrderList, otherConfig.id)
-		itemsTab:ResetUndo()
-		local hat = new("Item"):Item("Rarity: Normal\nIron Hat")
-		itemsTab:AddItem(hat, true)
-		itemsTab:AddUndoState()
-		configTab:SetActiveConfigSet(otherConfig.id)
-		configTab:SetViewActor("mercenary")
-		configTab:UpdateActorItemSetSelect()
-		configTab.controls.itemSetSelect.selFunc(nil, { id = otherMercSet.id })
-		assert.are.equal(otherMercSet.id, otherConfig.actors.mercenary.itemSetId)
-		configTab:SetActiveConfigSet(configTab.configSetOrderList[1])
-		itemsTab:Undo()
-		assert.are.equal(otherMercSet.id, otherConfig.actors.mercenary.itemSetId)
-		assert.are.equal(originalMercSet.id, configTab.configSets[configTab.activeConfigSetId].actors.mercenary.itemSetId)
-	end)
-
-	it("stores a false sentinel when an actor item-set assignment is cleared", function()
-		local config = build.configTab
-		local configSet = config.configSets[config.activeConfigSetId]
-		config:EnsureActorConfig(configSet)
-		local delta = config:ChangedActorItemSetIds(
-			{ [configSet.id] = { player = 1 } },
-			{ [configSet.id] = { player = 1, mercenary = 2 } }
-		)
-		assert.are.same({ [configSet.id] = { mercenary = false } }, delta)
-		configSet.actors.mercenary.itemSetId = 2
-		config:RestoreActorItemSetIds(delta)
-		assert.is_nil(configSet.actors.mercenary.itemSetId)
-	end)
-
-	it("clears an inactive config assignment when undoing first Mercenary equipment creation", function()
-		selectScionLuminary()
-		MercenaryTest.allocatePermanentHire()
-		local config, items = build.configTab, build.itemsTab
-		local first = config.configSets[config.activeConfigSetId]
-		config:EnsureActorConfig(first)
-		local second = config:NewConfigSet(nil, "Second", { copyLiveItemSets = false })
-		table.insert(config.configSetOrderList, second.id)
-		build.mercenaryTab.profile.buildId = "TrapsMinesShadowLightning"
-		items:ResetUndo()
-		assert.is_nil(first.actors.mercenary.itemSetId)
-		local created = build.mercenaryTab:GetItemSet(true)
-		items:AddUndoState()
-		assert.are.equal(created.id, first.actors.mercenary.itemSetId)
-		config:SetActiveConfigSet(second.id)
-		items:Undo()
-		-- Mercenary still references the set, so Items undo must not delete it.
-		assert.is_not_nil(items.itemSets[created.id])
-		assert.are.equal(created.id, build.mercenaryTab.itemSetId)
-		assert.is_nil(first.actors.mercenary.itemSetId)
-	end)
-
-	it("Items undo retains a later Mercenary equipment set created by the build picker", function()
-		MercenaryTest.allocatePermanentHire()
-		local items = build.itemsTab
-		items:ResetUndo()
-		local hat = new("Item"):Item("Rarity: Normal\nIron Hat")
-		items:AddItem(hat, true)
-		items:AddUndoState()
-		local tab = build.mercenaryTab
-		tab:EnsureData()
-		tab.controls.build.selFunc(1, tab.data.builds.ElementalWitchLightning)
-		assert.is_true(tab:SetSkill(1, "ArcMercenary"))
-		local set = assert(tab:GetItemSet(false))
-		items:Undo()
-		assert.is_table(tab:GetItemSet(false))
-		assert.are.equal(set.id, tab.itemSetId)
-		assert.are.equal(set, items.itemSets[set.id])
-		assert.are.equal("ElementalWitchLightning", tab.profile.buildId)
-	end)
-
-	it("Items undo restores a deleted set without reusing its ID for later Mercenary equipment", function()
-		MercenaryTest.allocatePermanentHire()
-		local items = build.itemsTab
-		local extra = items:NewItemSet()
-		extra.title = "To Delete"
-		table.insert(items.itemSetOrderList, extra.id)
-		assert.are.equal(2, extra.id)
-		items:ResetUndo()
-		local control = new("ItemSetListControl"):ItemSetListControl(nil, {0,0,350,200}, items)
-		local oldPopup = main.OpenConfirmPopup
-		main.OpenConfirmPopup = function(_, _, _, _, callback) callback() end
-		local ok, err = pcall(control.OnSelDelete, control, 2, extra.id)
-		main.OpenConfirmPopup = oldPopup
-		assert(ok, err)
-		assert.is_nil(items.itemSets[2])
-		local tab = build.mercenaryTab
-		tab:EnsureData()
-		tab.controls.build.selFunc(1, tab.data.builds.ElementalWitchLightning)
-		assert.is_true(tab:SetSkill(1, "ArcMercenary"))
-		local mercSet = assert(tab:GetItemSet(false))
-		assert.are.equal(3, mercSet.id)
-		local helm = new("Item"):Item("Rarity: Normal\nLeather Cap")
-		items:AddItem(helm, true)
-		mercSet.Helmet.selItemId = helm.id
-		build.skillsTab:PasteSocketGroup("Animate Guardian 20/0  1")
-		local gem = assert(findGuardianGem())
-		gem.skillMinionItemSet = mercSet.id
-		gem.skillMinionItemSetCalcs = mercSet.id
-		items:Undo()
-		local restored = assert(tab:GetItemSet(false))
-		assert.are.equal("To Delete", items.itemSets[2].title)
-		assert.are.equal(3, tab.itemSetId)
-		assert.are.equal(mercSet, restored)
-		assert.are.equal("Mercenary Equipment", restored.title)
-		assert.are.equal(helm, items.items[restored.Helmet.selItemId])
-		assert.are.equal(3, gem.skillMinionItemSet)
-		assert.are.equal(3, gem.skillMinionItemSetCalcs)
-		assert.are.equal(mercSet, items.itemSets[gem.skillMinionItemSet])
-		assert.are.equal("ElementalWitchLightning", tab.profile.buildId)
-	end)
-
-	it("Items undo restores a deleted item without reusing its ID for later Mercenary gear", function()
-		MercenaryTest.allocatePermanentHire()
-		local items = build.itemsTab
-		local oldHelm = new("Item"):Item("Rarity: Normal\nIron Hat")
-		items:AddItem(oldHelm, true)
-		local oldId = oldHelm.id
-		items:ResetUndo()
-		items:DeleteItem(oldHelm)
-		assert.is_nil(items.items[oldId])
-		local tab = build.mercenaryTab
-		tab:EnsureData()
-		tab.controls.build.selFunc(1, tab.data.builds.ElementalWitchLightning)
-		assert.is_true(tab:SetSkill(1, "ArcMercenary"))
-		local mercSet = assert(tab:GetItemSet(false))
-		local newHelm = new("Item"):Item("Rarity: Normal\nLeather Cap")
-		items:AddItem(newHelm, true)
-		assert.are_not.equal(oldId, newHelm.id)
-		mercSet.Helmet.selItemId = newHelm.id
-		items:Undo()
-		local restored = assert(tab:GetItemSet(false))
-		assert.are.equal("Iron Hat", items.items[oldId].name)
-		assert.are.equal(newHelm, items.items[restored.Helmet.selItemId])
-		assert.are.equal(newHelm.id, restored.Helmet.selItemId)
-		assert.are.equal("Leather Cap", items.items[restored.Helmet.selItemId].name)
-	end)
-
-	it("Items undo keeps two later Mercenary loadout equipment sets when restoring a deleted set ID", function()
-		MercenaryTest.allocatePermanentHire()
-		local items = build.itemsTab
-		local extra = items:NewItemSet()
-		extra.title = "To Delete"
-		table.insert(items.itemSetOrderList, extra.id)
-		items:ResetUndo()
-		local control = new("ItemSetListControl"):ItemSetListControl(nil, {0,0,350,200}, items)
-		local oldPopup = main.OpenConfirmPopup
-		main.OpenConfirmPopup = function(_, _, _, _, callback) callback() end
-		local ok, err = pcall(control.OnSelDelete, control, 2, extra.id)
-		main.OpenConfirmPopup = oldPopup
-		assert(ok, err)
-		local tab = build.mercenaryTab
-		tab:EnsureData()
-		tab.controls.build.selFunc(1, tab.data.builds.ElementalWitchLightning)
-		assert.is_true(tab:SetSkill(1, "ArcMercenary"))
-		local setA = assert(tab:GetItemSet(false))
-		local loadoutA = tab.activeMercenarySetId
-		assert.are.equal(3, setA.id)
-		local loadoutB = tab:NewMercenarySet()
-		table.insert(tab.mercenarySetOrderList, loadoutB.id)
-		tab:SetActiveMercenarySet(loadoutB.id)
-		tab.controls.build.selFunc(1, tab.data.builds.MeleeAOEMarauderFireSlam)
-		local setB = assert(tab:GetItemSet(false))
-		assert.are.equal(4, setB.id)
-		assert.are.equal(3, setA.id)
-		items:Undo()
-		assert.are.equal("To Delete", items.itemSets[2].title)
-		assert.are.equal(setA, items.itemSets[3])
-		assert.are.equal(setB, items.itemSets[4])
-		tab:SetActiveMercenarySet(loadoutA)
-		assert.are.equal(3, tab.itemSetId)
-		assert.are.equal(setA, tab:GetItemSet(false))
-		tab:SetActiveMercenarySet(loadoutB.id)
-		assert.are.equal(4, tab.itemSetId)
-		assert.are.equal(setB, tab:GetItemSet(false))
 	end)
 
 	it("matches actual weapon replacement for Animate Guardian Full DPS", function()

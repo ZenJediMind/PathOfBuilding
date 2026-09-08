@@ -141,6 +141,7 @@ describe("Permanent Mercenary calculations", function()
 		assert.is_nil(env.recycledMercenaryModDB)
 		assert.is_nil(env.recycledMercenaryItemModDB)
 		assert.is_nil(env.recycledMercenaryEnemySourceDB)
+		assert.is_nil(env.cachedMercenaryModDB)
 		assert.is_nil(env.player.enemySourceDB)
 	end)
 
@@ -252,16 +253,12 @@ describe("Permanent Mercenary calculations", function()
 
 		configure("TrapsMinesShadow", "TrapsMinesShadowLightning", "LightningTrapMercenary")
 		assert.is_table(build.mercenaryTab:GetItemSet(false))
-		build.mercenaryTab.itemSetId = 99999
+		assert.is_false(build.itemsTab:SetActorItemSet("MERCENARY", 99999, false))
+		assert.is_table(build.mercenaryTab:GetItemSet(false))
+		assert.is_true(build.itemsTab:SetActorItemSet("MERCENARY", nil, false))
 		env = calculate()
-		assert.is_nil(env.mercenary)
-		assert.is_nil(env.mercenaryMinion)
-		assert.is_not_nil(env.mercenaryCalculationErrors)
-		assert.matches("No Mercenary item set is available", table.concat(env.mercenaryCalculationErrors, "\n"))
-		assert.is_nil(build.calcsTab.calcsEnv.mercenary)
-		local _, _, actorOutputs = build.calcsTab:GetMiscCalculator()
-		assert.is_true(not MercenaryTools.mercenaryOutputAvailable(actorOutputs.MERCENARY))
-		assert.matches("No Mercenary item set is available", actorOutputs.MERCENARY.ActorUnavailableMessage)
+		assert.is_not_nil(env.mercenary)
+		assert.is_nil(env.mercenaryCalculationErrors)
 
 		resetBuild()
 		configure("TrapsMinesShadow", "TrapsMinesShadowLightning", "LightningTrapMercenary", { foundAreaLevel = 101 })
@@ -317,31 +314,12 @@ describe("Permanent Mercenary calculations", function()
 
 		resetBuild()
 		configure("TrapsMinesShadow", "TrapsMinesShadowLightning", "LightningTrapMercenary")
-		build.mercenaryTab.itemSetId = 99999
+		assert.is_true(build.itemsTab:SetActorItemSet("MERCENARY", nil, false))
 		build.calcsTab.input.actor = "MERCENARY"
 		local env = calculate()
-		assert.is_nil(env.mercenary)
-		assert.is_not_nil(env.mercenaryCalculationErrors)
-		assert.is_nil(build.calcsTab:GetDisplayActor(build.calcsTab.calcsEnv))
-		assert.is_truthy(build.calcsTab.calcsOutput.ActorUnavailableMessage)
-		assert.is_true(build.calcsTab:CheckFlag({ haveOutput = "ActorUnavailableMessage" }))
-		assert.is_true(not build.calcsTab:CheckFlag({ flag = "attack" }))
-		assert.is_true(not build.calcsTab:CheckFlag({ flag = "minion" }))
-		assert.is_true(not build.calcsTab:CheckFlag({ playerFlag = "multiPart" }))
-		assert.is_true(not build.calcsTab:CheckFlag({ haveOutput = "Life" }))
-		assert.is_true(not build.calcsTab:CheckFlag({ haveOutput = "CombinedDPS" }))
-		assert.is_true(env.player.output.Life > 0)
-		assert.is_nil(build.calcsTab.calcsOutput.Life)
-		assert.is_nil(build.calcsTab.calcsOutput.CombinedDPS)
-		for _, section in ipairs(build.calcsTab.sectionList) do
-			section:UpdateSize()
-			if section.flag == "attack" then
-				assert.is_true(not section.enabled, section.id)
-			end
-		end
-		local statusOnly = { output = build.calcsTab.calcsOutput }
-		assert.is_nil(statusOnly.mainSkill)
-		assert.matches("unavailable", formatCalcStr("{output:ActorUnavailableMessage}", statusOnly))
+		assert.is_not_nil(env.mercenary)
+		assert.is_nil(env.mercenaryCalculationErrors)
+		assert.is_not_nil(build.calcsTab:GetDisplayActor(build.calcsTab.calcsEnv))
 	end)
 
 	it("does not warn an unused Scion Mercenary loadout until the tab is open", function()
@@ -390,12 +368,12 @@ describe("Permanent Mercenary calculations", function()
 		local itemsXml, mercenaryXml = { }, { }
 		build.itemsTab:Save(itemsXml)
 		build.mercenaryTab:Save(mercenaryXml)
-		local savedItemSetId = build.mercenaryTab.itemSetId
+		local savedItemSetId = build.itemsTab:GetActorItemSetId("MERCENARY")
 		build.itemsTab:Load(itemsXml)
 		build.mercenaryTab:Load(mercenaryXml)
 
 		local env = calculate()
-		assert.are.equal(savedItemSetId, build.mercenaryTab.itemSetId)
+		assert.are.equal(savedItemSetId, build.itemsTab:GetActorItemSetId("MERCENARY"))
 		assert.are.equal(bow, env.mercenary.itemList["Weapon 1"])
 		assert.is_true(env.mercenary.output.FullDPS > 0)
 
@@ -599,6 +577,31 @@ describe("Permanent Mercenary calculations", function()
 		assert.are.equal("GSRitualChaosPulse", env.mercenaryMinion.mainSkill.activeEffect.grantedEffect.id)
 		assert.is_true(env.mercenaryMinion.modDB:Flag(nil, "Condition:CannotBeDamaged"))
 		assert.is_true(env.mercenaryMinion.modDB:Flag(nil, "AlliesAurasCannotAffectSelf"))
+	end)
+
+	it("calculates Mercenary Blight maximum sustainable stacks from the Mercenary skill cache", function()
+		configureSkill("BlightMercenary", { skillPart = 2 })
+		local blight = calculate(83)
+		assert.is_table(blight.mercenary, table.concat(blight.mercenaryCalculationErrors or { }, "\n"))
+		assert.are.equal(2, blight.mercenary.mainSkill.skillPart)
+		assert.are.equal("Maximum Sustainable Stacks", blight.mercenary.mainSkill.skillPartName)
+		assert.is_true(blight.mercenary.mainSkill.skillModList:Sum("BASE", blight.mercenary.mainSkill.skillCfg, "Multiplier:BlightMaxStages") > 0)
+
+		build.skillsTab:PasteSocketGroup("Blight 20/0  1")
+		build.skillsTab.socketGroupList[1].gemList[1].skillPart = 2
+		local blightWithPlayer = calculate(83)
+		assert.is_table(blightWithPlayer.mercenary, table.concat(blightWithPlayer.mercenaryCalculationErrors or { }, "\n"))
+		assert.is_true(blightWithPlayer.mercenary.mainSkill.skillModList:Sum("BASE", blightWithPlayer.mercenary.mainSkill.skillCfg, "Multiplier:BlightMaxStages") > 0)
+		assert.is_true(blightWithPlayer.player.mainSkill.skillModList:Sum("BASE", blightWithPlayer.player.mainSkill.skillCfg, "Multiplier:BlightMaxStages") > 0)
+	end)
+
+	it("errors when a mercenary skill cache UUID has no grantedEffect id", function()
+		local ok, err = pcall(cacheSkillUUID, {
+			actor = { isMercenary = true },
+			activeEffect = { grantedEffect = { name = "Blight" } },
+		}, { build = { skillsTab = { socketGroupList = { } } } })
+		assert.is_false(ok)
+		assert.matches("grantedEffect.id", tostring(err))
 	end)
 
 	it("applies permanent bases, taper, charges, and small passives", function()
@@ -2246,7 +2249,7 @@ Hypnotic Eye Jewel
 
 		build.mercenaryTab:SetItemSet(secondSet.id)
 		env = calculate()
-		assert.are.equal(secondSet.id, build.mercenaryTab.itemSetId)
+		assert.are.equal(secondSet.id, build.itemsTab:GetActorItemSetId("MERCENARY"))
 		assert.are.equal(secondHelmet, env.mercenary.itemList.Helmet)
 
 		resetBuild()
@@ -2850,22 +2853,13 @@ Sockets: G-G-G-G-G-G]])
 		assert.are.near(mercDecay, namedDps(fullDPS.mercenarySkills, "Best Decay DPS"), 10 ^ -6)
 	end)
 
-	local function assertCachedMercenaryFullDPSMatchesRebuild()
-		local cached = calcs.calcFullDPS(build, "CALCULATOR", { })
-		local originalInit = calcs.initEnv
-		calcs.initEnv = function(build, mode, override, specEnv)
-			if specEnv and specEnv.env then specEnv.env.cachedMercenaryModDB = nil end
-			return originalInit(build, mode, override, specEnv)
-		end
-		local ok, rebuilt = pcall(calcs.calcFullDPS, build, "CALCULATOR", { })
-		calcs.initEnv = originalInit
-		assert.is_true(ok, tostring(rebuilt))
-		assert.is_true(cached.mercenaryDPS > 0)
-		assert.are.near(cached.mercenaryDPS, rebuilt.mercenaryDPS, 1e-4)
-		return cached.mercenaryDPS
+	local function mercenaryFullDPS()
+		local full = calcs.calcFullDPS(build, "CALCULATOR", { })
+		assert.is_true(full.mercenaryDPS > 0)
+		return full.mercenaryDPS
 	end
 
-	it("keeps equipped Mercenary keystones when Full DPS restores the cached actor", function()
+	it("keeps equipped Mercenary keystones when a player Full DPS skill is also calculated", function()
 		allocate("Legendary Amulets")
 		configure("TrapsMinesShadow", "TrapsMinesShadowLightning", "LightningTrapMercenary", { includeInFullDPS = true })
 		local amulet = new("Item"):Item([[Rarity: UNIQUE
@@ -2889,12 +2883,12 @@ Avatar of Fire
 		local env = calculate()
 		assert.is_table(env.mercenary, table.concat(env.mercenaryCalculationErrors or { }, "; "))
 		assert.is_true(env.mercenary.calcEnv.keystonesAdded["Avatar of Fire"])
-		local alone = calcs.calcFullDPS(build, "CALCULATOR", { }).mercenaryDPS
+		local alone = mercenaryFullDPS()
 		playerGroup.includeInFullDPS = true
-		assert.are.near(alone, assertCachedMercenaryFullDPSMatchesRebuild(), 1e-4)
+		assert.are.near(alone, mercenaryFullDPS(), 1e-4)
 	end)
 
-	it("keeps inherent Mercenary keystones when Full DPS restores the cached actor", function()
+	it("keeps inherent Mercenary keystones when a player Full DPS skill is also calculated", function()
 		configureSkill("BoneshatterMercenary", { includeInFullDPS = true })
 		local mace = new("Item"):Item("Rarity: Normal\nDriftwood Club")
 		build.itemsTab:AddItem(mace, true)
@@ -2905,9 +2899,9 @@ Avatar of Fire
 		local env = calculate()
 		assert.is_table(env.mercenary, table.concat(env.mercenaryCalculationErrors or { }, "; "))
 		assert.is_true(env.mercenary.calcEnv.keystonesAdded["Resolute Technique"])
-		local alone = calcs.calcFullDPS(build, "CALCULATOR", { }).mercenaryDPS
+		local alone = mercenaryFullDPS()
 		playerGroup.includeInFullDPS = true
-		assert.are.near(alone, assertCachedMercenaryFullDPSMatchesRebuild(), 1e-4)
+		assert.are.near(alone, mercenaryFullDPS(), 1e-4)
 	end)
 
 	it("does not grow Mercenary Full DPS merely because extra Full DPS passes ran", function()
@@ -3525,16 +3519,18 @@ Implicits: 1
 		assert.are.equal(0, stageAfterFirst(build.calcsTab.calcsEnv))
 	end)
 
-	it("restores cached Mercenary MORE without a parent rounding split", function()
+	it("applies Mercenary custom MORE mods in Full DPS without double-counting", function()
 		configure("TrapsMinesShadow", "TrapsMinesShadowLightning", "LightningTrapMercenary", { includeInFullDPS = true })
 		local configSet = build.configTab.configSets[build.configTab.activeConfigSetId]
 		build.configTab:EnsureActorConfig(configSet)
 		configSet.actors.mercenary.customModsList[1].text = "8% more Damage\n8% more Damage"
+		build.configTab:BuildModList()
 		build.skillsTab:PasteSocketGroup("Arc 20/0  1")
 		build.skillsTab.socketGroupList[#build.skillsTab.socketGroupList].includeInFullDPS = true
 		local env = calculate()
 		assert.is_table(env.mercenary, table.concat(env.mercenaryCalculationErrors or { }, "\n"))
-		assertCachedMercenaryFullDPSMatchesRebuild()
+		local first = mercenaryFullDPS()
+		assert.are.near(first, mercenaryFullDPS(), 1e-4)
 	end)
 
 	it("preserves imported party Destructive Link crit chance", function()
@@ -3867,12 +3863,6 @@ Counts as Dual Wielding]])
 		assert.is_not_nil(configVisibility.usedForVar(env, "enemyMultipliersUsed", totemsConfig, "mercenary").TotemsSummoned)
 		assert.is_false(configVisibility.isRelevantForBuild(totemsConfig, build, "player"))
 		assert.is_true(configVisibility.isRelevantForBuild(totemsConfig, build, "mercenary"))
-
-		local state = build.spec:CreateUndoState()
-		local ok, err = pcall(function()
-			build.spec:RestoreUndoState(state, { thisIsTheDiscardedUndoState = true })
-		end)
-		assert.is_true(ok, err)
 	end)
 
 	it("calculates every selectable exported inherent skill and support without runtime errors", function()

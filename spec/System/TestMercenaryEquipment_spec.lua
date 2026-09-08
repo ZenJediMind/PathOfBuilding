@@ -23,22 +23,6 @@ describe("Mercenary equipment validation", function()
 		mercenaryItemSet = tab:GetItemSet(true)
 	end
 
-	it("preserves user-created equipment sets with the auxiliary set's title", function()
-		newBuild()
-		selectScionLuminary()
-		local mercenaryTab = build.mercenaryTab
-		local userSet = build.itemsTab:NewItemSet()
-		userSet.title = "Mercenary Equipment"
-		table.insert(build.itemsTab.itemSetOrderList, userSet.id)
-		assert.is_true(mercenaryTab:SetItemSet(userSet.id, false))
-		local saved = { }
-		mercenaryTab:Save(saved)
-		mercenaryTab:Load(saved)
-		mercenaryTab:PostLoad()
-		assert.is_nil(mercenaryTab.auxiliaryItemSetId)
-		assert.is_truthy(isValueInArray(build.itemsTab:GetPlayerItemSetOrderList(), userSet.id))
-	end)
-
 	local function showMercenaryEquipment()
 		mercenaryItemSet = tab:GetItemSet(true)
 		build.itemsTab:SetViewItemSet(mercenaryItemSet.id)
@@ -67,8 +51,6 @@ describe("Mercenary equipment validation", function()
 		node = build.spec.nodes[node.id] or node
 		node.alloc = true
 		build.spec.allocNodes[node.id] = node
-		-- A Mercenary's equipment permissions are modifiers, so they only reach the tab
-		-- once a calculation has rebuilt the modifier database.
 		build.spec.modFlag = true
 		build.buildFlag = true
 		runCallback("OnFrame")
@@ -80,6 +62,7 @@ describe("Mercenary equipment validation", function()
 		tab = build.mercenaryTab
 		itemSet = build.itemsTab.activeItemSet
 		mercenaryItemSet = nil
+		tab:EnsureData()
 	end
 
 	local function stubThrowingCalculator()
@@ -102,6 +85,26 @@ describe("Mercenary equipment validation", function()
 	end
 
 	before_each(freshBuild)
+
+	it("assigns a user-created item set to MERCENARY without duplicating ownership", function()
+		newBuild()
+		selectScionLuminary()
+		local mercenaryTab = build.mercenaryTab
+		local itemsTab = build.itemsTab
+		local userSet = itemsTab:NewItemSet()
+		userSet.title = "Mercenary Equipment"
+		table.insert(itemsTab.itemSetOrderList, userSet.id)
+		assert.is_true(mercenaryTab:SetItemSet(userSet.id, false))
+		assert.are.equal(userSet.id, itemsTab:GetActorItemSetId("MERCENARY"))
+		local saved = { }
+		mercenaryTab:Save(saved)
+		assert.is_nil(saved.attrib.itemSetId)
+		assert.is_nil(saved.attrib.auxiliaryItemSetId)
+		mercenaryTab:Load(saved)
+		mercenaryTab:PostLoad()
+		assert.are.equal(userSet.id, itemsTab:GetActorItemSetId("MERCENARY"))
+		assert.is_truthy(isValueInArray(itemsTab.itemSetOrderList, userSet.id))
+	end)
 
 	it("Items views and edits Mercenary or AG gear without displacing the player's worn set", function()
 		local itemsTab = build.itemsTab
@@ -226,8 +229,8 @@ describe("Mercenary equipment validation", function()
 		assert.are.same({ first.id, second.id }, itemsTab.itemOrderList)
 	end)
 
-	it("Mercenary equipment persists in a generic item set with no owner", function()
-		local mercSet = tab:EnsureItemSet()
+	it("persists Mercenary equipment in a generic ItemsTab set and actor assignment", function()
+		local mercSet = tab:GetItemSet(true)
 		assert.are.equal(mercSet, tab:GetItemSet(true))
 
 		freshBuild()
@@ -239,26 +242,25 @@ describe("Mercenary equipment validation", function()
 		build.itemsTab:Save(itemsXml)
 		local savedItemId
 		local savedOwner
+		local savedActor
 		for _, node in ipairs(itemsXml) do
 			if node.elem == "ItemSet" and tonumber(node.attrib.id) == mercSet.id then
 				savedOwner = node.attrib.owner
 				for _, slot in ipairs(node) do
 					if slot.attrib and slot.attrib.name == "Helmet" then savedItemId = slot.attrib.itemId end
 				end
+			elseif node.elem == "ActorItemSet" and node.attrib.actor == "MERCENARY" then
+				savedActor = tonumber(node.attrib.itemSetId)
 			end
 		end
 		assert.are.equal("9001", savedItemId)
 		assert.is_nil(savedOwner)
+		assert.are.equal(mercSet.id, savedActor)
 		assert.is_nil(itemsXml.attrib.viewItemSet)
-		for _, node in ipairs(itemsXml) do
-			if node.elem == "ItemSet" and tonumber(node.attrib.id) == itemSet.id then
-				assert.is_nil(node.attrib.owner)
-			end
-		end
 		local mercenaryXml = { }
 		tab:Save(mercenaryXml)
-		assert.are.equal(tostring(mercSet.id), mercenaryXml.attrib.itemSetId)
-		assert.are.equal(tostring(mercSet.id), mercenaryXml.attrib.auxiliaryItemSetId)
+		assert.is_nil(mercenaryXml.attrib.itemSetId)
+		assert.is_nil(mercenaryXml.attrib.auxiliaryItemSetId)
 
 		freshBuild()
 		selectBuild("MeleeAOEMarauderFireSlam")
@@ -276,27 +278,26 @@ describe("Mercenary equipment validation", function()
 		end
 		assert.is_not_nil(secondSetIndex)
 		tab.controls.itemSetSelect:SetSel(secondSetIndex)
-		assert.are.equal(secondSet.id, tab.itemSetId)
+		assert.are.equal(secondSet.id, itemsTab:GetActorItemSetId("MERCENARY"))
 		assert.are.equal(secondSet.id, itemsTab.viewItemSetId)
 		assert.are.equal(activePlayerSetId, itemsTab.activeItemSetId)
 
 		local saved = { }
 		tab:Save(saved)
-		assert.are.equal(tostring(secondSet.id), saved.attrib.itemSetId)
+		assert.is_nil(saved.attrib.itemSetId)
 
 		freshBuild()
 		selectBuild("MeleeAOEMarauderFireSlam")
+		itemsTab = build.itemsTab
 		local validSet = tab:GetItemSet(false)
 		assert.is_table(validSet)
-		tab.itemSetId = 99999
+		assert.is_false(itemsTab:SetActorItemSet("MERCENARY", 99999, false))
+		assert.are.equal(validSet, tab:GetItemSet(false))
+		assert.is_true(itemsTab:SetActorItemSet("MERCENARY", nil, false))
 		assert.is_nil(tab:GetItemSet(false))
-		assert.is_nil(tab:GetItemSet(true))
-		assert.is_nil(tab:EnsureItemSet())
-		assert.are.equal(99999, tab.itemSetId)
-		tab:PostLoad()
-		assert.are.equal(99999, tab.itemSetId)
-		assert.is_nil(tab:GetItemSet(false))
-		assert.are.equal(validSet, build.itemsTab.itemSets[validSet.id])
+		local created = tab:GetItemSet(true)
+		assert.is_table(created)
+		assert.are_not.equal(99999, created.id)
 
 		freshBuild()
 		local playerSet = build.itemsTab:NewItemSet()
@@ -324,14 +325,9 @@ describe("Mercenary equipment validation", function()
 		tab:Save(mercenaryXml)
 		itemsTab:Load(itemsXml)
 		tab:Load(mercenaryXml)
+		tab:PostLoad()
 		assert.are.equal(activePlayerSetId, itemsTab.activeItemSetId)
 		assert.are.equal(activePlayerSetId, itemsTab.viewItemSetId)
-		assert.is_nil(itemsXml.attrib.viewItemSet)
-		for _, node in ipairs(itemsXml) do
-			if node.elem == "ItemSet" and tonumber(node.attrib.id) == activePlayerSetId then
-				assert.is_nil(node.attrib.owner)
-			end
-		end
 		assert.are.equal(playerHelmet.id, itemsTab.itemSets[activePlayerSetId].Helmet.selItemId)
 		assert.are.equal(mercHelmet.id, tab:GetItemSet(true)["Helmet"].selItemId)
 
@@ -353,8 +349,7 @@ describe("Mercenary equipment validation", function()
 		build.itemsTab.items[9001] = item({ id = 9001, name = "Mercenary Helmet", type = "Helmet", base = { type = "Helmet" } })
 		mercSet["Helmet"].selItemId = 9001
 		tab:Reset()
-		assert.is_nil(tab.itemSetId)
-		assert.are.equal(build.itemsTab.activeItemSetId, build.itemsTab.viewItemSetId)
+		assert.are.equal(mercSet.id, build.itemsTab:GetActorItemSetId("MERCENARY"))
 		assert.are.equal(mercSet, build.itemsTab.itemSets[mercSet.id])
 		assert.are.equal(9001, mercSet["Helmet"].selItemId)
 	end)
@@ -395,7 +390,7 @@ describe("Mercenary equipment validation", function()
 		assert.are.equal(newSetId, itemsTab.viewItemSetId)
 		assert.are.equal(playerSetId, itemsTab.activeItemSetId)
 		assert(tab:SetItemSet(newSetId))
-		assert.are.equal(newSetId, tab.itemSetId)
+		assert.are.equal(newSetId, build.itemsTab:GetActorItemSetId("MERCENARY"))
 		assert.are.equal(newSetId, itemsTab.viewItemSetId)
 		assert.are.equal(playerSetId, itemsTab.activeItemSetId)
 		assert.matches("%(Visible%)", manager:GetRowValue(1, isValueInArray(manager.list, newSetId), newSetId))
@@ -1239,12 +1234,12 @@ Note: ~b/o 1 mirror
 		tab.controls.editEquipment.onClick()
 		assert.are.equal("ITEMS", build.viewMode)
 		assert.are.equal(playerSetId, itemsTab.viewItemSetId)
-		assert.are.equal("MERCENARY", MercenaryTools.comparisonActorForItemSet(playerSetId, itemsTab))
+		assert.are.equal("MERCENARY", itemsTab:ComparisonActorForItemSet(playerSetId))
 		assert.are.equal("MERCENARY", itemsTab:ItemCalculationOverride("Helmet", item()).comparisonActor)
 
-		assert.are.equal("MERCENARY", MercenaryTools.comparisonActorForItemSet(playerSetId, itemsTab))
+		assert.are.equal("MERCENARY", itemsTab:ComparisonActorForItemSet(playerSetId))
 		assert(itemsTab:SetViewItemSet(playerSetId))
-		assert.are.equal("PLAYER", MercenaryTools.comparisonActorForItemSet(playerSetId, itemsTab))
+		assert.are.equal("PLAYER", itemsTab:ComparisonActorForItemSet(playerSetId))
 		assert.are.equal("PLAYER", itemsTab:ItemCalculationOverride("Helmet", item()).comparisonActor)
 
 		freshBuild()
@@ -1253,7 +1248,7 @@ Note: ~b/o 1 mirror
 		local mercSet = assert(tab:GetItemSet(true))
 		assert(itemsTab:SetViewItemSet(mercSet.id))
 		assert.are_not.equal(itemsTab.activeItemSetId, mercSet.id)
-		assert.are.equal("MERCENARY", MercenaryTools.comparisonActorForItemSet(mercSet.id, itemsTab))
+		assert.are.equal("MERCENARY", itemsTab:ComparisonActorForItemSet(mercSet.id))
 		assert.are.equal("MERCENARY", itemsTab:ItemCalculationOverride("Helmet", item()).comparisonActor)
 
 		assert(tab:GetItemSet(true))
@@ -1263,8 +1258,8 @@ Note: ~b/o 1 mirror
 		assert(tab:SetItemSet(bossingSet.id, false))
 		assert(itemsTab:SetViewItemSet(bossingSet.id))
 		assert.are_not.equal(itemsTab.activeItemSetId, bossingSet.id)
-		assert.are.equal("PLAYER", MercenaryTools.comparisonActorForItemSet(bossingSet.id, itemsTab))
-		assert.are.equal("PLAYER", itemsTab:ItemCalculationOverride("Helmet", item()).comparisonActor)
+		assert.are.equal("MERCENARY", itemsTab:ComparisonActorForItemSet(bossingSet.id))
+		assert.are.equal("MERCENARY", itemsTab:ItemCalculationOverride("Helmet", item()).comparisonActor)
 	end)
 
 	it("migrates legacy Slot XML into the fallback item set", function()
@@ -1286,14 +1281,16 @@ Note: ~b/o 1 mirror
 		assert.are.equal(1, itemsTab.slots.Helmet.selItemId)
 	end)
 
-	it("copies a Mercenary loadout onto a forked item set and keeps Reset's equipment id", function()
+	it("copies a Mercenary loadout without cloning ItemsTab item sets", function()
 		selectBuild("MeleeAOEMarauderFireSlam")
 		local itemsTab = build.itemsTab
 		local mercSet = assert(tab:GetItemSet(true))
-		local sourceItemSetId = tab.itemSetId
+		local sourceItemSetId = itemsTab:GetActorItemSetId("MERCENARY")
 		local helmet = new("Item"):Item("Rarity: Normal\nLeather Cap")
 		itemsTab:AddItem(helmet, true)
 		mercSet.Helmet.selItemId = helmet.id
+		local setCount = #itemsTab.itemSetOrderList
+		tab:ResetUndo()
 
 		local manager = new("MercenarySetListControl"):MercenarySetListControl(nil, { 0, 0, 350, 200 }, tab)
 		manager.selValue = tab.activeMercenarySetId
@@ -1317,166 +1314,18 @@ Note: ~b/o 1 mirror
 			if tab.mercenarySets[setId].title == "Copied Loadout" then copied = tab.mercenarySets[setId] break end
 		end
 		assert.is_not_nil(copied)
-		assert.are_not.equal(sourceItemSetId, copied.itemSetId)
-		assert.are.equal(helmet.id, itemsTab.itemSets[copied.itemSetId].Helmet.selItemId)
-		itemsTab.itemSets[copied.itemSetId].Helmet.selItemId = 0
+		assert.is_nil(copied.itemSetId)
+		assert.are.equal(setCount, #itemsTab.itemSetOrderList)
+		assert.are.equal(sourceItemSetId, itemsTab:GetActorItemSetId("MERCENARY"))
 		assert.are.equal(helmet.id, mercSet.Helmet.selItemId)
 
-		local firstId = tab.activeMercenarySetId
-		tab:SetActiveMercenarySet(copied.id)
-		copied.buildId = "TrapsMinesShadowLightning"
-		copied.skills = { { id = "LightningTrapMercenary", enabled = true, supports = { } } }
-		copied.mainSkillId = "LightningTrapMercenary"
-		tab:SetActiveMercenarySet(firstId)
-		tab:Reset()
-		assert.are.equal(sourceItemSetId, tab.profile.itemSetId)
-		tab:SetActiveMercenarySet(copied.id)
-		tab:SetActiveMercenarySet(firstId)
-		assert.are.equal(sourceItemSetId, tab.itemSetId)
-	end)
-
-	local function copySelectedLoadout(title)
-		title = title or "Copied Loadout"
-		local manager = new("MercenarySetListControl"):MercenarySetListControl(nil, { 0, 0, 350, 200 }, tab)
-		manager.selValue = tab.activeMercenarySetId
-		manager.selIndex = 1
-		local popup
-		local originalOpenPopup = main.OpenPopup
-		local originalClosePopup = main.ClosePopup
-		main.OpenPopup = function(_, _, _, _, controls) popup = controls end
-		main.ClosePopup = function() end
-		local ok, err = pcall(function()
-			manager.controls.copy.onClick()
-			popup.edit.buf = title
-			popup.save.onClick()
-		end)
-		main.OpenPopup = originalOpenPopup
-		main.ClosePopup = originalClosePopup
-		assert.is_true(ok, err)
-		for _, setId in ipairs(tab.mercenarySetOrderList) do
-			if tab.mercenarySets[setId].title == title then
-				return tab.mercenarySets[setId]
-			end
-		end
-	end
-
-	it("undo Copy removes the forked equipment set and redo restores it", function()
-		selectBuild("MeleeAOEMarauderFireSlam")
-		local itemsTab = build.itemsTab
-		assert(tab:GetItemSet(true))
-		local sourceItemSetId = tab.itemSetId
-		tab:ResetUndo()
-		local copied = copySelectedLoadout("Copied Loadout")
-		assert.is_not_nil(copied)
-		local clonedItemSetId = copied.itemSetId
-		assert.are_not.equal(sourceItemSetId, clonedItemSetId)
-		assert.is_not_nil(itemsTab.itemSets[clonedItemSetId])
 		tab:Undo()
 		assert.is_nil(tab.mercenarySets[copied.id])
-		assert.is_nil(itemsTab.itemSets[clonedItemSetId])
-		assert.is_nil(isValueInArray(itemsTab.itemSetOrderList, clonedItemSetId))
-		tab:Redo()
-		assert.is_not_nil(tab.mercenarySets[copied.id])
-		assert.is_not_nil(itemsTab.itemSets[clonedItemSetId])
-		assert.are.equal(clonedItemSetId, tab.mercenarySets[copied.id].itemSetId)
-		tab:Undo()
-		assert.is_nil(tab.mercenarySets[copied.id])
-		assert.is_nil(itemsTab.itemSets[clonedItemSetId])
-		assert.is_nil(isValueInArray(itemsTab.itemSetOrderList, clonedItemSetId))
+		assert.is_not_nil(itemsTab.itemSets[sourceItemSetId])
+		assert.are.equal(sourceItemSetId, itemsTab:GetActorItemSetId("MERCENARY"))
 	end)
 
-	it("Items undo keeps a Mercenary Copy set created between Items snapshots", function()
-		selectBuild("MeleeAOEMarauderFireSlam")
-		local itemsTab = build.itemsTab
-		assert(tab:GetItemSet(true))
-		itemsTab:ResetUndo()
-		tab:ResetUndo()
-		local copied = copySelectedLoadout("Copied Loadout")
-		assert.is_not_nil(copied)
-		local clonedItemSetId = copied.itemSetId
-		local hat = new("Item"):Item("Rarity: Normal\nIron Hat")
-		itemsTab:AddItem(hat, true)
-		itemsTab:AddUndoState()
-		itemsTab:Undo()
-		assert.is_not_nil(tab.mercenarySets[copied.id])
-		assert.are.equal(clonedItemSetId, tab.mercenarySets[copied.id].itemSetId)
-		assert.is_not_nil(itemsTab.itemSets[clonedItemSetId])
-		assert.is_nil(itemsTab.items[hat.id])
-	end)
-
-	it("Items Redo does not resurrect a Mercenary Copy set that Mercenary undo deleted", function()
-		selectBuild("MeleeAOEMarauderFireSlam")
-		local itemsTab = build.itemsTab
-		assert(tab:GetItemSet(true))
-		itemsTab:ResetUndo()
-		tab:ResetUndo()
-		local copied = copySelectedLoadout("Copied Loadout")
-		assert.is_not_nil(copied)
-		local clonedItemSetId = copied.itemSetId
-		local hat = new("Item"):Item("Rarity: Normal\nIron Hat")
-		itemsTab:AddItem(hat, true)
-		itemsTab:AddUndoState()
-		itemsTab:Undo()
-		assert.is_not_nil(itemsTab.itemSets[clonedItemSetId])
-		tab:Undo()
-		assert.is_nil(tab.mercenarySets[copied.id])
-		assert.is_nil(itemsTab.itemSets[clonedItemSetId])
-		itemsTab:Redo()
-		assert.is_nil(tab.mercenarySets[copied.id])
-		assert.is_nil(itemsTab.itemSets[clonedItemSetId])
-		assert.is_not_nil(itemsTab.items[hat.id])
-	end)
-
-	it("Items Undo does not resurrect a Mercenary Copy set that Mercenary undo deleted", function()
-		selectBuild("MeleeAOEMarauderFireSlam")
-		local itemsTab = build.itemsTab
-		assert(tab:GetItemSet(true))
-		itemsTab:ResetUndo()
-		tab:ResetUndo()
-		local copied = copySelectedLoadout("Copied Loadout")
-		assert.is_not_nil(copied)
-		local clonedItemSetId = copied.itemSetId
-		local hat = new("Item"):Item("Rarity: Normal\nIron Hat")
-		itemsTab:AddItem(hat, true)
-		itemsTab:AddUndoState()
-		local cap = new("Item"):Item("Rarity: Normal\nLeather Cap")
-		itemsTab:AddItem(cap, true)
-		itemsTab:AddUndoState()
-		tab:Undo()
-		assert.is_nil(tab.mercenarySets[copied.id])
-		assert.is_nil(itemsTab.itemSets[clonedItemSetId])
-		itemsTab:Undo()
-		assert.is_nil(tab.mercenarySets[copied.id])
-		assert.is_nil(itemsTab.itemSets[clonedItemSetId])
-		assert.is_nil(itemsTab.items[cap.id])
-		assert.is_not_nil(itemsTab.items[hat.id])
-	end)
-
-	it("Items Redo keeps a user-created set Mercenary assigned then left", function()
-		selectBuild("MeleeAOEMarauderFireSlam")
-		local itemsTab = build.itemsTab
-		assert(tab:GetItemSet(true))
-		local mercSetId = tab.itemSetId
-		local bossing = itemsTab:NewItemSet()
-		bossing.title = "Bossing"
-		table.insert(itemsTab.itemSetOrderList, bossing.id)
-		assert(tab:SetItemSet(bossing.id, false))
-		itemsTab:ResetUndo()
-		tab:ResetUndo()
-		local hat = new("Item"):Item("Rarity: Normal\nIron Hat")
-		itemsTab:AddItem(hat, true)
-		itemsTab:AddUndoState()
-		assert(tab:SetItemSet(mercSetId, false))
-		itemsTab:Undo()
-		itemsTab:Redo()
-		assert.is_not_nil(itemsTab.itemSets[bossing.id])
-		assert.are.equal("Bossing", itemsTab.itemSets[bossing.id].title)
-		assert.is_truthy(isValueInArray(itemsTab.itemSetOrderList, bossing.id))
-		assert.are.equal(mercSetId, tab.itemSetId)
-		assert.is_not_nil(itemsTab.items[hat.id])
-	end)
-
-	it("Edit Equipment stamps a new item set so a later Mercenary undo does not delete it", function()
+	it("Edit Equipment creates an ItemsTab set that Mercenary undo does not delete", function()
 		MercenaryTest.allocatePermanentHire()
 		tab = build.mercenaryTab
 		tab:EnsureData()
@@ -1488,61 +1337,41 @@ Note: ~b/o 1 mirror
 		assert.is_nil(tab:GetItemSet(false))
 		tab:ResetUndo()
 		tab.controls.editEquipment.onClick()
-		local createdId = tab.itemSetId
+		local createdId = itemsTab:GetActorItemSetId("MERCENARY")
 		assert.is_not_nil(itemsTab.itemSets[createdId])
 		local hat = new("Item"):Item("Rarity: Normal\nIron Hat")
 		itemsTab:AddItem(hat, true)
+		itemsTab.itemSets[createdId].Helmet.selItemId = hat.id
 		itemsTab:AddUndoState()
 		tab.profile.foundAreaLevel = 80
 		tab:Changed()
 		tab:Undo()
 		assert.are.equal(68, tab.profile.foundAreaLevel)
 		assert.is_not_nil(itemsTab.itemSets[createdId])
-		assert.are.equal(createdId, tab.itemSetId)
+		assert.are.equal(createdId, itemsTab:GetActorItemSetId("MERCENARY"))
+		assert.are.equal(hat.id, itemsTab.itemSets[createdId].Helmet.selItemId)
 	end)
 
-	it("Mercenary undo of Edit Equipment keeps later Items equipment on the new set", function()
-		MercenaryTest.allocatePermanentHire()
-		tab = build.mercenaryTab
-		tab:EnsureData()
-		local itemsTab = build.itemsTab
-		tab.profile.buildId = "MeleeAOEMarauderFireSlam"
-		tab.profile.classId = tab.data.builds.MeleeAOEMarauderFireSlam.classId
-		tab.profile.foundAreaLevel = 68
-		tab:Changed()
-		assert.is_nil(tab:GetItemSet(false))
-		tab:ResetUndo()
-		tab.controls.editEquipment.onClick()
-		local createdId = tab.itemSetId
-		local hat = new("Item"):Item("Rarity: Normal\nIron Hat")
-		itemsTab:AddItem(hat, true)
-		itemsTab.itemSets[createdId].Helmet.selItemId = hat.id
-		tab:Undo()
-		assert.is_not_nil(itemsTab.itemSets[createdId])
-		assert.are.equal(hat.id, itemsTab.itemSets[createdId].Helmet.selItemId)
-		assert.is_not_nil(itemsTab.items[hat.id])
-		tab:Redo()
-		assert.are.equal(createdId, tab.itemSetId)
-		assert.are.equal(hat.id, itemsTab.itemSets[createdId].Helmet.selItemId)
-		assert.is_not_nil(itemsTab.items[hat.id])
-	end)
-
-	it("undo item-set assignment does not delete a user-created set", function()
+	it("Items undo restores mercenary item-set assignment without touching Mercenary profile", function()
 		selectBuild("MeleeAOEMarauderFireSlam")
 		local itemsTab = build.itemsTab
 		assert(tab:GetItemSet(true))
-		local mercSetId = tab.itemSetId
+		local mercSetId = itemsTab:GetActorItemSetId("MERCENARY")
 		local bossing = itemsTab:NewItemSet()
 		bossing.title = "Bossing"
 		table.insert(itemsTab.itemSetOrderList, bossing.id)
-		tab:ResetUndo()
+		tab.profile.foundAreaLevel = 80
+		tab:Changed()
+		itemsTab:ResetUndo()
 		assert(tab:SetItemSet(bossing.id, false))
-		assert.are.equal(bossing.id, tab.itemSetId)
+		assert.are.equal(bossing.id, itemsTab:GetActorItemSetId("MERCENARY"))
 		tab:Undo()
-		assert.are.equal(mercSetId, tab.itemSetId)
+		assert.are.equal(68, tab.profile.foundAreaLevel)
+		assert.are.equal(bossing.id, itemsTab:GetActorItemSetId("MERCENARY"))
 		assert.is_not_nil(itemsTab.itemSets[bossing.id])
-		assert.are.equal("Bossing", itemsTab.itemSets[bossing.id].title)
-		assert.is_truthy(isValueInArray(itemsTab.itemSetOrderList, bossing.id))
+		itemsTab:Undo()
+		assert.are.equal(mercSetId, itemsTab:GetActorItemSetId("MERCENARY"))
+		assert.is_not_nil(itemsTab.itemSets[bossing.id])
 	end)
 
 	it("records Mercenary tab undo history", function()

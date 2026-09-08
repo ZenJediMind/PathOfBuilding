@@ -111,7 +111,7 @@ describe("CompareTab", function()
 		local compareTab = build.compareTab
 		assert.is_true(compareTab:ImportBuild(assert(build:SaveDB("mercenary-copy")), "Mercenary"))
 		local entry = assert(compareTab:GetActiveCompare())
-		entry.itemsTab:SetViewItemSet(assert(entry.mercenaryTab.itemSetId))
+		entry.itemsTab:SetViewItemSet(assert(entry.itemsTab:GetActorItemSetId("MERCENARY")))
 		build.itemsTab:SetViewItemSet(primaryMercenarySet.id)
 		build.calcsTab:BuildOutput()
 		local _, baseOutput, actorOutputs = build.calcsTab:GetMiscCalculator()

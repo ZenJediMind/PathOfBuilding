@@ -2,9 +2,33 @@ describe("TradeQuery", function()
 	local mock_tradeQuery
 	local mock_queryGen
 
+	local function stubItemsTab(itemsTab)
+		itemsTab = itemsTab or { }
+		function itemsTab:ComparisonActorForSlot(slotName, itemSetId)
+			if type(slotName) == "string" and slotName:match("^Jewel ") then
+				return "PLAYER"
+			end
+			if type(slotName) == "string" and slotName:match("^Mercenary ") then
+				return "MERCENARY"
+			end
+			return "PLAYER"
+		end
+		function itemsTab:ItemCalculationOverride(slotName, item, itemSetId)
+			itemSetId = itemSetId or self.viewItemSetId
+			local isTreeJewel = type(slotName) == "string" and slotName:match("^Jewel ") ~= nil
+			return {
+				itemSetId = (not isTreeJewel) and itemSetId or nil,
+				comparisonActor = self:ComparisonActorForSlot(slotName, itemSetId),
+				repSlotName = slotName,
+				repItem = item,
+			}
+		end
+		return itemsTab
+	end
+
 	before_each(function()
-		mock_tradeQuery = new("TradeQuery"):TradeQuery({ itemsTab = {} })
-		mock_queryGen = new("TradeQueryGenerator"):TradeQueryGenerator({ itemsTab = {} })
+		mock_tradeQuery = new("TradeQuery"):TradeQuery(stubItemsTab())
+		mock_queryGen = new("TradeQueryGenerator"):TradeQueryGenerator({ itemsTab = stubItemsTab() })
 	end)
 	describe("result dropdown tooltipFunc", function()
 		-- Builds a TradeQuery with the strict minimum needed for
@@ -14,7 +38,7 @@ describe("TradeQuery", function()
 		-- lives behind a callback we never trigger, or is already initialized
 		-- by the TradeQuery constructor.
 		local function newTradeQuery(state)
-			local tq = new("TradeQuery"):TradeQuery({ itemsTab = {} })
+			local tq = new("TradeQuery"):TradeQuery(stubItemsTab())
 			tq.itemsTab.activeItemSet = {}
 			tq.itemsTab.slots         = {}
 			tq.itemsTab.GetVisibleItemSet = function(itemsTab) return itemsTab.activeItemSet end
@@ -103,9 +127,9 @@ describe("TradeQuery", function()
 	end)
 	describe("GetResultEvaluation", function()
 		it("uses the first visible ring for a Pearl result without a selected slot", function()
-			local tq = new("TradeQuery"):TradeQuery({ itemsTab = {} })
+			local tq = new("TradeQuery"):TradeQuery(stubItemsTab())
 			tq.statSortSelectionList = {}
-			tq.tradeQueryGenerator = new("TradeQueryGenerator"):TradeQueryGenerator({ itemsTab = {} })
+			tq.tradeQueryGenerator = new("TradeQueryGenerator"):TradeQueryGenerator({ itemsTab = stubItemsTab() })
 			tq.itemsTab.slots = {
 				["Ring 1"] = { slotName = "Ring 1", shown = function() return false end },
 				["Ring 2"] = { slotName = "Ring 2", shown = function() return true end },
@@ -129,9 +153,9 @@ describe("TradeQuery", function()
 			local slotTbl = {
 				slotName = "Megalomaniac", unique = true, alreadyCorrupted = true, selectedJewelNodeId = 12345,
 			}
-			local tq = new("TradeQuery"):TradeQuery({ itemsTab = {} })
+			local tq = new("TradeQuery"):TradeQuery(stubItemsTab())
 			tq.statSortSelectionList = {}
-			tq.tradeQueryGenerator = new("TradeQueryGenerator"):TradeQueryGenerator({ itemsTab = {} })
+			tq.tradeQueryGenerator = new("TradeQueryGenerator"):TradeQueryGenerator({ itemsTab = stubItemsTab() })
 			tq.itemsTab.build = {
 				spec = {
 					tree = {

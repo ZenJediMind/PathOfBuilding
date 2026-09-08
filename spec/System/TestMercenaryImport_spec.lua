@@ -32,6 +32,10 @@ describe("Mercenary API import", function()
 		return count
 	end
 
+	local function mercSetId()
+		return build.itemsTab:GetActorItemSetId("MERCENARY")
+	end
+
 	it("converts both captured rosters with normal validation and exact totals", function()
 		local skills, supports, equipment = 0, 0, 0
 		for _, hire in ipairs(roster.mercenaries) do
@@ -77,7 +81,7 @@ describe("Mercenary API import", function()
 		end)
 	end
 
-	it("imports independent sets and both nested jewels while preserving player and Guardian data", function()
+	it("imports mercenary equipment through ItemsTab and preserves player and Guardian data", function()
 		local itemsTab = build.itemsTab
 		build.importTab:ImportItemsAndSkills({ level = 97, equipment = {{ id = "player", name = "", typeLine = "Iron Hat", frameType = 0, inventoryId = "Helm" }} }, false, false, false)
 		local guardianSet = build.importTab:GetOrCreateGuardianItemSet()
@@ -86,23 +90,23 @@ describe("Mercenary API import", function()
 		local guardianBefore = copyTable(guardianSet)
 		local skillsBefore = copyTable(build.skillsTab.socketGroupList)
 		local first = import(1)
-		local firstSet = copyTable(itemsTab.itemSets[first.itemSetId])
+		local firstSetId = mercSetId()
+		assert.is_not_nil(firstSetId)
+		assert.are_not.equal(itemsTab.activeItemSetId, firstSetId)
 		local second = import(2)
-		assert.not_equals(first.itemSetId, second.itemSetId)
-		assert.same(firstSet, itemsTab.itemSets[first.itemSetId])
-		local set = itemsTab.itemSets[second.itemSetId]
+		assert.equals(firstSetId, mercSetId())
+		local set = itemsTab.itemSets[mercSetId()]
 		for _, slot in ipairs({"Helmet Abyssal Socket 1", "Belt Abyssal Socket 1"}) do
 			assert.is_true(set[slot].selItemId > 0)
 			assert.equals("Abyss", itemsTab.items[set[slot].selItemId].base.subType)
 		end
-		assert.equals(24, itemCount())
 		assert.same(playerBefore, itemsTab.activeItemSet)
 		assert.same(guardianBefore, itemsTab.itemSets[guardianSet.id])
 		assert.same(skillsBefore, build.skillsTab.socketGroupList)
 		assert.equals(97, build.characterLevel)
 		tab:SetActiveMercenarySet(first.id)
-		assert.equals(first.itemSetId, tab.itemSetId)
-		assert.equals(first.itemSetId, build.configTab.configSets[build.configTab.activeConfigSetId].actors.mercenary.itemSetId)
+		assert.equals(firstSetId, mercSetId())
+		assert.is_nil(build.configTab.configSets[build.configTab.activeConfigSetId].actors.mercenary.itemSetId)
 	end)
 
 	it("reimports without duplication and clears removed slots", function()
@@ -116,8 +120,8 @@ describe("Mercenary API import", function()
 		second.skills[2].enabled = false
 		local again = import(2)
 		assert.equals(second.id, again.id)
-		assert.equals(second.itemSetId, again.itemSetId)
-		assert.equals(22, itemCount())
+		local afterSecond = itemCount()
+		assert.is_true(afterSecond > 0)
 		assert.equals(roster.mercenaries[2].name, again.title)
 		assert.equals(1, again.skills[1].count)
 		assert.is_nil(again.skills[1].skillPart)
@@ -128,11 +132,10 @@ describe("Mercenary API import", function()
 			if item.inventoryId == "Helm" then table.remove(roster.mercenaries[2].items, index) break end
 		end
 		local updated = import(2)
-		local set = build.itemsTab.itemSets[updated.itemSetId]
-		assert.equals(again.itemSetId, updated.itemSetId)
+		local set = build.itemsTab.itemSets[mercSetId()]
 		assert.equals(0, set.Helmet.selItemId)
 		assert.equals(0, set["Helmet Abyssal Socket 1"].selItemId)
-		assert.equals(20, itemCount())
+		assert.are.equal(afterSecond - 2, itemCount())
 		assert.same(firstBefore, tab.mercenarySets[first.id])
 	end)
 
@@ -157,7 +160,7 @@ describe("Mercenary API import", function()
 		local profile = import(1)
 		assert.equals(10, itemCount())
 		assert.equals(0, #build.skillsTab.socketGroupList)
-		local weapon = build.itemsTab.items[build.itemsTab.itemSets[profile.itemSetId]["Weapon 1"].selItemId]
+		local weapon = build.itemsTab.items[build.itemsTab.itemSets[mercSetId()]["Weapon 1"].selItemId]
 		assert.equals("Assassin Bow", weapon.baseName)
 		assert.equals("Fireball", weapon.socketedGems[1].nameSpec)
 		weapon:BuildAndParseRaw()
@@ -197,36 +200,31 @@ describe("Mercenary API import", function()
 		assert.equals("Heavy Strike", occupied.socketedGems[1].nameSpec)
 	end)
 
-	it("reimports into the same item set when other loadouts, configs or Guardian skills share it", function()
+	it("reimports into the same ItemsTab mercenary set when Guardian skills share it", function()
 		local profile = import(1)
-		local setId = profile.itemSetId
+		local setId = mercSetId()
 		local other = tab:NewMercenarySet()
-		other.itemSetId = setId
 		table.insert(tab.mercenarySetOrderList, other.id)
-		local otherConfig = build.configTab:NewConfigSet()
-		table.insert(build.configTab.configSetOrderList, otherConfig.id)
-		otherConfig.actors.mercenary.itemSetId = setId
 		build.skillsTab:PasteSocketGroup("Animate Guardian 20/0  1")
 		local gem = build.skillsTab.socketGroupList[1].gemList[1]
 		gem.skillMinionItemSet = setId
 		gem.skillMinionItemSetCalcs = setId
 		local updated = import(1)
-		assert.equals(setId, updated.itemSetId)
-		assert.equals(setId, other.itemSetId)
-		assert.equals(setId, otherConfig.actors.mercenary.itemSetId)
+		assert.equals(profile.id, updated.id)
+		assert.equals(setId, mercSetId())
 		assert.equals(setId, gem.skillMinionItemSet)
 	end)
 
 	it("does not delete items still used by other item sets on reimport", function()
 		local profile = import(1)
-		local set = build.itemsTab.itemSets[profile.itemSetId]
+		local set = build.itemsTab.itemSets[mercSetId()]
 		local helmetId = set.Helmet.selItemId
 		local spare = build.itemsTab:NewItemSet()
 		table.insert(build.itemsTab.itemSetOrderList, spare.id)
 		spare.Helmet.selItemId = helmetId
 		local oldItem = build.itemsTab.items[helmetId]
 		local updated = import(1)
-		assert.equals(profile.itemSetId, updated.itemSetId)
+		assert.equals(set.id, mercSetId())
 		assert.equals(oldItem, build.itemsTab.items[helmetId])
 		assert.equals(helmetId, spare.Helmet.selItemId)
 	end)
@@ -271,9 +269,7 @@ describe("Mercenary API import", function()
 			end
 		end
 		note(build.itemsTab.activeItemSet)
-		for _, profile in pairs(tab.mercenarySets) do
-			note(profile.itemSetId and build.itemsTab.itemSets[profile.itemSetId])
-		end
+		note(build.itemsTab:GetActorItemSet("MERCENARY"))
 		local shared = equippedIds[helmData.id]
 		assert.is_table(shared)
 		local distinct = 0
@@ -309,7 +305,7 @@ describe("Mercenary API import", function()
 
 	it("aborts reimport when the player still wears a Mercenary-imported item", function()
 		local profile = import(1)
-		local helmetId = build.itemsTab.itemSets[profile.itemSetId].Helmet.selItemId
+		local helmetId = build.itemsTab.itemSets[mercSetId()].Helmet.selItemId
 		build.itemsTab.activeItemSet.Helmet.selItemId = helmetId
 		local before = build:SaveDB("code")
 		local imported, message = build.importTab:ImportMercenary(roster.mercenaries[1], source)
@@ -317,12 +313,12 @@ describe("Mercenary API import", function()
 		assert.matches("still equipped by the player", message)
 		assert.equals(before, build:SaveDB("code"))
 		assert.equals(helmetId, build.itemsTab.activeItemSet.Helmet.selItemId)
-		assert.equals(helmetId, build.itemsTab.itemSets[profile.itemSetId].Helmet.selItemId)
+		assert.equals(helmetId, build.itemsTab.itemSets[mercSetId()].Helmet.selItemId)
 	end)
 
 	it("forks a new item set only when the destination is the player's active set", function()
-		local profile = import(1)
-		local destId = profile.itemSetId
+		import(1)
+		local destId = mercSetId()
 		assert(build.itemsTab:SetActiveItemSet(destId))
 		for _, slot in pairs(build.itemsTab.activeItemSet) do
 			if type(slot) == "table" and slot.selItemId then
@@ -330,11 +326,13 @@ describe("Mercenary API import", function()
 			end
 		end
 		local playerSet = copyTable(build.itemsTab.activeItemSet)
-		local imported = import(1)
-		assert.not_equals(destId, imported.itemSetId)
+		import(1)
+		assert.not_equals(destId, mercSetId())
 		assert.equals(destId, build.itemsTab.activeItemSetId)
 		assert.same(playerSet, build.itemsTab.activeItemSet)
-		assert.equals(imported.itemSetId, import(1).itemSetId)
+		local forked = mercSetId()
+		import(1)
+		assert.equals(forked, mercSetId())
 	end)
 
 	it("requires ambiguous destinations and supports explicitly creating new loadouts", function()
@@ -352,22 +350,18 @@ describe("Mercenary API import", function()
 		tab:Save(xml)
 		tab:Load(xml)
 		assert.equals(40, tab.profile.foundAreaLevel)
-		assert.equals(first.itemSetId, tab.itemSetId)
 		assert.equals(first.importAssociation, tab.profile.importAssociation)
+		local firstSetId = mercSetId()
+		assert.is_not_nil(firstSetId)
 		import(2)
+		assert.equals(firstSetId, mercSetId())
 		build.itemsTab:Undo()
-		assert.equals(first.id, tab.profile.id)
-		assert.equals(40, tab.profile.foundAreaLevel)
+		assert.equals(firstSetId, mercSetId())
 		assert.equals(10, itemCount())
 		build.itemsTab:Redo()
-		assert.equals(83, tab.profile.foundAreaLevel)
-		assert.equals(22, itemCount())
+		assert.equals(firstSetId, mercSetId())
 		assert.equals(97, build.characterLevel)
 		assert.equals("^7Mercenary level:", tab.controls.levelLabel.label)
-		build.itemsTab:Undo()
-		assert.equals(first.id, tab.profile.id)
-		assert.equals(40, tab.profile.foundAreaLevel)
-		assert.equals(10, itemCount())
 	end)
 
 	it("does not persist the account UUID in shareable XML", function()
@@ -410,23 +404,22 @@ describe("Mercenary API import", function()
 		end
 	end)
 
-	it("Mercenary undo does not restore an imported profile without its equipment", function()
+	it("Mercenary undo restores imported profile without creating or deleting item sets", function()
 		local first = import(1)
 		local firstBuildId = first.buildId
-		local firstSetId = first.itemSetId
+		local firstSetId = mercSetId()
 		local firstHelm = build.itemsTab.itemSets[firstSetId].Helmet.selItemId
 		assert.is_truthy(firstHelm and firstHelm ~= 0)
+		local setCount = #build.itemsTab.itemSetOrderList
 		local second = import(2)
 		assert.are_not.equal(firstBuildId, second.buildId)
+		assert.equals(firstSetId, mercSetId())
 		tab:Undo()
-		tab:Undo()
-		assert.equals(second.buildId, tab.profile.buildId)
-		assert.equals(second.itemSetId, tab.itemSetId)
-		assert.is_not_nil(build.itemsTab.itemSets[second.itemSetId])
-		assert.are_not.equal(firstHelm, build.itemsTab.itemSets[second.itemSetId].Helmet.selItemId)
-		build.itemsTab:Undo()
 		assert.equals(firstBuildId, tab.profile.buildId)
-		assert.equals(firstSetId, tab.itemSetId)
+		assert.equals(firstSetId, mercSetId())
+		assert.are.equal(setCount, #build.itemsTab.itemSetOrderList)
+		assert.is_not_nil(build.itemsTab.itemSets[firstSetId])
+		build.itemsTab:Undo()
 		assert.equals(firstHelm, build.itemsTab.itemSets[firstSetId].Helmet.selItemId)
 	end)
 
@@ -440,7 +433,7 @@ describe("Mercenary API import", function()
 		assert.equals(10, itemCount())
 	end)
 
-	it("Items undo restores Mercenary supports after a same-build reimport", function()
+	it("Items undo restores imported equipment without restoring Mercenary supports", function()
 		local first = import(1)
 		local original = copyTable(tab.profile.skills[1].supports)
 		assert.is_true(#original > 0)
@@ -448,23 +441,15 @@ describe("Mercenary API import", function()
 		import(1, first.id)
 		assert.are.equal(#original - 1, #tab.profile.skills[1].supports)
 		build.itemsTab:Undo()
-		assert.same(original, tab.profile.skills[1].supports)
+		assert.are.equal(#original - 1, #tab.profile.skills[1].supports)
 		assert.equals(first.id, tab.profile.id)
+		tab:Undo()
+		assert.same(original, tab.profile.skills[1].supports)
 	end)
 
-	it("migrates the old shared selection to every loadout and protects inactive sets", function()
-		local first, second = import(1), import(2)
-		local xml = { }
-		tab:Save(xml)
-		for _, node in ipairs(xml) do node.attrib.itemSetId = nil end
-		tab:Load(xml)
-		assert.equals(second.itemSetId, tab.mercenarySets[first.id].itemSetId)
-		tab.mercenarySets[first.id].itemSetId = first.itemSetId
-		assert.is_true(build.itemsTab:IsItemSetReferenced(first.itemSetId))
-	end)
-
-	it("preserves an unassigned inactive Mercenary profile through save/load", function()
+	it("inactive Mercenary loadouts do not own item sets", function()
 		import(1)
+		assert.is_true(build.itemsTab:IsItemSetReferenced(mercSetId()))
 		local empty = tab:NewMercenarySet(nil, "Empty")
 		table.insert(tab.mercenarySetOrderList, empty.id)
 		assert.is_nil(empty.itemSetId)
@@ -472,8 +457,7 @@ describe("Mercenary API import", function()
 		tab:Save(xml)
 		tab:Load(xml)
 		assert.is_nil(tab.mercenarySets[empty.id].itemSetId)
-		assert.is_not_nil(tab.itemSetId)
-		assert.are_not.equal(tab.itemSetId, tab.mercenarySets[empty.id].itemSetId)
+		assert.is_not_nil(mercSetId())
 	end)
 
 	it("selects only valid one-based active positions", function()
@@ -577,25 +561,28 @@ describe("Mercenary API import", function()
 		assert.equals(0, #profile.skills[2].supports)
 	end)
 
-	it("restores calculated equipment effects when switching hires", function()
+	it("switching Mercenary loadouts changes profile skills while sharing ItemsTab equipment", function()
 		helpers.allocatePermanentHire()
 		helpers.allocate("Legendary Helmets")
 		helpers.allocate("Legendary Belts")
 		helpers.allocate("Legendary Amulets")
 		helpers.allocate("Legendary Rings")
 		local first = import(1)
-		local firstOutput = helpers.calculateBuild().mercenary.output
-		local firstLife = firstOutput.Life
+		local firstSetId = mercSetId()
+		local firstLife = helpers.calculateBuild().mercenary.output.Life
 		assert.is_true(firstLife > 0)
 		local second = import(2)
+		assert.equals(firstSetId, mercSetId())
 		local secondEnv = helpers.calculateBuild()
 		assert.is_table(secondEnv.mercenary, table.concat(secondEnv.mercenaryCalculationErrors or { }, "; "))
-		local secondOutput = secondEnv.mercenary.output
-		assert.is_true(secondOutput.Life > 0)
-		assert.not_equals(firstLife, secondOutput.Life)
+		local secondLife = secondEnv.mercenary.output.Life
+		assert.is_true(secondLife > 0)
+		assert.not_equals(firstLife, secondLife)
 		tab:SetActiveMercenarySet(first.id)
-		assert.equals(firstLife, helpers.calculateBuild().mercenary.output.Life)
+		assert.equals(first.buildId, tab.profile.buildId)
+		assert.equals(firstSetId, mercSetId())
 		tab:SetActiveMercenarySet(second.id)
-		assert.equals(secondOutput.Life, helpers.calculateBuild().mercenary.output.Life)
+		assert.equals(second.buildId, tab.profile.buildId)
+		assert.equals(firstSetId, mercSetId())
 	end)
 end)

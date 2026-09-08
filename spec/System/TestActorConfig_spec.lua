@@ -108,8 +108,6 @@ describe("Player and mercenary configuration", function()
 	end)
 
 	it("Config UI writes and hides against the viewed actor without stealing Items comparison", function()
-		local MercenaryTools = require("Modules.MercenaryTools")
-		local itemsTab = build.itemsTab
 		local configTab = build.configTab
 		local configSet = actorConfig()
 		configTab:SetViewActor("mercenary")
@@ -141,92 +139,26 @@ describe("Player and mercenary configuration", function()
 		assert.is_false(configTab.varControls.pantheonMinorGod.shown())
 		assert.is_false(configTab.varControls.bandit.shown())
 		assert.is_false(configTab.varControls.resistancePenalty.shown())
-
-		local playerSetId = itemsTab.activeItemSetId
-		local altPlayer = itemsTab:NewItemSet()
-		altPlayer.title = "Config Wear"
-		table.insert(itemsTab.itemSetOrderList, altPlayer.id)
-		assert(itemsTab:SetViewItemSet(playerSetId, "PLAYER"))
-		configTab:SetViewActor("player")
-		configTab:UpdateActorItemSetSelect()
-		configTab.controls.itemSetSelect.selFunc(nil, { id = altPlayer.id })
-		assert.are.equal(altPlayer.id, itemsTab.activeItemSetId)
-		assert.are.equal(playerSetId, itemsTab.viewItemSetId)
-		assert.are.equal("PLAYER", MercenaryTools.comparisonActorForItemSet(playerSetId, itemsTab))
-
-		itemsTab:SetActiveItemSet(playerSetId)
-		local viewItemSetId = itemsTab.viewItemSetId
-		configTab:SetViewActor("mercenary")
-		configTab:UpdateActorItemSetSelect()
-		configTab.controls.itemSetSelect.selFunc(nil, { id = playerSetId })
-		assert.are.equal(playerSetId, build.mercenaryTab.itemSetId)
-		assert.are.equal(viewItemSetId, itemsTab.viewItemSetId)
-		assert.are.equal("PLAYER", MercenaryTools.comparisonActorForItemSet(playerSetId, itemsTab))
 	end)
 
-	it("config sets apply per-actor item sets without hijacking Items view", function()
+	it("switching Config Sets does not change actor equipment", function()
 		local itemsTab = build.itemsTab
 		local configTab = build.configTab
 		local originalPlayerId = itemsTab.activeItemSetId
-		local originalMercId = build.mercenaryTab.itemSetId
-		local mapping = actorConfig()
-
+		local originalMercId = itemsTab:GetActorItemSetId("MERCENARY")
 		local altPlayer = itemsTab:NewItemSet()
 		altPlayer.title = "Bossing"
 		table.insert(itemsTab.itemSetOrderList, altPlayer.id)
-		local altMerc = itemsTab:NewItemSet()
-		altMerc.title = "Merc Bossing"
-		table.insert(itemsTab.itemSetOrderList, altMerc.id)
 		local bossing = configTab:NewConfigSet()
 		table.insert(configTab.configSetOrderList, bossing.id)
-		configTab:EnsureActorConfig(bossing)
-		bossing.actors.player.itemSetId = altPlayer.id
-		bossing.actors.mercenary.itemSetId = altMerc.id
-
 		configTab:SetActiveConfigSet(bossing.id)
-		assert.are.equal(altPlayer.id, itemsTab.activeItemSetId)
-		assert.are.equal(altMerc.id, build.mercenaryTab.itemSetId)
-		assert.are.equal(altPlayer.id, itemsTab.viewItemSetId)
-		assert.are.equal(originalPlayerId, mapping.actors.player.itemSetId)
-		assert.are.equal(originalMercId, mapping.actors.mercenary.itemSetId)
-		configTab:SetActiveConfigSet(mapping.id)
 		assert.are.equal(originalPlayerId, itemsTab.activeItemSetId)
-		assert.are.equal(originalMercId, build.mercenaryTab.itemSetId)
-
-		local mercSet = assert(build.mercenaryTab:GetItemSet(true))
-		assert(itemsTab:SetViewItemSet(mercSet.id, "MERCENARY"))
-		configTab:ApplyActorItemSets()
-		assert.are.equal(originalPlayerId, itemsTab.activeItemSetId)
-		assert.are.equal(mercSet.id, itemsTab.viewItemSetId)
-		assert.are.equal("MERCENARY", itemsTab.viewComparisonActor)
-
-		assert(build.mercenaryTab:SetItemSet(originalPlayerId, false))
-		assert(itemsTab:SetViewItemSet(originalPlayerId, "MERCENARY"))
-		configTab:ApplyActorItemSets()
-		assert.are.equal("MERCENARY", itemsTab.viewComparisonActor)
-		assert.are.equal(originalPlayerId, build.mercenaryTab.itemSetId)
-
-		configTab:AddUndoState()
-		altPlayer = itemsTab:NewItemSet()
-		table.insert(itemsTab.itemSetOrderList, altPlayer.id)
-		configTab.controls.itemSetSelect.selFunc(nil, { id = altPlayer.id })
-		assert.are.equal(altPlayer.id, itemsTab.activeItemSetId)
-		configTab:Undo()
-		assert.are.equal(originalPlayerId, itemsTab.activeItemSetId)
-		assert.are.equal(originalPlayerId, configTab.configSets[configTab.activeConfigSetId].actors.player.itemSetId)
-
-		local configSet = actorConfig()
-		configSet.actors.player.itemSetId = 9999
-		configTab:ApplyActorItemSets()
-		assert.is_nil(configSet.actors.player.itemSetId)
-		assert.are.equal(originalPlayerId, itemsTab.activeItemSetId)
-
-		assert(build.mercenaryTab:SetItemSet(build.itemsTab.activeItemSetId, false))
-		newBuild()
-		assert.is_nil(build.mercenaryTab.itemSetId)
+		assert.are.equal(originalMercId, itemsTab:GetActorItemSetId("MERCENARY"))
+		assert.is_nil(configTab.configSets[bossing.id].actors.player.itemSetId)
+		assert.is_nil(configTab.configSets[bossing.id].actors.mercenary.itemSetId)
 	end)
 
-	it("round-trips actor config XML and treats stored itemSetIds as source of truth", function()
+	it("round-trips actor combat config XML without owning item sets", function()
 		local configTab = build.configTab
 		local configSet = actorConfig()
 		configSet.customModsList[1].text = "10% increased Damage"
@@ -265,51 +197,25 @@ describe("Player and mercenary configuration", function()
 		assert.are.equal("20% increased Damage", loaded.actors.mercenary.customModsList[1].text)
 
 		local itemsTab = build.itemsTab
-		local liveMercenaryId = build.mercenaryTab.itemSetId
+		local livePlayerId = itemsTab.activeItemSetId
+		local liveMercenaryId = itemsTab:GetActorItemSetId("MERCENARY")
 		build.configTab:Load({
 			elem = "Config",
 			attrib = { activeConfigSet = "1" },
 			{
 				elem = "ConfigSet",
 				attrib = { id = "1", title = "Mapping" },
-				{ elem = "Actor", attrib = { id = "player" } },
-				{ elem = "Actor", attrib = { id = "mercenary" } },
+				{ elem = "Actor", attrib = { id = "player", itemSetId = "99" } },
+				{ elem = "Actor", attrib = { id = "mercenary", itemSetId = "99" } },
 			},
-		}, "no-merc-itemset.xml")
+		}, "legacy-config-itemset.xml")
 		build.configTab:PostLoad()
 		local mapping = build.configTab.configSets[1]
 		build.configTab:EnsureActorConfig(mapping)
+		assert.is_nil(mapping.actors.player.itemSetId)
 		assert.is_nil(mapping.actors.mercenary.itemSetId)
-		assert.are.equal(liveMercenaryId, build.mercenaryTab.itemSetId)
-
-		local mappingSet = itemsTab.activeItemSetId
-		local bossingSet = itemsTab:NewItemSet()
-		bossingSet.title = "Boss Gear"
-		table.insert(itemsTab.itemSetOrderList, bossingSet.id)
-		build.configTab:Load({
-			elem = "Config",
-			attrib = { activeConfigSet = "1" },
-			{
-				elem = "ConfigSet",
-				attrib = { id = "1", title = "Mapping" },
-				{ elem = "Actor", attrib = { id = "player", itemSetId = tostring(mappingSet) } },
-				{ elem = "Actor", attrib = { id = "mercenary" } },
-			},
-			{
-				elem = "ConfigSet",
-				attrib = { id = "2", title = "Bossing" },
-				{ elem = "Actor", attrib = { id = "player", itemSetId = tostring(bossingSet.id) } },
-				{ elem = "Actor", attrib = { id = "mercenary" } },
-			},
-		}, "actor-ids.xml")
-		itemsTab.skipConfigItemSetSync = true
-		itemsTab:SetActiveItemSet(mappingSet)
-		itemsTab.skipConfigItemSetSync = false
-		build.configTab:PostLoad()
-		assert.are.equal(mappingSet, build.configTab.configSets[1].actors.player.itemSetId)
-		assert.are.equal(bossingSet.id, build.configTab.configSets[2].actors.player.itemSetId)
-		build.configTab:SetActiveConfigSet(2)
-		assert.are.equal(bossingSet.id, itemsTab.activeItemSetId)
+		assert.are.equal(livePlayerId, itemsTab.activeItemSetId)
+		assert.are.equal(liveMercenaryId, itemsTab:GetActorItemSetId("MERCENARY"))
 	end)
 
 	it("keeps Mercenary melee distance independent of the player", function()
@@ -432,9 +338,11 @@ describe("Player and mercenary configuration", function()
 			local env = calculateBuild()
 			assert.is_not_nil(env.mercenary, table.concat(env.mercenaryCalculationErrors or { }, "\n"))
 			assert.are.equal(case.applies, not not enemyShocked(env), case.source.." -> "..case.target)
-			if case.source == "PLAYER" and case.target == "MERCENARY" then
-				assert.is_true(env.enemyDB:GetCondition("Chilled") or env.enemyDB:Flag(nil, "Condition:Chilled"))
-			end
+			local sourceDB = case.source == "PLAYER" and env.player.enemySourceDB or env.mercenary.enemySourceDB
+			local otherDB = case.source == "PLAYER" and env.mercenary.enemySourceDB or env.player.enemySourceDB
+			assert.is_not_true(env.enemyDB:GetCondition("Chilled") or env.enemyDB:Flag(nil, "Condition:Chilled"), case.source.." shared Chilled")
+			assert.is_true(sourceDB:GetCondition("Chilled") or sourceDB:Flag(nil, "Condition:Chilled"), case.source.." overlay Chilled")
+			assert.is_not_true(otherDB:GetCondition("Chilled") or otherDB:Flag(nil, "Condition:Chilled"), case.source.." other overlay Chilled")
 		end
 
 		for _, case in ipairs({
@@ -452,6 +360,44 @@ describe("Player and mercenary configuration", function()
 			local env = calculateBuild()
 			assert.is_not_nil(env.mercenary, table.concat(env.mercenaryCalculationErrors or { }, "\n"))
 			assert.are.equal(case.delta, enemyDamageTaken(env) - baseline, case.source.." frozen -> "..case.target)
+		end
+
+		local chilledByYouBurningMod = "Enemies Chilled by you take 20% increased Burning Damage"
+		local function enemyFireDotTaken(env)
+			return env.enemyDB:Sum("INC", nil, "FireDamageTakenOverTime")
+		end
+		for _, case in ipairs({
+			{ source = "PLAYER", target = "MERCENARY", delta = 0 },
+			{ source = "MERCENARY", target = "MERCENARY", delta = 20 },
+			{ source = "MERCENARY", target = "PLAYER", delta = 0 },
+			{ source = "PLAYER", target = "PLAYER", delta = 20 },
+		}) do
+			newBuild()
+			selectScionLuminary()
+			configureMercenary()
+			local baseline = enemyFireDotTaken(calculateBuild())
+			setActorInput(case.source, "multiplierChilledByYouSeconds", 10)
+			setActorMod(case.target, chilledByYouBurningMod)
+			local env = calculateBuild()
+			assert.is_not_nil(env.mercenary, table.concat(env.mercenaryCalculationErrors or { }, "\n"))
+			assert.are.equal(case.delta, enemyFireDotTaken(env) - baseline, case.source.." chilled -> "..case.target)
+		end
+
+		for _, case in ipairs({
+			{ source = "PLAYER", target = "MERCENARY", delta = 0 },
+			{ source = "MERCENARY", target = "MERCENARY", delta = 20 },
+			{ source = "MERCENARY", target = "PLAYER", delta = 0 },
+			{ source = "PLAYER", target = "PLAYER", delta = 20 },
+		}) do
+			newBuild()
+			selectScionLuminary()
+			configureMercenary()
+			local baseline = enemyFireDotTaken(calculateBuild())
+			setActorInput(case.source, "conditionEnemyChilledByYourHits", true)
+			setActorMod(case.target, chilledByYouBurningMod)
+			local env = calculateBuild()
+			assert.is_not_nil(env.mercenary, table.concat(env.mercenaryCalculationErrors or { }, "\n"))
+			assert.are.equal(case.delta, enemyFireDotTaken(env) - baseline, case.source.." chilled-by-hits -> "..case.target)
 		end
 
 		for _, case in ipairs({

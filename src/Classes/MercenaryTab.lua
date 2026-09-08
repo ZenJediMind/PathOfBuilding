@@ -110,8 +110,6 @@ function MercenaryTabClass:MercenaryTab(build)
 	self:NewMercenarySet(1)
 	self.activeMercenarySetId = 1
 	self.profile = self.mercenarySets[1]
-	self.itemSetId = nil
-	self.auxiliaryItemSetId = nil
 	self.sortGemsByDPS = true
 	self.sortGemsByDPSField = "CombinedDPS"
 	self.supportSortRevision = 0
@@ -150,7 +148,6 @@ function MercenaryTabClass:MercenaryTab(build)
 		self.profile.skills = { }
 		self.profile.mainSkillId = nil
 		self.selectedSkillIndex = 1
-		if value then self:GetItemSet(true) end
 		self:Changed()
 	end)
 	self.controls.levelLabel = new("LabelControl"):LabelControl({ "LEFT", self.controls.build, "RIGHT" }, { 20, 0, 0, 16 }, "^7Mercenary level:")
@@ -160,13 +157,8 @@ function MercenaryTabClass:MercenaryTab(build)
 	end)
 
 	self.controls.editEquipment = new("ButtonControl"):ButtonControl({ "TOPLEFT", self.controls.buildLabel, "BOTTOMLEFT" }, { 0, 14, 150, 20 }, "Edit Equipment", function()
-		local created = not self.itemSetId
-		local itemSet = self:GetItemSet(true)
-		-- Commit EnsureItemSet ownership now; do not leave it on the next unrelated edit.
-		if created and itemSet then
-			self:Changed()
-		end
-		if itemSet then build.itemsTab:SetViewItemSet(itemSet.id, "MERCENARY") end
+		local itemSet = build.itemsTab:EnsureActorItemSet("MERCENARY")
+		build.itemsTab:SetViewItemSet(itemSet.id, "MERCENARY")
 		build.viewMode = "ITEMS"
 	end)
 	self.controls.reset = new("ButtonControl"):ButtonControl({ "LEFT", self.controls.editEquipment, "RIGHT" }, { 8, 0, 80, 20 }, "Reset", function()
@@ -186,7 +178,9 @@ function MercenaryTabClass:MercenaryTab(build)
 	end)
 	self.controls.itemSetLabel = new("LabelControl"):LabelControl({ "TOPLEFT", self.controls.editEquipment, "BOTTOMLEFT" }, { 0, 12, 0, 16 }, "^7Equipment item set:")
 	self.controls.itemSetSelect = new("DropDownControl"):DropDownControl({ "LEFT", self.controls.itemSetLabel, "RIGHT" }, { 6, 0, 230, 20 }, { }, function(_, value)
-		if value and value.id then self:SetItemSet(value.id) end
+		if value and value.id then
+			self:SetItemSet(value.id)
+		end
 	end)
 	self.controls.itemSetSelect.enableDroppedWidth = true
 	self.controls.itemSetManage = new("ButtonControl"):ButtonControl({ "LEFT", self.controls.itemSetSelect, "RIGHT" }, { 4, 0, 90, 20 }, "Manage...", function()
@@ -346,21 +340,11 @@ end
 
 local function makeMercenarySupportGem(build, support)
 	if not support then return end
-	local templateId = build.data.mercenaryStatData.supportTemplates[support.id]
-	local template = templateId and build.data.skills[templateId]
-	local effect = {
-		name = support.name,
-		icon = support.icon,
-		support = true,
-		statDescriptionScope = template and template.statDescriptionScope or "gem_stat_descriptions",
-		stats = { },
-		constantStats = { },
-		levels = { { levelRequirement = 1 } },
-		statMap = build.data.mercenarySupportStatMap,
-	}
-	for _, stat in ipairs(support.stats or { }) do
-		t_insert(effect.constantStats, { stat.id, stat.value })
-	end
+	build.data.ensureMercenaries()
+	local grantedEffect = build.data.mercenarySupportGrantedEffect(support.id)
+	if not grantedEffect then return end
+	local effect = copyTable(grantedEffect, true)
+	effect.icon = support.icon
 	return {
 		level = 1,
 		quality = 0,
@@ -479,9 +463,7 @@ function MercenaryTabClass:Changed()
 	self.build.configTab:EnsureMercenaryProfileModList()
 	self:InvalidateSupportSort()
 	self:RefreshControls()
-	if not self.skipUndo then
-		self:AddUndoState()
-	end
+	self:AddUndoState()
 end
 
 function MercenaryTabClass:GetMercenaryItemSetList()
@@ -496,58 +478,22 @@ function MercenaryTabClass:GetMercenaryItemSetList()
 	return itemSetList
 end
 
-function MercenaryTabClass:EnsureItemSet()
-	local itemsTab = self.build.itemsTab
-	if self.itemSetId then
-		local itemSet = itemsTab.itemSets[self.itemSetId]
-		if itemSet then
-			return itemSet
-		end
-		return
-	end
-	local itemSet = itemsTab:NewItemSet()
-	itemSet.title = "Mercenary Equipment"
-	t_insert(itemsTab.itemSetOrderList, itemSet.id)
-	self.itemSetId = itemSet.id
-	self.profile.itemSetId = itemSet.id
-	self.auxiliaryItemSetId = itemSet.id
-	self:NoteCreatedItemSet(itemSet.id)
-	if self.build.configTab then
-		self.build.configTab:SyncActorItemSet("mercenary", itemSet.id)
-	end
-	return itemSet
-end
-
 function MercenaryTabClass:GetItemSet(create)
-	local itemSet = self.itemSetId and self.build.itemsTab.itemSets[self.itemSetId]
-	if itemSet then return itemSet end
-	if self.itemSetId then return end
-	if create == true then return self:EnsureItemSet() end
+	local itemsTab = self.build.itemsTab
+	if create == true then
+		return itemsTab:EnsureActorItemSet("MERCENARY")
+	end
+	return itemsTab:GetActorItemSet("MERCENARY")
 end
 
 function MercenaryTabClass:SetItemSet(itemSetId, changeView)
 	local itemsTab = self.build.itemsTab
-	local itemSet = itemsTab.itemSets[itemSetId]
-	if not itemSet then return false end
-	local unchanged = self.itemSetId == itemSetId and self.profile.itemSetId == itemSetId
-	self.itemSetId = itemSetId
-	self.profile.itemSetId = itemSetId
-	if changeView ~= false then
-		itemsTab:SetViewItemSet(itemSetId, "MERCENARY")
+	if not itemsTab:SetActorItemSet("MERCENARY", itemSetId, changeView) then
+		return false
 	end
-	if self.build.configTab and not self.skipConfigItemSetSync then
-		self.build.configTab:SyncActorItemSet("mercenary", itemSetId)
-	end
-	-- Config apply/undo reassigns the stored set. That is not a Mercenary edit.
-	if unchanged or self.skipConfigItemSetSync then
-		if not unchanged then
-			self.modFlag = true
-			self.build.buildFlag = true
-			self:RefreshControls()
-		end
-		return true
-	end
-	self:Changed()
+	itemsTab:AddUndoState()
+	self:RefreshControls()
+	self.build.buildFlag = true
 	return true
 end
 
@@ -722,7 +668,7 @@ function MercenaryTabClass:RefreshControls()
 		itemSetList[1] = { label = "<No Mercenary item set>" }
 	end
 	self.controls.itemSetSelect:SetList(itemSetList)
-	self.controls.itemSetSelect:SelByValue(self.itemSetId, "id")
+	self.controls.itemSetSelect:SelByValue(self.build.itemsTab:GetActorItemSetId("MERCENARY"), "id")
 	self.controls.itemSetSelect.enabled = hasMercenaryItemSets
 
 	local classGroup = self.classGroupsByClassId[self.profile.classId]
@@ -834,11 +780,10 @@ function MercenaryTabClass:SetActiveMercenarySet(setId, init)
 
 	self.activeMercenarySetId = setId
 	self.profile = self.mercenarySets[setId]
-	self.itemSetId = self.profile.itemSetId
 	if not init then
-		self.build.configTab:SyncActorItemSet("mercenary", self.itemSetId)
-		if self.build.itemsTab.viewComparisonActor == "MERCENARY" and self.itemSetId then
-			self.build.itemsTab:SetViewItemSet(self.itemSetId, "MERCENARY")
+		local itemSetId = self.build.itemsTab:GetActorItemSetId("MERCENARY")
+		if self.build.itemsTab.viewComparisonActor == "MERCENARY" and itemSetId then
+			self.build.itemsTab:SetViewItemSet(itemSetId, "MERCENARY")
 		end
 	end
 	self.selectedSkillIndex = 1
@@ -850,7 +795,7 @@ function MercenaryTabClass:SetActiveMercenarySet(setId, init)
 	if self.controls.skillList then
 		self:RefreshControls()
 	end
-	if not init and not self.skipUndo then
+	if not init then
 		self:AddUndoState()
 	end
 end
@@ -935,7 +880,6 @@ function MercenaryTabClass:ImportWarrant(text)
 	self.profile.mainSkillId = imported.mainSkillId
 	self.profile.skills = imported.skills
 	self.selectedSkillIndex = 1
-	self:GetItemSet(true)
 	self:Changed()
 	return true
 end
@@ -965,26 +909,8 @@ function MercenaryTabClass:OpenWarrantImportPopup()
 end
 
 function MercenaryTabClass:Reset()
-	local itemSetId = self.itemSetId
 	self.profile = self:NewMercenarySet(self.activeMercenarySetId, self.profile.title)
 	self.selectedSkillIndex = 1
-	local hasConfiguredProfile = false
-	for _, setId in ipairs(self.mercenarySetOrderList) do
-		local profile = self.mercenarySets[setId]
-		if profile and profile.buildId then hasConfiguredProfile = true break end
-	end
-	if not hasConfiguredProfile then
-		self.itemSetId = nil
-		self.auxiliaryItemSetId = nil
-		if self.build.configTab then
-			self.build.configTab:SyncActorItemSet("mercenary", nil)
-		end
-		if self.build.itemsTab.viewItemSetId == itemSetId then
-			self.build.itemsTab:SetViewItemSet(self.build.itemsTab.activeItemSetId)
-		end
-	else
-		self.profile.itemSetId = itemSetId
-	end
 	self:Changed()
 end
 
@@ -1019,10 +945,8 @@ function MercenaryTabClass:GetErrors()
 		t_insert(errors, "Selected build has no exported wieldable-type data")
 	end
 	local itemsTab = self.build.itemsTab
-	local itemSet = self:GetItemSet(false)
-	if not itemSet then
-		if self.profile.buildId then t_insert(errors, "No Mercenary item set is available") end
-	elseif self.data then
+	local itemSet = itemsTab:GetActorItemSet("MERCENARY")
+	if itemSet and self.data then
 		for _, errorText in ipairs(MercenaryTools.equipmentErrors({
 			profile = self.profile,
 			mercenaryData = self.data,
@@ -1065,19 +989,7 @@ function MercenaryTabClass:Load(xml)
 		end
 		t_insert(profile.skills, skill)
 	end
-	local hasPerProfileItemSet = false
-	for _, child in ipairs(xml) do
-		if child.elem == "MercenarySet" and child.attrib.itemSetId then
-			hasPerProfileItemSet = true
-			break
-		end
-	end
 	local function loadProfile(node, profile)
-		if node.attrib.itemSetId ~= nil then
-			profile.itemSetId = tonumber(node.attrib.itemSetId)
-		elseif not hasPerProfileItemSet then
-			profile.itemSetId = self.itemSetId
-		end
 		profile.importAssociation = MercenaryImport.canonicalizeAssociation(node.attrib.importAssociation)
 		profile.buildId = node.attrib.buildId
 		profile.foundAreaLevel = tonumber(node.attrib.foundAreaLevel)
@@ -1099,8 +1011,7 @@ function MercenaryTabClass:Load(xml)
 
 	self.activeMercenarySetId = nil
 	self.profile = nil
-	self.itemSetId = tonumber(xml.attrib.itemSetId)
-	self.auxiliaryItemSetId = tonumber(xml.attrib.auxiliaryItemSetId)
+	self.legacyItemSetId = tonumber(xml.attrib.itemSetId)
 	self.mercenarySets = { }
 	self.mercenarySetOrderList = { }
 	if xml.attrib.sortGemsByDPS then
@@ -1109,6 +1020,7 @@ function MercenaryTabClass:Load(xml)
 	self.controls.sortGemsByDPS.state = self.sortGemsByDPS
 	self.controls.sortGemsByDPSFieldControl:SelByValue(xml.attrib.sortGemsByDPSField or "CombinedDPS", "type")
 	self.sortGemsByDPSField = self.controls.sortGemsByDPSFieldControl:GetSelValueByKey("type")
+	local activeMercenarySetId = tonumber(xml.attrib.activeMercenarySet) or 1
 	for _, child in ipairs(xml) do
 		if child.elem == "MercenarySet" then
 			local setId = tonumber(child.attrib.id) or 1
@@ -1116,15 +1028,25 @@ function MercenaryTabClass:Load(xml)
 			local profile = self:NewMercenarySet(setId, child.attrib.title)
 			loadProfile(child, profile)
 			t_insert(self.mercenarySetOrderList, setId)
+			if setId == activeMercenarySetId and child.attrib.itemSetId then
+				self.legacyItemSetId = self.legacyItemSetId or tonumber(child.attrib.itemSetId)
+			end
 		end
 	end
-	self:SetActiveMercenarySet(tonumber(xml.attrib.activeMercenarySet) or 1, true)
+	self:SetActiveMercenarySet(activeMercenarySetId, true)
 	self.modFlag = false
 	self:RefreshControls()
 	self:ResetUndo()
 end
 
 function MercenaryTabClass:PostLoad()
+	local itemsTab = self.build.itemsTab
+	if itemsTab and not itemsTab:GetActorItemSetId("MERCENARY") and self.legacyItemSetId and itemsTab.itemSets[self.legacyItemSetId] then
+		itemsTab:SetActorItemSet("MERCENARY", self.legacyItemSetId, false)
+		-- ItemsTab:Load already ResetUndo before this migration.
+		itemsTab:ResetUndo()
+	end
+	self.legacyItemSetId = nil
 	self:RefreshControls()
 	self.modFlag = false
 end
@@ -1132,8 +1054,6 @@ end
 function MercenaryTabClass:Save(xml)
 	xml.attrib = {
 		activeMercenarySet = tostring(self.activeMercenarySetId),
-		itemSetId = self.itemSetId and tostring(self.itemSetId),
-		auxiliaryItemSetId = self.auxiliaryItemSetId and tostring(self.auxiliaryItemSetId),
 		sortGemsByDPS = tostring(self.sortGemsByDPS),
 		sortGemsByDPSField = self.sortGemsByDPSField,
 	}
@@ -1147,7 +1067,6 @@ function MercenaryTabClass:Save(xml)
 			local setNode = { elem = "MercenarySet", attrib = {
 				id = tostring(setId),
 				title = profile.title,
-				itemSetId = profile.itemSetId and tostring(profile.itemSetId),
 				importAssociation = profile.importAssociation,
 				buildId = profile.buildId,
 				classId = profile.classId,
@@ -1179,136 +1098,22 @@ function MercenaryTabClass:Save(xml)
 	self.modFlag = false
 end
 
-function MercenaryTabClass:NoteCreatedItemSet(itemSetId)
-	if not itemSetId then
-		return
-	end
-	self.undoCreatedItemSetIds = self.undoCreatedItemSetIds or { }
-	self.undoCreatedItemSetIds[itemSetId] = true
-end
-
--- IDs Mercenary created (Copy/Ensure), including undone/redone stamps.
--- Assigned user sets such as Bossing are never in this map.
-function MercenaryTabClass:CreatedItemSetIds()
-	local ids = { }
-	local function add(map)
-		for itemSetId in pairs(map or { }) do
-			ids[itemSetId] = true
-		end
-	end
-	add(self.undoCreatedItemSetIds)
-	for _, state in ipairs(self.undo or { }) do
-		add(state.createdItemSetIds)
-	end
-	for _, state in ipairs(self.redo or { }) do
-		add(state.createdItemSetIds)
-	end
-	return ids
-end
-
-local function snapshotCreatedItemSets(tab, createdIds)
-	local itemsTab = tab.build.itemsTab
-	local itemSets = { }
-	if not itemsTab then
-		return itemSets
-	end
-	for itemSetId in pairs(createdIds) do
-		if itemsTab.itemSets[itemSetId] then
-			itemSets[itemSetId] = copyTable(itemsTab.itemSets[itemSetId])
-		end
-	end
-	return itemSets
-end
-
-local function itemSetSlotSelectionChanged(live, snapshot)
-	if not live then
-		return false
-	end
-	if not snapshot then
-		return true
-	end
-	local function selItemId(itemSet, slotName)
-		local slot = itemSet[slotName]
-		return type(slot) == "table" and (slot.selItemId or 0) or 0
-	end
-	local slotNames = { }
-	for name, slot in pairs(live) do
-		if type(slot) == "table" and slot.selItemId then
-			slotNames[name] = true
-		end
-	end
-	for name, slot in pairs(snapshot) do
-		if type(slot) == "table" and slot.selItemId then
-			slotNames[name] = true
-		end
-	end
-	for name in pairs(slotNames) do
-		if selItemId(live, name) ~= selItemId(snapshot, name) then
-			return true
-		end
-	end
-	return false
-end
-
-local function restoreCreatedItemSets(tab, state, after)
-	local itemsTab = tab.build.itemsTab
-	if not itemsTab then
-		return
-	end
-	for itemSetId, itemSet in pairs(state.itemSets or { }) do
-		if not itemsTab.itemSets[itemSetId] then
-			itemsTab.itemSets[itemSetId] = copyTable(itemSet)
-			if not isValueInArray(itemsTab.itemSetOrderList, itemSetId) then
-				t_insert(itemsTab.itemSetOrderList, itemSetId)
-			end
-			itemsTab:NoteItemSetId(itemSetId)
-		end
-	end
-	-- Only drop sets this Mercenary undo step created, never user-created sets
-	-- that were merely assigned in the dropdown. Keep a created set whose
-	-- equipped items changed after the snapshot (Edit Equipment then Items).
-	for itemSetId in pairs(after and after.createdItemSetIds or { }) do
-		if not (state.itemSets and state.itemSets[itemSetId])
-			and itemsTab.itemSets[itemSetId]
-			and itemsTab.activeItemSetId ~= itemSetId
-			and not itemsTab:IsItemSetReferenced(itemSetId)
-			and not itemSetSlotSelectionChanged(itemsTab.itemSets[itemSetId], after.itemSets and after.itemSets[itemSetId]) then
-			if itemsTab.viewItemSetId == itemSetId then
-				itemsTab:SetViewItemSet(itemsTab.activeItemSetId)
-			end
-			itemsTab.itemSets[itemSetId] = nil
-			for index, orderedId in ipairs(itemsTab.itemSetOrderList) do
-				if orderedId == itemSetId then
-					t_remove(itemsTab.itemSetOrderList, index)
-					break
-				end
-			end
-		end
-	end
-end
-
 function MercenaryTabClass:CreateUndoState()
 	if self.activeMercenarySetId and self.profile then
 		self.profile.id = self.activeMercenarySetId
 		self.mercenarySets[self.activeMercenarySetId] = self.profile
 	end
-	local createdItemSetIds = self.undoCreatedItemSetIds or { }
-	self.undoCreatedItemSetIds = { }
 	return {
 		activeMercenarySetId = self.activeMercenarySetId,
-		itemSetId = self.itemSetId,
-		auxiliaryItemSetId = self.auxiliaryItemSetId,
 		mercenarySets = copyTable(self.mercenarySets),
 		mercenarySetOrderList = copyTable(self.mercenarySetOrderList),
-		itemSets = snapshotCreatedItemSets(self, createdItemSetIds),
-		createdItemSetIds = createdItemSetIds,
 		selectedSkillIndex = self.selectedSkillIndex,
 		sortGemsByDPS = self.sortGemsByDPS,
 		sortGemsByDPSField = self.sortGemsByDPSField,
 	}
 end
 
-function MercenaryTabClass:RestoreUndoState(state, after)
+function MercenaryTabClass:RestoreUndoState(state)
 	self.mercenarySets = copyTable(state.mercenarySets)
 	wipeTable(self.mercenarySetOrderList)
 	for index, setId in ipairs(state.mercenarySetOrderList) do
@@ -1316,18 +1121,11 @@ function MercenaryTabClass:RestoreUndoState(state, after)
 	end
 	self.activeMercenarySetId = state.activeMercenarySetId
 	self.profile = self.mercenarySets[self.activeMercenarySetId]
-	self.itemSetId = state.itemSetId
-	self.auxiliaryItemSetId = state.auxiliaryItemSetId
 	self.selectedSkillIndex = state.selectedSkillIndex or 1
 	self.sortGemsByDPS = state.sortGemsByDPS
 	self.sortGemsByDPSField = state.sortGemsByDPSField
-	restoreCreatedItemSets(self, state, after)
-	-- UndoHandler rebuilds the current snapshot after Undo/Redo; put Copy/Ensure
-	-- ownership back so the next CreateUndoState does not drop those IDs.
-	self.undoCreatedItemSetIds = copyTable(state.createdItemSetIds or { })
 	self:InvalidateSupportSort()
 	if self.build.configTab then
-		self.build.configTab:SyncActorItemSet("mercenary", self.itemSetId)
 		self.build.configTab:EnsureMercenaryProfileModList()
 	end
 	self:RefreshControls()

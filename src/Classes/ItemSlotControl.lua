@@ -80,7 +80,7 @@ function ItemSlotClass:SetSelItemId(selItemId, targetItemSet)
 			end
 		end
 	else
-		local itemSet = targetItemSet or self.itemsTab.activeItemSet
+		local itemSet = targetItemSet or self.itemsTab:GetVisibleItemSet()
 		local itemSlot = itemSet and itemSet[self.slotName]
 		if itemSlot then itemSlot.selItemId = selItemId end
 	end

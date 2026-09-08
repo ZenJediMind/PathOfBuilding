@@ -2383,11 +2383,6 @@ function PassiveSpecClass:CreateUndoState()
 end
 
 function PassiveSpecClass:RestoreUndoState(state, treeVersion)
-	-- UndoHandler passes the discarded current state as argument 2. Tree conversion
-	-- passes a version string. Ignore anything that is not a tree version.
-	if type(treeVersion) ~= "string" then
-		treeVersion = nil
-	end
 	self:ImportFromNodeList(nil, state.classId, state.ascendClassId, state.secondaryAscendClassId, state.hashList, state.hashOverrides, state.masteryEffects, treeVersion or state.treeVersion)
 	self:SetWindowTitleWithBuildClass()
 end

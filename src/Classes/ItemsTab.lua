@@ -158,13 +158,13 @@ function ItemsTabClass:ItemsTab(build)
 			-- Add alternate weapon slot
 			slot.weaponSet = 1
 			slot.shown = function()
-				return not self:GetVisibleItemSet().useSecondWeaponSet
+				return not self:VisibleUsesSecondWeaponSet()
 			end
 			local swapSlot = new("ItemSlotControl"):ItemSlotControl({"TOPLEFT",prevSlot,"BOTTOMLEFT"}, 0, 2, self, slotName.." Swap", slotName)
 			addSlot(swapSlot)
 			swapSlot.weaponSet = 2
 			swapSlot.shown = function()
-				return self:GetVisibleItemSet().useSecondWeaponSet
+				return self:VisibleUsesSecondWeaponSet()
 			end
 			for i = 1, 6 do
 				local abyssal = new("ItemSlotControl"):ItemSlotControl({"TOPLEFT",prevSlot,"BOTTOMLEFT"}, 0, 2, self, slotName.." Swap Abyssal Socket "..i, "Abyssal #"..i)
@@ -172,7 +172,7 @@ function ItemsTabClass:ItemsTab(build)
 				abyssal.parentSlot = swapSlot
 				abyssal.weaponSet = 2
 				abyssal.shown = function()
-					return not abyssal.inactive and self:GetVisibleItemSet().useSecondWeaponSet
+					return not abyssal.inactive and self:VisibleUsesSecondWeaponSet()
 				end
 				swapSlot.abyssalSocketList[i] = abyssal
 			end
@@ -194,7 +194,7 @@ function ItemsTabClass:ItemsTab(build)
 				if slotName:match("Weapon") then
 					abyssal.weaponSet = 1
 					abyssal.shown = function()
-						return not abyssal.inactive and not self:GetVisibleItemSet().useSecondWeaponSet
+						return not abyssal.inactive and not self:VisibleUsesSecondWeaponSet()
 					end
 				end
 				slot.abyssalSocketList[i] = abyssal
@@ -238,17 +238,26 @@ function ItemsTabClass:ItemsTab(build)
 		self:SetVisibleWeaponSet(false)
 	end)
 	self.controls.weaponSwap1.overSizeText = 3
+	self.controls.weaponSwap1.shown = function()
+		return self:ComparisonActorForItemSet() ~= "MERCENARY"
+	end
 	self.controls.weaponSwap1.locked = function()
-		return not self:GetVisibleItemSet().useSecondWeaponSet
+		return not self:VisibleUsesSecondWeaponSet()
 	end
 	self.controls.weaponSwap2 = new("ButtonControl"):ButtonControl({"BOTTOMRIGHT",self.slotAnchor,"TOPRIGHT"}, {0, -2, 18, 18}, "II", function()
 		self:SetVisibleWeaponSet(true)
 	end)
 	self.controls.weaponSwap2.overSizeText = 3
+	self.controls.weaponSwap2.shown = function()
+		return self:ComparisonActorForItemSet() ~= "MERCENARY"
+	end
 	self.controls.weaponSwap2.locked = function()
-		return self:GetVisibleItemSet().useSecondWeaponSet
+		return self:VisibleUsesSecondWeaponSet()
 	end
 	self.controls.weaponSwapLabel = new("LabelControl"):LabelControl({"RIGHT",self.controls.weaponSwap1,"LEFT"}, {-4, 0, 0, 14}, "^7Weapon Set:")
+	self.controls.weaponSwapLabel.shown = function()
+		return self:ComparisonActorForItemSet() ~= "MERCENARY"
+	end
 	-- All items list
 	if main.portraitMode then
 		self.controls.itemList = new("ItemListControl"):ItemListControl({"TOPRIGHT",self.lastSlot,"BOTTOMRIGHT"}, {0, 0, 360, 308}, self, true)
@@ -1179,8 +1188,7 @@ holding Shift will put it in the second.]])
 	-- Initialise item sets
 	self.itemSets = { }
 	self.itemSetOrderList = { 1 }
-	self.nextItemSetId = 1
-	self.nextItemId = 1
+	self.actorItemSetIds = { }
 	self:NewItemSet(1)
 	self:SetActiveItemSet(1)
 
@@ -1196,8 +1204,7 @@ function ItemsTabClass:Load(xml, dbFileName)
 	self.viewComparisonActor = nil
 	self.itemSets = { }
 	self.itemSetOrderList = { }
-	self.nextItemSetId = 1
-	self.nextItemId = 1
+	self.actorItemSetIds = { }
 	self.tradeQuery.statSortSelectionList = { }
 	for _, node in ipairs(xml) do
 		if node.elem == "Item" then
@@ -1277,6 +1284,12 @@ function ItemsTabClass:Load(xml, dbFileName)
 				end
 			end
 			t_insert(self.itemSetOrderList, itemSet.id)
+		elseif node.elem == "ActorItemSet" then
+			local actor = node.attrib.actor
+			local itemSetId = tonumber(node.attrib.itemSetId)
+			if actor and actor ~= "PLAYER" and itemSetId then
+				self.actorItemSetIds[actor] = itemSetId
+			end
 		elseif node.elem == "TradeSearchWeights" then
 			for _, child in ipairs(node) do
 				local statSort = {
@@ -1313,13 +1326,15 @@ function ItemsTabClass:Load(xml, dbFileName)
 	if not self.itemSets[activeItemSetId] then
 		activeItemSetId = self.itemSetOrderList[1]
 	end
-	self.skipConfigItemSetSync = true
 	self:SetActiveItemSet(activeItemSetId)
-	self.skipConfigItemSetSync = false
+	for actor, itemSetId in pairs(self.actorItemSetIds) do
+		if not self.itemSets[itemSetId] then
+			self.actorItemSetIds[actor] = nil
+		end
+	end
 	if xml.attrib.showStatDifferences then
 		self.showStatDifferences = xml.attrib.showStatDifferences == "true"
 	end
-	self:RefreshAllocIds()
 	self:ResetUndo()
 end
 
@@ -1395,6 +1410,12 @@ function ItemsTabClass:Save(xml)
 			end
 		end
 		t_insert(xml, child)
+	end
+	for _, actor in ipairs({ "MERCENARY" }) do
+		local itemSetId = self.actorItemSetIds[actor]
+		if itemSetId and self.itemSets[itemSetId] then
+			t_insert(xml, { elem = "ActorItemSet", attrib = { actor = actor, itemSetId = tostring(itemSetId) } })
+		end
 	end
 	if self.tradeQuery.statSortSelectionList then
 		local parent = {
@@ -1571,25 +1592,88 @@ function ItemsTabClass:Draw(viewPort, inputEvents)
 	self.controls.specSelect:SetList(self.build.treeTab:GetSpecList())
 end
 
-function ItemsTabClass:GetPlayerItemSetOrderList()
-	local playerSets = { }
-	for _, itemSetId in ipairs(self.itemSetOrderList) do
-		-- Skip the auto-created auxiliary Mercenary equipment set, not any set
-		-- the Mercenary happens to be wearing.
-		if not MercenaryTools.isAuxiliaryMercenaryItemSet(itemSetId, self) then
-			t_insert(playerSets, itemSetId)
-		end
-	end
-	return playerSets
-end
-
 function ItemsTabClass:GetVisibleItemSet()
 	return self.viewItemSet
+end
+
+function ItemsTabClass:VisibleUsesSecondWeaponSet(itemSet)
+	if self:ComparisonActorForItemSet() == "MERCENARY" then
+		return false
+	end
+	itemSet = itemSet or self:GetVisibleItemSet()
+	return itemSet and itemSet.useSecondWeaponSet or false
+end
+
+function ItemsTabClass:NormalizeItemSetActor(actor)
+	if actor == "player" then
+		return "PLAYER"
+	end
+	if actor == "mercenary" then
+		return "MERCENARY"
+	end
+	return actor
+end
+
+function ItemsTabClass:GetActorItemSetId(actor)
+	actor = self:NormalizeItemSetActor(actor)
+	if actor == "PLAYER" then
+		return self.activeItemSetId
+	end
+	return self.actorItemSetIds[actor]
+end
+
+function ItemsTabClass:GetActorItemSet(actor)
+	local itemSetId = self:GetActorItemSetId(actor)
+	return itemSetId and self.itemSets[itemSetId]
+end
+
+-- Assign an item set to an actor. PLAYER wraps SetActiveItemSet.
+-- Pass changeView == false to assign without switching the Items tab's viewed set.
+function ItemsTabClass:SetActorItemSet(actor, itemSetId, changeView)
+	actor = self:NormalizeItemSetActor(actor)
+	if actor == "PLAYER" then
+		return self:SetActiveItemSet(itemSetId, changeView)
+	end
+	if itemSetId then
+		local itemSet = self.itemSets[itemSetId]
+		if not itemSet then
+			return false
+		end
+		self.actorItemSetIds[actor] = itemSetId
+		if changeView ~= false then
+			self:SetViewItemSet(itemSetId, actor)
+		end
+	else
+		self.actorItemSetIds[actor] = nil
+	end
+	self.build.buildFlag = true
+	return true
+end
+
+function ItemsTabClass:EnsureActorItemSet(actor, title)
+	actor = self:NormalizeItemSetActor(actor)
+	local itemSet = self:GetActorItemSet(actor)
+	if itemSet then
+		return itemSet
+	end
+	if actor == "PLAYER" then
+		return self.activeItemSet
+	end
+	itemSet = self:NewItemSet()
+	itemSet.title = title or (actor == "MERCENARY" and "Mercenary Equipment" or (actor.." Equipment"))
+	t_insert(self.itemSetOrderList, itemSet.id)
+	self:SetActorItemSet(actor, itemSet.id, false)
+	self:AddUndoState()
+	self.build.buildFlag = true
+	return itemSet
 end
 
 -- Changes weapon set I/II on the currently viewed item set.
 -- The player's selected main skill only follows this change when that set is actually equipped.
 function ItemsTabClass:SetVisibleWeaponSet(useSecond)
+	if self:ComparisonActorForItemSet() == "MERCENARY" then
+		return
+	end
 	local visibleItemSet = self:GetVisibleItemSet()
 	if not visibleItemSet then
 		return
@@ -1620,73 +1704,22 @@ function ItemsTabClass:SetVisibleWeaponSet(useSecond)
 end
 
 function ItemsTabClass:IsItemSetReferenced(itemSetId)
-	local mercenaryTab = self.build.mercenaryTab
-	if mercenaryTab and mercenaryTab.itemSetId == itemSetId then
-		return true
-	end
-	for _, profile in pairs(mercenaryTab and mercenaryTab.mercenarySets or { }) do
-		if profile.itemSetId == itemSetId then
+	for actor, assignedId in pairs(self.actorItemSetIds) do
+		if actor ~= "PLAYER" and assignedId == itemSetId then
 			return true
 		end
 	end
 	return self.build.skillsTab and self.build.skillsTab:UsesItemSet(itemSetId) or false
 end
 
--- Session-monotonic IDs: never reuse a deleted item or item-set ID until
--- the tab is reloaded. Ordinary Items undo can then reinsert preserved
--- Mercenary sets by ID without remapping references.
-local function maxNumericId(map)
-	local maxId = 0
-	for id in pairs(map) do
-		if type(id) == "number" and id > maxId then
-			maxId = id
-		end
-	end
-	return maxId
-end
-
-function ItemsTabClass:NoteItemSetId(id)
-	if type(id) == "number" and id >= (self.nextItemSetId or 1) then
-		self.nextItemSetId = id + 1
-	end
-end
-
-function ItemsTabClass:NoteItemId(id)
-	if type(id) == "number" and id >= (self.nextItemId or 1) then
-		self.nextItemId = id + 1
-	end
-end
-
-function ItemsTabClass:RefreshAllocIds()
-	self:NoteItemSetId(maxNumericId(self.itemSets))
-	self:NoteItemId(maxNumericId(self.items))
-end
-
-function ItemsTabClass:AllocItemSetId()
-	local id = self.nextItemSetId or 1
-	while self.itemSets[id] do
-		id = id + 1
-	end
-	self.nextItemSetId = id + 1
-	return id
-end
-
-function ItemsTabClass:AllocItemId()
-	local id = self.nextItemId or 1
-	while self.items[id] do
-		id = id + 1
-	end
-	self.nextItemId = id + 1
-	return id
-end
-
 -- Creates a new item set
 function ItemsTabClass:NewItemSet(itemSetId)
 	local itemSet = { id = itemSetId }
 	if not itemSetId then
-		itemSet.id = self:AllocItemSetId()
-	else
-		self:NoteItemSetId(itemSetId)
+		itemSet.id = 1
+		while self.itemSets[itemSet.id] do
+			itemSet.id = itemSet.id + 1
+		end
 	end
 	for _, slot in ipairs(self.orderedSlots) do
 		if not slot.nodeId then
@@ -1697,8 +1730,40 @@ function ItemsTabClass:NewItemSet(itemSetId)
 	return itemSet
 end
 
-function ItemsTabClass:ItemCalculationOverride(slotName, item)
-	return MercenaryTools.itemCalculationOverride(self.viewItemSetId, slotName, item, self)
+local function isTreeJewelSlot(slotName)
+	return type(slotName) == "string" and slotName:match("^Jewel ") ~= nil
+end
+
+function ItemsTabClass:ComparisonActorForItemSet(itemSetId)
+	itemSetId = itemSetId or self.viewItemSetId
+	if itemSetId and itemSetId == self.viewItemSetId and self.viewComparisonActor then
+		return self.viewComparisonActor
+	end
+	if self:GetActorItemSetId("MERCENARY") == itemSetId and self:GetActorItemSetId("PLAYER") ~= itemSetId then
+		return "MERCENARY"
+	end
+	return "PLAYER"
+end
+
+function ItemsTabClass:ComparisonActorForSlot(slotName, itemSetId)
+	if isTreeJewelSlot(slotName) then
+		return "PLAYER"
+	end
+	if MercenaryTools.baseItemSlotName(slotName) then
+		return "MERCENARY"
+	end
+	return self:ComparisonActorForItemSet(itemSetId)
+end
+
+function ItemsTabClass:ItemCalculationOverride(slotName, item, itemSetId)
+	itemSetId = itemSetId or self.viewItemSetId
+	local isTreeJewel = isTreeJewelSlot(slotName)
+	return {
+		itemSetId = (not isTreeJewel) and itemSetId or nil,
+		comparisonActor = self:ComparisonActorForSlot(slotName, itemSetId),
+		repSlotName = slotName,
+		repItem = item,
+	}
 end
 
 function ItemsTabClass:SetViewItemSet(itemSetId, comparisonActor)
@@ -1733,9 +1798,6 @@ function ItemsTabClass:SetActiveItemSet(itemSetId, changeView)
 		self.viewItemSet = itemSet
 		self.viewComparisonActor = nil
 	end
-	if self.build.configTab and not self.skipConfigItemSetSync then
-		self.build.configTab:SyncActorItemSet("player", itemSetId)
-	end
 	self.build.buildFlag = true
 	self:PopulateSlots()
 	self:UpdateSockets()
@@ -1748,7 +1810,7 @@ function ItemsTabClass:EquipItemInSet(item, itemSetId)
 	local itemSet = self.itemSets[itemSetId]
 	local slotName = item:GetPrimarySlot()
 	local slot = self.slots[slotName]
-	if slot and slot.weaponSet == 1 and itemSet.useSecondWeaponSet then
+	if slot and slot.weaponSet == 1 and itemSet.useSecondWeaponSet and self:ComparisonActorForItemSet(itemSetId) ~= "MERCENARY" then
 		-- Redirect to second weapon set
 		slotName = slotName .. " Swap"
 	end
@@ -1816,7 +1878,11 @@ end
 -- Adds the given item to the build's item list
 function ItemsTabClass:AddItem(item, noAutoEquip, index)
 	if not item.id then
-		item.id = self:AllocItemId()
+		-- Find an unused item ID
+		item.id = 1
+		while self.items[item.id] do
+			item.id = item.id + 1
+		end
 
 		if index then
 			t_insert(self.itemOrderList, index, item.id)
@@ -1835,8 +1901,6 @@ function ItemsTabClass:AddItem(item, noAutoEquip, index)
 				end
 			end
 		end
-	else
-		self:NoteItemId(item.id)
 	end
 
 	-- Add it to the list
@@ -5071,7 +5135,7 @@ function ItemsTabClass:AddItemStatDifferences(tooltip, item, base, slot)
 		local compareSlots = { }
 		local visibleItemSet = self:GetVisibleItemSet()
 		for slotName, slot in pairs(self.slots) do
-			if self:IsItemValidForSlot(item, slotName, visibleItemSet) and not slot.inactive and (not slot.weaponSet or slot.weaponSet == (visibleItemSet.useSecondWeaponSet and 2 or 1)) and slot.shown() then
+			if self:IsItemValidForSlot(item, slotName, visibleItemSet) and not slot.inactive and (not slot.weaponSet or slot.weaponSet == (self:VisibleUsesSecondWeaponSet(visibleItemSet) and 2 or 1)) and slot.shown() then
 				t_insert(compareSlots, slot)
 			end
 		end
@@ -5095,7 +5159,7 @@ function ItemsTabClass:AddItemStatDifferences(tooltip, item, base, slot)
 			else
 				header = string.format("^7Equipping this item in %s will give you:%s", compareSlot.label or compareSlot.slotName, selItem and "\n(replacing " .. colorCodes[selItem.rarity] .. selItem.name .. "^7)" or "")
 			end
-			local comparisonActor = MercenaryTools.comparisonActorForSlot(compareSlot.slotName, self.viewItemSetId, self)
+			local comparisonActor = self:ComparisonActorForSlot(compareSlot.slotName)
 			if comparisonActor == "PLAYER" then
 				comparisonActor = nil
 			end
@@ -5189,108 +5253,10 @@ function ItemsTabClass:AddItemStatDifferences(tooltip, item, base, slot)
 	end
 end
 
--- Equipment sets the live Mercenary profile still references. Ordinary Items
--- undos keep later Mercenary edits, including Copy/Ensure between Items stamps.
-local function copyLiveMercenaryItemSets(itemsTab)
-	local kept = { }
-	local mercenaryTab = itemsTab.build.mercenaryTab
-	if not mercenaryTab then
-		return kept
-	end
-	local function keep(itemSetId)
-		local itemSet = itemSetId and itemsTab.itemSets[itemSetId]
-		if itemSet then
-			kept[itemSetId] = itemSet
-		end
-	end
-	keep(mercenaryTab.itemSetId)
-	keep(mercenaryTab.auxiliaryItemSetId)
-	for _, profile in pairs(mercenaryTab.mercenarySets or { }) do
-		keep(profile.itemSetId)
-	end
-	local configTab = itemsTab.build.configTab
-	for _, configSet in pairs(configTab and configTab.configSets or { }) do
-		keep(configSet.actors and configSet.actors.mercenary and configSet.actors.mercenary.itemSetId)
-	end
-	return kept
-end
-
-local function mercenaryCreatedItemSetIds(itemsTab)
-	local mercenaryTab = itemsTab.build.mercenaryTab
-	return mercenaryTab and mercenaryTab:CreatedItemSetIds() or { }
-end
-
--- Copy/Ensure sets the live Mercenary no longer references must not return from
--- an Items undo/redo of an unrelated edit. User-created sets that were only
--- assigned (Bossing) are not in createdIds and must not be deleted.
-local function dropResurrectedMercenaryCreatedSets(itemsTab, createdIds, keptSets, liveItemSetIds, afterItemSets)
-	if not createdIds or not liveItemSetIds then
-		return
-	end
-	keptSets = keptSets or { }
-	for itemSetId in pairs(createdIds) do
-		-- Undo of an Items-side deletion: after no longer has the set, so restore it.
-		local itemsOpKeptSet = not afterItemSets or afterItemSets[itemSetId]
-		if itemsOpKeptSet
-			and not liveItemSetIds[itemSetId]
-			and not keptSets[itemSetId]
-			and itemsTab.itemSets[itemSetId]
-			and itemsTab.activeItemSetId ~= itemSetId
-			and not itemsTab:IsItemSetReferenced(itemSetId) then
-			if itemsTab.viewItemSetId == itemSetId then
-				itemsTab:SetViewItemSet(itemsTab.activeItemSetId)
-			end
-			itemsTab.itemSets[itemSetId] = nil
-			for index, orderedId in ipairs(itemsTab.itemSetOrderList) do
-				if orderedId == itemSetId then
-					t_remove(itemsTab.itemSetOrderList, index)
-					break
-				end
-			end
-		end
-	end
-end
-
--- Reinstall live Mercenary-referenced sets after restoring an older Items stamp.
--- Session-monotonic IDs mean a restored historical set cannot occupy a
--- later Mercenary allocation, so missing IDs are inserted as-is.
-local function restoreKeptItemSets(itemsTab, keptSets, liveItems)
-	if not keptSets then
-		return
-	end
-	for itemSetId, itemSet in pairs(keptSets) do
-		if not itemsTab.itemSets[itemSetId] then
-			itemsTab.itemSets[itemSetId] = itemSet
-			if not isValueInArray(itemsTab.itemSetOrderList, itemSet.id) then
-				t_insert(itemsTab.itemSetOrderList, itemSet.id)
-			end
-			for _, slot in pairs(itemSet) do
-				local itemId = type(slot) == "table" and slot.selItemId
-				if itemId and itemId ~= 0 and not itemsTab.items[itemId] and liveItems[itemId] then
-					itemsTab.items[itemId] = liveItems[itemId]
-					if not isValueInArray(itemsTab.itemOrderList, itemId) then
-						t_insert(itemsTab.itemOrderList, itemId)
-					end
-				end
-			end
-		end
-	end
-end
-
 function ItemsTabClass:CreateUndoState()
 	local state = { }
-	if self.build.mercenaryTab then
-		state.mercenary = { }
-		local modFlag = self.build.mercenaryTab.modFlag
-		self.build.mercenaryTab:Save(state.mercenary)
-		self.build.mercenaryTab.modFlag = modFlag
-	end
-	state.mercenaryChangedByItems = self.mercenaryChangedByItems
-	self.mercenaryChangedByItems = nil
-	if self.build.configTab then
-		state.configActorItemSetIds = self.build.configTab:CopyActorItemSetIds()
-	end
 	state.activeItemSetId = self.activeItemSetId
+	state.actorItemSetIds = copyTable(self.actorItemSetIds)
 	state.viewItemSetId = self.viewItemSetId
 	state.viewComparisonActor = self.viewComparisonActor
 	state.items = { }
@@ -5304,24 +5270,10 @@ function ItemsTabClass:CreateUndoState()
 	end
 	state.itemSets = copyTableSafe(self.itemSets)
 	state.itemSetOrderList = copyTable(self.itemSetOrderList)
-	state.mercenaryCreatedItemSetIds = mercenaryCreatedItemSetIds(self)
 	return state
 end
 
-function ItemsTabClass:RestoreUndoState(state, after)
-	-- Only rewind Mercenary when this Items stamp itself mutated it (import).
-	-- UndoHandler rebuilds the current snapshot after Undo/Redo, so the flag
-	-- lives on every stamp of that operation, not only the first transition.
-	local restoreMercenary = (after or state).mercenaryChangedByItems == true
-	local keptSets, liveItems, liveItemSetIds
-	if not restoreMercenary then
-		keptSets = copyLiveMercenaryItemSets(self)
-		liveItems = self.items
-		liveItemSetIds = { }
-		for itemSetId in pairs(self.itemSets) do
-			liveItemSetIds[itemSetId] = true
-		end
-	end
+function ItemsTabClass:RestoreUndoState(state)
 	self.items = state.items
 	wipeTable(self.itemOrderList)
 	for k, v in pairs(state.itemOrderList) do
@@ -5332,28 +5284,9 @@ function ItemsTabClass:RestoreUndoState(state, after)
 	for k, v in pairs(state.itemSetOrderList) do
 		self.itemSetOrderList[k] = v
 	end
-	restoreKeptItemSets(self, keptSets, liveItems)
+	self.actorItemSetIds = copyTable(state.actorItemSetIds)
 	self.activeItemSetId = state.activeItemSetId
 	self.activeItemSet = self.itemSets[self.activeItemSetId]
-	if not restoreMercenary then
-		dropResurrectedMercenaryCreatedSets(self, state.mercenaryCreatedItemSetIds, keptSets, liveItemSetIds, after and after.itemSets)
-		self.activeItemSet = self.itemSets[self.activeItemSetId]
-	end
-	if self.build.configTab then
-		-- Restore only actor item-set refs this Items operation changed, so a later
-		-- Config/Mercenary loadout edit on another config set survives this undo.
-		local restoreConfigActorItemSetIds
-		if after then
-			restoreConfigActorItemSetIds = self.build.configTab:ChangedActorItemSetIds(state.configActorItemSetIds, after.configActorItemSetIds)
-			after.restoreConfigActorItemSetIds = self.build.configTab:ChangedActorItemSetIds(after.configActorItemSetIds, state.configActorItemSetIds)
-		else
-			restoreConfigActorItemSetIds = state.restoreConfigActorItemSetIds ~= nil and state.restoreConfigActorItemSetIds or state.configActorItemSetIds
-		end
-		self.build.configTab:RestoreActorItemSetIds(restoreConfigActorItemSetIds)
-		if not self.skipConfigItemSetSync then
-			self.build.configTab:SyncActorItemSet("player", self.activeItemSetId)
-		end
-	end
 	local viewItemSetId = state.viewItemSetId
 	if not self.itemSets[viewItemSetId] then
 		viewItemSetId = self.activeItemSetId
@@ -5361,26 +5294,9 @@ function ItemsTabClass:RestoreUndoState(state, after)
 	self.viewItemSetId = viewItemSetId
 	self.viewItemSet = self.itemSets[self.viewItemSetId]
 	self.viewComparisonActor = state.viewComparisonActor
-	-- Restore the Mercenary profile only when this Items operation changed it
-	-- (import, loadout swap). Ordinary item edits leave later profile edits intact.
-	if state.mercenary and self.build.mercenaryTab and restoreMercenary then
-		self.build.mercenaryTab:Load(copyTable(state.mercenary))
-		if self.build.configTab and not self.skipConfigItemSetSync then
-			self.build.configTab:SyncActorItemSet("mercenary", self.build.mercenaryTab.itemSetId)
-		end
-		-- Load already ResetUndo; do not push a Mercenary stamp for an Items-owned restore.
-		self.build.mercenaryTab.skipUndo = true
-		self.build.mercenaryTab:Changed()
-		self.build.mercenaryTab.skipUndo = false
-	elseif self.build.configTab and not self.skipConfigItemSetSync and self.build.mercenaryTab then
-		self.build.configTab:SyncActorItemSet("mercenary", self.build.mercenaryTab.itemSetId)
-	end
 	for slotName, selItemId in pairs(state.slotSelItemId) do
 		local slot = self.slots[slotName]
 		if slot and slot.nodeId then slot:SetSelItemId(selItemId) end
 	end
 	self:PopulateSlots()
-	-- UndoHandler calls AddUndoState after restore; keep import ownership on the
-	-- rebuilt current snapshot so a later Undo/Redo of this same stamp still knows.
-	self.mercenaryChangedByItems = state.mercenaryChangedByItems
 end

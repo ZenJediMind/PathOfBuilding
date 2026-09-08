@@ -1190,6 +1190,93 @@ local function ensureMercenarySkills()
 	end
 end
 
+-- Turn extracted Mercenary support rows into ordinary grantedEffect objects.
+-- Skill-specific stat maps are applied here so CalcSetup only looks them up.
+local function buildMercenarySupportGrantedEffect(support, supportedEffect)
+	local source = "Mercenary Support:"..support.id
+	local constantStats = { }
+	local statMap = { }
+	local unsupported = { }
+	for _, stat in ipairs(support.stats or { }) do
+		local implementation = (supportedEffect and supportedEffect.statMap[stat.id]) or data.mercenarySupportStatMap[stat.id]
+		if not implementation then
+			t_insert(unsupported, stat.id)
+		else
+			t_insert(constantStats, { stat.id, stat.value })
+			statMap[stat.id] = copyTable(implementation, true)
+			for _, modOrGroup in ipairs(statMap[stat.id]) do
+				if modOrGroup.name then
+					modOrGroup.source = source
+				else
+					for _, mod in ipairs(modOrGroup) do
+						mod.source = source
+					end
+				end
+			end
+		end
+	end
+	local templateId = data.mercenaryStatData.supportTemplates[support.id]
+	local template = templateId and data.skills[templateId]
+	local grantedEffect = {
+		name = support.name,
+		support = true,
+		mercenary = true,
+		mercenarySupportId = support.id,
+		requireSkillTypes = copyTable(template and template.requireSkillTypes or { }, true),
+		excludeSkillTypes = copyTable(template and template.excludeSkillTypes or { }, true),
+		addSkillTypes = copyTable(template and template.addSkillTypes or { }, true),
+		addFlags = copyTable(template and template.addFlags or { }, true),
+		weaponTypes = template and template.weaponTypes and copyTable(template.weaponTypes, true),
+		ignoreMinionTypes = template and template.ignoreMinionTypes,
+		isTrigger = template and template.isTrigger,
+		statDescriptionScope = template and template.statDescriptionScope or "gem_stat_descriptions",
+		baseFlags = { },
+		skillTypes = { },
+		constantStats = constantStats,
+		stats = { },
+		levels = { { levelRequirement = 1 } },
+		statMap = statMap,
+		unsupportedMercenaryStats = unsupported[1] and unsupported or nil,
+		missingSupportTemplate = (templateId and not template) and templateId or nil,
+	}
+	grantedEffect.name = sanitiseText(grantedEffect.name)
+	grantedEffect.id = "MercenarySupport:"..support.id
+	grantedEffect.modSource = source
+	setmetatable(grantedEffect.statMap, data.skillStatMapMeta)
+	grantedEffect.statMap._grantedEffect = grantedEffect
+	return grantedEffect
+end
+
+local function installMercenarySupportGrantedEffects(mercenaries)
+	data.mercenarySupportGrantedEffects = { }
+	data.mercenarySupportGrantedEffectsBySkill = { }
+	for supportId, support in pairs(mercenaries.supports) do
+		data.mercenarySupportGrantedEffects[supportId] = buildMercenarySupportGrantedEffect(support)
+	end
+	for skillId, skill in pairs(mercenaries.skills) do
+		local skillEffect = data.skills[skillId]
+		local bySkill = { }
+		for _, supportId in ipairs(skill.possibleSupportIds or { }) do
+			local support = mercenaries.supports[supportId]
+			if support then
+				bySkill[supportId] = buildMercenarySupportGrantedEffect(support, skillEffect)
+			end
+		end
+		data.mercenarySupportGrantedEffectsBySkill[skillId] = bySkill
+	end
+end
+
+function data.mercenarySupportGrantedEffect(supportId, skillId)
+	if not data.mercenarySupportGrantedEffects then
+		data.ensureMercenaries()
+	end
+	local bySkill = skillId and data.mercenarySupportGrantedEffectsBySkill[skillId]
+	if bySkill and bySkill[supportId] then
+		return bySkill[supportId]
+	end
+	return data.mercenarySupportGrantedEffects[supportId]
+end
+
 -- Load gems
 data.gems = LoadModule("Data/Gems")
 data.gemForSkill = { }
@@ -1317,6 +1404,7 @@ function data.ensureMercenaries()
 		end
 	end
 	data.mercenaries = mercenaries
+	installMercenarySupportGrantedEffects(mercenaries)
 	return mercenaries
 end
 data.spectres = LoadModule("Data/Spectres")(makeSkillMod, makeFlagMod)

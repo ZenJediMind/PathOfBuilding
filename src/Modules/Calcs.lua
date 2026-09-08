@@ -650,12 +650,21 @@ function calcs.buildActiveSkill(env, mode, skill, targetUUID, limitedProcessingF
 	end
 
 	targetUUID = targetUUID or cacheSkillUUID(skill, env)
-	for _, activeSkill in ipairs(fullEnv.player.activeSkillList) do
-		local activeSkillUUID = cacheSkillUUID(activeSkill, fullEnv)
-		if activeSkillUUID == targetUUID then
-			fullEnv.player.mainSkill = activeSkill
-			calcs.perform(fullEnv, true)
-			return
+	local skillLists = { fullEnv.player.activeSkillList }
+	if fullEnv.mercenary then
+		t_insert(skillLists, fullEnv.mercenary.activeSkillList)
+	end
+	for _, skillList in ipairs(skillLists) do
+		for _, activeSkill in ipairs(skillList) do
+			if cacheSkillUUID(activeSkill, fullEnv) == targetUUID then
+				if activeSkill.actor and activeSkill.actor.isMercenary then
+					fullEnv.mercenary.mainSkill = activeSkill
+				else
+					fullEnv.player.mainSkill = activeSkill
+				end
+				calcs.perform(fullEnv, true)
+				return
+			end
 		end
 	end
 	ConPrintf("[calcs.buildActiveSkill] Failed to process skill: " .. skill.activeEffect.grantedEffect.name)

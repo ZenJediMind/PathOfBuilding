@@ -301,8 +301,8 @@ Blight 20/0  1
 
 		newBuild()
 		itemsTab = build.itemsTab
-		mercenaryItemSet = build.mercenaryTab:EnsureItemSet()
-		build.mercenaryTab.itemSetId = nil
+		mercenaryItemSet = build.mercenaryTab:GetItemSet(true)
+		build.itemsTab:SetActorItemSet("MERCENARY", nil, false)
 		local orphanHelmet = new("Item"):Item("Rarity: Normal\nIron Hat")
 		itemsTab:AddItem(orphanHelmet, true)
 		mercenaryItemSet["Helmet"].selItemId = orphanHelmet.id
@@ -311,6 +311,6 @@ Blight 20/0  1
 		}), true, true, true)
 		assert.is_not_nil(itemsTab.items[orphanHelmet.id])
 		assert.are.equal(orphanHelmet.id, mercenaryItemSet["Helmet"].selItemId)
-		assert.is_nil(build.mercenaryTab.itemSetId)
+		assert.is_nil(build.itemsTab:GetActorItemSetId("MERCENARY"))
 	end)
 end)

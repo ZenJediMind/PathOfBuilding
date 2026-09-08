@@ -47,4 +47,12 @@ function MercenaryTest.calculateBuild(enemyLevel)
 	return build.calcsTab.mainEnv
 end
 
+function MercenaryTest.mercenaryItemSetId()
+	return build.itemsTab:GetActorItemSetId("MERCENARY")
+end
+
+function MercenaryTest.playerItemSetId()
+	return build.itemsTab:GetActorItemSetId("PLAYER")
+end
+
 return MercenaryTest

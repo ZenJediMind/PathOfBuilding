@@ -15,8 +15,6 @@ local m_modf = math.modf
 local band = bit.band
 local bor = bit.bor
 
-local ConfigScope = require("Modules.ConfigScope")
-
 local mod_createMod = modLib.createMod
 
 -- Magic tables for caching multiplier/condition modifier names
@@ -57,19 +55,12 @@ end
 
 local function sourceOwnedDB(self, tag)
 	-- No overlay means a single actor: shared enemy is origin behaviour.
-	-- Skip classification entirely in that case.
-	local overlay = (tag.sourceActor and tag.sourceActor.enemySourceDB)
+	if tag.sourceOwned ~= true then
+		return nil
+	end
+	return (tag.sourceActor and tag.sourceActor.enemySourceDB)
 		or (self.actor and self.actor.enemySourceDB)
-	if not overlay then
-		return nil
-	end
-	if tag.sourceOwned == false then
-		return nil
-	end
-	if tag.sourceOwned ~= true and not ConfigScope.isSourceOwnedEnemyTag(tag) then
-		return nil
-	end
-	return overlay
+		or nil
 end
 
 local function actorModDB(self, actorType, tag)

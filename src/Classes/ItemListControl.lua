@@ -102,7 +102,7 @@ function ItemListClass:UpdateLoadoutList()
 		end
 	end
 	if self.itemsTab.itemSetOrderList then
-		local itemSetOrderList = self.itemsTab:GetPlayerItemSetOrderList()
+		local itemSetOrderList = self.itemsTab.itemSetOrderList
 		for _, itemSetId in ipairs(itemSetOrderList) do
 			local itemSet = self.itemsTab.itemSets[itemSetId]
 			local title = itemSet and (itemSet.title or "Default")
@@ -142,7 +142,7 @@ function ItemListClass:UpdateList()
 			filterSpec = self.itemsTab.build.treeTab.specList[self.itemsTab.build.treeTab.activeSpec]
 		elseif selFilter ~= 3 and filterVal ~= "Unused Items" then
 			local filterTitle = filterVal:gsub("^%[[^%]]+%]%s*", "")
-			local itemSetOrderList = self.itemsTab:GetPlayerItemSetOrderList()
+			local itemSetOrderList = self.itemsTab.itemSetOrderList
 			for _, itemSetId in ipairs(itemSetOrderList) do
 				local itemSet = self.itemsTab.itemSets[itemSetId]
 				if (itemSet.title or "Default") == filterTitle then

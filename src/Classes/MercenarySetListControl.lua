@@ -20,18 +20,6 @@ function MercenarySetListClass:MercenarySetListControl(anchor, rect, mercenaryTa
 		while mercenaryTab.mercenarySets[newSet.id] do
 			newSet.id = newSet.id + 1
 		end
-		if set.itemSetId then
-			local itemsTab = mercenaryTab.build.itemsTab
-			local sourceSet = itemsTab.itemSets[set.itemSetId]
-			if sourceSet then
-				local itemSet = copyTable(sourceSet)
-				itemSet.id = itemsTab:AllocItemSetId()
-				itemsTab.itemSets[itemSet.id] = itemSet
-				t_insert(itemsTab.itemSetOrderList, itemSet.id)
-				newSet.itemSetId = itemSet.id
-				mercenaryTab:NoteCreatedItemSet(itemSet.id)
-			end
-		end
 		mercenaryTab.mercenarySets[newSet.id] = newSet
 		self:RenameSet(newSet, true)
 	end)
@@ -78,19 +66,6 @@ function MercenarySetListClass:RenameSet(set, addOnName)
 	controls.cancel = new("ButtonControl"):ButtonControl(nil, {45, 70, 80, 20}, "Cancel", function()
 		if addOnName then
 			self.mercenaryTab.mercenarySets[set.id] = nil
-			if set.itemSetId then
-				local itemsTab = self.mercenaryTab.build.itemsTab
-				local itemSet = itemsTab.itemSets[set.itemSetId]
-				if itemSet and not itemsTab:IsItemSetReferenced(set.itemSetId) then
-					itemsTab.itemSets[set.itemSetId] = nil
-					for index, itemSetId in ipairs(itemsTab.itemSetOrderList) do
-						if itemSetId == set.itemSetId then
-							t_remove(itemsTab.itemSetOrderList, index)
-							break
-						end
-					end
-				end
-			end
 		end
 		main:ClosePopup()
 	end)

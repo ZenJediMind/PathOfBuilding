@@ -19,73 +19,21 @@ local m_floor = math.floor
 
 local tempTable1 = { }
 
-local mercenarySupportEffectCache = { }
-
 local function mercenarySupportEffect(env, support, supportedEffect, errors)
 	if not support then
 		t_insert(errors, "Missing exported Mercenary support data")
 		return
 	end
-	local cacheKey = supportedEffect and supportedEffect.id and (support.id .. "\0" .. supportedEffect.id)
-	local cached = cacheKey and mercenarySupportEffectCache[cacheKey]
-	if cached then
-		return {
-			grantedEffect = cached,
-			level = 1,
-			quality = 0,
-			enabled = true,
-			isSupporting = { },
-		}
+	local grantedEffect = env.data.mercenarySupportGrantedEffect(support.id, supportedEffect and supportedEffect.id)
+	if not grantedEffect then
+		t_insert(errors, "Missing Mercenary support grantedEffect: "..support.id)
+		return
 	end
-	local errorCount = #errors
-	local constantStats = { }
-	local statMap = { }
-	for _, stat in ipairs(support.stats or { }) do
-		-- A support stat means whatever it means on the skill being supported, so that
-		-- skill's own implementation wins over the shared fallback map. The fallback
-		-- only holds stats whose meaning is the same everywhere.
-		local implementation = supportedEffect.statMap[stat.id] or env.data.mercenarySupportStatMap[stat.id]
-		if not implementation then
-			t_insert(errors, "Unsupported Mercenary support stat: "..stat.id)
-		else
-			t_insert(constantStats, { stat.id, stat.value })
-			statMap[stat.id] = copyTable(implementation, true)
-			for _, modOrGroup in ipairs(statMap[stat.id]) do
-				if modOrGroup.name then
-					modOrGroup.source = "Mercenary Support:"..support.id
-				else
-					for _, mod in ipairs(modOrGroup) do mod.source = "Mercenary Support:"..support.id end
-				end
-			end
-		end
+	if grantedEffect.missingSupportTemplate then
+		t_insert(errors, "Missing Mercenary support template: "..grantedEffect.missingSupportTemplate)
 	end
-	local templateId = env.data.mercenaryStatData.supportTemplates[support.id]
-	local template = templateId and env.data.skills[templateId]
-	if templateId and not template then t_insert(errors, "Missing Mercenary support template: "..templateId) end
-	local grantedEffect = {
-		id = "MercenarySupport:"..support.id,
-		name = support.name,
-		modSource = "Mercenary Support:"..support.id,
-		mercenarySupportId = support.id,
-		support = true,
-		requireSkillTypes = copyTable(template and template.requireSkillTypes or { }, true),
-		excludeSkillTypes = copyTable(template and template.excludeSkillTypes or { }, true),
-		addSkillTypes = copyTable(template and template.addSkillTypes or { }, true),
-		addFlags = copyTable(template and template.addFlags or { }, true),
-		weaponTypes = template and template.weaponTypes and copyTable(template.weaponTypes, true),
-		ignoreMinionTypes = template and template.ignoreMinionTypes,
-		isTrigger = template and template.isTrigger,
-		baseFlags = { },
-		skillTypes = { },
-		constantStats = constantStats,
-		stats = { },
-		levels = { { levelRequirement = 1 } },
-		statMap = statMap,
-	}
-	setmetatable(grantedEffect.statMap, env.data.skillStatMapMeta)
-	grantedEffect.statMap._grantedEffect = grantedEffect
-	if cacheKey and #errors == errorCount then
-		mercenarySupportEffectCache[cacheKey] = grantedEffect
+	for _, statId in ipairs(grantedEffect.unsupportedMercenaryStats or { }) do
+		t_insert(errors, "Unsupported Mercenary support stat: "..statId)
 	end
 	return {
 		grantedEffect = grantedEffect,
@@ -364,40 +312,6 @@ function calcs.attachEnemySourceDB(env, actor, sourceModList)
 	end
 end
 
-local function recycleModDB(db)
-	if not db then
-		return nil
-	end
-	wipeTable(db.mods)
-	wipeTable(db.conditions)
-	wipeTable(db.multipliers)
-	db.parent = nil
-	-- The previous actor graph must not stay reachable from a parked overlay.
-	db.actor = nil
-	return db
-end
-
-local function dropRecycledMercenary(env)
-	env.recycledMercenaryModDB = nil
-	env.recycledMercenaryItemModDB = nil
-	env.recycledMercenaryEnemySourceDB = nil
-end
-
-local function parkRecycledMercenary(env, modDB, itemModDB, enemySourceDB)
-	env.recycledMercenaryModDB = recycleModDB(modDB)
-	env.recycledMercenaryItemModDB = recycleModDB(itemModDB)
-	env.recycledMercenaryEnemySourceDB = recycleModDB(enemySourceDB)
-end
-
-local function dropCachedMercenary(env)
-	env.cachedMercenaryModDB = nil
-	env.cachedMercenaryEnemySourceDB = nil
-	env.cachedMercenaryItemModDB = nil
-	env.cachedMercenaryMinionModDBs = nil
-	env.cachedMercenaryMainSkill = nil
-	env.mercenaryFromCache = nil
-end
-
 local function copyModDB(db)
 	if not db then
 		return nil
@@ -435,108 +349,23 @@ end
 calcs.copyModDB = copyModDB
 calcs.restoreModDB = restoreModDB
 
-local preservedSkillDataKeys = {
-	"manaReservationPercent", "cooldown", "storedUses", "CritChance",
-	"attackTime", "attackSpeedMultiplier", "totemLevel", "damageEffectiveness", "stagesMax",
-}
-
-local function resetActiveSkillData(modDB, activeSkill)
-	if not activeSkill then
-		return
-	end
-	local skillData = activeSkill.skillData or { }
-	activeSkill.skillData = { }
-	if modDB and activeSkill.skillCfg then
-		for _, value in ipairs(modDB:List(activeSkill.skillCfg, "SkillData")) do
-			activeSkill.skillData[value.key] = value.value
-		end
-	end
-	if activeSkill.skillModList and activeSkill.skillCfg then
-		for _, value in ipairs(activeSkill.skillModList:List(activeSkill.skillCfg, "SkillData")) do
-			activeSkill.skillData[value.key] = value.value
-		end
-	end
-	for _, key in ipairs(preservedSkillDataKeys) do
-		if skillData[key] ~= nil then
-			activeSkill.skillData[key] = skillData[key]
-		end
-	end
-	activeSkill.skillData.soulPreventionDuration = activeSkill.soulPreventionDuration or skillData.soulPreventionDuration
-	if activeSkill.skillCfg and activeSkill.skillCfg.skillCond then
-		activeSkill.skillCfg.skillCond.usedByMirage = nil
-	end
-end
-
--- Snapshot taken after initMercenary and before perform(). Full DPS reuses it
--- instead of reconstructing items/passives/skills on every player skill.
-local function cacheMercenaryBaseline(env)
-	dropCachedMercenary(env)
-	local mercenary = env.mercenary
-	if not mercenary then
-		return
-	end
-	env.cachedMercenaryModDB = copyModDB(mercenary.modDB)
-	env.cachedMercenaryEnemySourceDB = copyModDB(mercenary.enemySourceDB)
-	env.cachedMercenaryItemModDB = mercenary.calcEnv and copyModDB(mercenary.calcEnv.itemModDB)
-	env.cachedMercenaryMainSkill = mercenary.mainSkill
-	env.cachedMercenaryMinionModDBs = { }
-	for index, skill in ipairs(mercenary.activeSkillList) do
-		if skill.minion and skill.minion.modDB then
-			env.cachedMercenaryMinionModDBs[index] = copyModDB(skill.minion.modDB)
-		end
-	end
-end
-
-local function restoreCachedMercenary(env)
-	local mercenary = env.mercenary
-	if not mercenary or not env.cachedMercenaryModDB then
-		return false
-	end
-	restoreModDB(mercenary.modDB, env.cachedMercenaryModDB, mercenary)
-	if mercenary.enemySourceDB then
-		restoreModDB(mercenary.enemySourceDB, env.cachedMercenaryEnemySourceDB, mercenary)
-	end
-	if mercenary.calcEnv and mercenary.calcEnv.itemModDB then
-		restoreModDB(mercenary.calcEnv.itemModDB, env.cachedMercenaryItemModDB, mercenary)
-	end
-	mercenary.mainSkill = env.cachedMercenaryMainSkill
-	env.mercenaryMinion = nil
-	if mercenary.calcEnv then
-		mercenary.calcEnv.minion = false
-	end
-	for index, skill in ipairs(mercenary.activeSkillList) do
-		resetActiveSkillData(mercenary.modDB, skill)
-		local minion = skill.minion
-		if minion and minion.modDB then
-			restoreModDB(minion.modDB, env.cachedMercenaryMinionModDBs and env.cachedMercenaryMinionModDBs[index], minion)
-			for _, minionSkill in ipairs(minion.activeSkillList or { }) do
-				resetActiveSkillData(minion.modDB, minionSkill)
-			end
-		end
-	end
-	env.mercenaryFromCache = true
-	return true
-end
-
-local function parkCurrentMercenary(env)
-	dropCachedMercenary(env)
-	if env.mercenary then
-		parkRecycledMercenary(env, env.mercenary.modDB, env.mercenary.calcEnv and env.mercenary.calcEnv.itemModDB, env.mercenary.enemySourceDB)
-	else
-		dropRecycledMercenary(env)
-	end
+-- Mercenary actors are reconstructed each initEnv. Do not park ModDBs or
+-- snapshot a pre-perform baseline for Full DPS reuse; that cache has to
+-- round-trip every field perform() mutates. Reconstruct instead.
+local function dropCurrentMercenary(env)
 	env.mercenary = nil
 	env.mercenaryMinion = nil
 	env.mercenaryCalculationErrors = nil
 end
 
--- Mercenary calculations reuse upstream actor-aware calculation functions, some of
--- which still access env.player. Actor-local environment values therefore need
--- explicit substitution while encounter-wide state remains shared.
--- Fields that must never fall through a proxy env to another actor.
--- Add a key here when Mercenary calculation reads it and the value is actor-owned.
--- createActorCalcEnv refuses to construct a proxy that omits them, and errors if they are read unset.
-calcs.ACTOR_LOCAL_ENV_KEYS = {
+-- Mercenary calculations reuse upstream functions that still read env.player.
+-- This proxy is a Mercenary compatibility adapter: actor-local values are substituted,
+-- encounter-wide state is shared, and unclassified root fields error on access.
+-- It is not a general actor framework. Add a key to mercenaryLocalEnvKeys when
+-- Mercenary calculation reads it and the value is actor-owned.
+-- createMercenaryCalcEnv refuses to construct a proxy that omits them, and errors
+-- if they are read unset.
+local mercenaryLocalEnvKeys = {
 	"player",
 	"modDB",
 	"configInput",
@@ -550,7 +379,7 @@ calcs.ACTOR_LOCAL_ENV_KEYS = {
 
 -- Encounter/build state that Mercenary calculation actually reads through the proxy
 -- and that is semantically shared. Unclassified root fields error on access.
-calcs.ACTOR_SHARED_ENV_KEYS = {
+local mercenarySharedEnvKeys = {
 	"build",
 	"data",
 	"enemy",
@@ -565,34 +394,34 @@ calcs.ACTOR_SHARED_ENV_KEYS = {
 	"spec",
 }
 
-local actorLocalEnvKeySet = { }
-for _, key in ipairs(calcs.ACTOR_LOCAL_ENV_KEYS) do
-	actorLocalEnvKeySet[key] = true
+local mercenaryLocalEnvKeySet = { }
+for _, key in ipairs(mercenaryLocalEnvKeys) do
+	mercenaryLocalEnvKeySet[key] = true
 end
 
-local actorSharedEnvKeySet = { }
-for _, key in ipairs(calcs.ACTOR_SHARED_ENV_KEYS) do
-	if actorLocalEnvKeySet[key] then
-		error("Calc env field '"..key.."' cannot be both actor-local and shared")
+local mercenarySharedEnvKeySet = { }
+for _, key in ipairs(mercenarySharedEnvKeys) do
+	if mercenaryLocalEnvKeySet[key] then
+		error("Calc env field '"..key.."' cannot be both mercenary-local and shared")
 	end
-	actorSharedEnvKeySet[key] = true
+	mercenarySharedEnvKeySet[key] = true
 end
 
--- Build an actor-scoped calculation environment over `rootEnv`.
--- Inheritable encounter/build state is read from the root; actor-local
+-- Build a Mercenary-scoped calculation environment over `rootEnv`.
+-- Inheritable encounter/build state is read from the root; mercenary-local
 -- fields must be supplied on `actorFields` (use `false` rather than nil
--- when the actor has no value, so __index cannot leak the root actor).
-function calcs.createActorCalcEnv(rootEnv, actorFields)
+-- when the Mercenary has no value, so __index cannot leak the player actor).
+function calcs.createMercenaryCalcEnv(rootEnv, actorFields)
 	if not rootEnv then
-		error("createActorCalcEnv requires a root environment")
+		error("createMercenaryCalcEnv requires a root environment")
 	end
 	actorFields = actorFields or { }
-	for _, key in ipairs(calcs.ACTOR_LOCAL_ENV_KEYS) do
+	for _, key in ipairs(mercenaryLocalEnvKeys) do
 		if actorFields[key] == nil then
-			error("createActorCalcEnv: missing actor-local field '"..key.."'")
+			error("createMercenaryCalcEnv: missing mercenary-local field '"..key.."'")
 		end
 	end
-	for _, key in ipairs(calcs.ACTOR_SHARED_ENV_KEYS) do
+	for _, key in ipairs(mercenarySharedEnvKeys) do
 		if actorFields[key] == nil then
 			local value = rootEnv[key]
 			if value ~= nil then
@@ -602,14 +431,14 @@ function calcs.createActorCalcEnv(rootEnv, actorFields)
 	end
 	return setmetatable(actorFields, {
 		__index = function(_, key)
-			if actorLocalEnvKeySet[key] then
-				error("createActorCalcEnv: actor-local field '"..key.."' is unset")
+			if mercenaryLocalEnvKeySet[key] then
+				error("createMercenaryCalcEnv: mercenary-local field '"..key.."' is unset")
 			end
-			if actorSharedEnvKeySet[key] then
+			if mercenarySharedEnvKeySet[key] then
 				return rootEnv[key]
 			end
 			if rawget(rootEnv, key) ~= nil then
-				error("createActorCalcEnv: unclassified env field '"..key.."'")
+				error("createMercenaryCalcEnv: unclassified env field '"..key.."'")
 			end
 		end,
 	})
@@ -617,28 +446,14 @@ end
 
 function calcs.initMercenary(env)
 	local tab = env.build.mercenaryTab
+	dropCurrentMercenary(env)
 	if not tab or not tab.profile or not tab.profile.buildId then
-		env.mercenary = nil
-		env.mercenaryMinion = nil
-		env.mercenaryCalculationErrors = nil
-		dropRecycledMercenary(env)
-		dropCachedMercenary(env)
 		return
 	end
 	env.data.ensureMercenaries()
-	local recycledModDB = env.recycledMercenaryModDB
-	local recycledItemModDB = env.recycledMercenaryItemModDB
-	local recycledEnemySourceDB = env.recycledMercenaryEnemySourceDB
-	dropRecycledMercenary(env)
-	dropCachedMercenary(env)
-	env.mercenary = nil
-	env.mercenaryMinion = nil
-	env.mercenaryCalculationErrors = nil
 
 	local function abortInit(errors)
 		env.mercenaryCalculationErrors = errors
-		dropCachedMercenary(env)
-		parkRecycledMercenary(env, recycledModDB, recycledItemModDB, recycledEnemySourceDB)
 	end
 
 	local profile = tab.profile
@@ -656,14 +471,11 @@ function calcs.initMercenary(env)
 		return
 	end
 	local itemsTab = env.build.itemsTab
-	local itemSet = tab:GetItemSet(false)
+	local itemSet = itemsTab:GetActorItemSet("MERCENARY")
+	local mercenaryItemSetId = itemsTab:GetActorItemSetId("MERCENARY")
 	local selectedItemSet = env.override.itemSetId and itemsTab.itemSets[env.override.itemSetId]
-	if selectedItemSet and tab.itemSetId == selectedItemSet.id then
+	if selectedItemSet and mercenaryItemSetId == selectedItemSet.id then
 		itemSet = selectedItemSet
-	end
-	if not itemSet then
-		abortInit({ "No Mercenary item set is available" })
-		return
 	end
 	local equipmentErrors = MercenaryTools.equipmentErrors({
 		profile = profile,
@@ -672,7 +484,7 @@ function calcs.initMercenary(env)
 		playerItemSet = itemsTab.activeItemSet,
 		items = itemsTab.items,
 		override = env.override,
-		mercenaryItemSetId = tab.itemSetId,
+		mercenaryItemSetId = mercenaryItemSetId,
 		playerHasFlag = function(flagName) return env.modDB:Flag(nil, flagName) end,
 		isItemValidForSlot = function(item, slotName, set, equippedLookup)
 			return itemsTab:IsItemValidForSlot(item, slotName, set, equippedLookup)
@@ -686,7 +498,6 @@ function calcs.initMercenary(env)
 	-- configured profile for editing, but do not construct an actor that
 	-- would enter the player calculation graph.
 	if not env.modDB:Flag(nil, "CanHirePermanentMercenary") then
-		parkRecycledMercenary(env, recycledModDB, recycledItemModDB, recycledEnemySourceDB)
 		return
 	end
 	local mercenary = {
@@ -702,14 +513,13 @@ function calcs.initMercenary(env)
 		profile = profile,
 		monster = monster,
 	}
-	mercenary.modDB = recycledModDB or new("ModDB"):ModDB()
+	mercenary.modDB = new("ModDB"):ModDB()
 	mercenary.modDB.actor = mercenary
 	mercenary.modDB.multipliers.Level = mercenary.level
 	calcs.initModDB(env, mercenary.modDB)
 	if env.build.configTab.mercenaryModList then
 		mercenary.modDB:AddList(env.build.configTab.mercenaryModList)
 	end
-	mercenary.enemySourceDB = recycledEnemySourceDB
 	calcs.attachEnemySourceDB(env, mercenary, env.build.configTab.mercenaryEnemyModList)
 	local baseStats = env.data.mercenaries.baseStats
 	mercenary.modDB:NewMod("Life", "BASE", baseStats.lifePerLevel * mercenary.level, "Base")
@@ -745,11 +555,11 @@ function calcs.initMercenary(env)
 
 	for _, slotName in ipairs(MercenaryTools.equipmentSlots) do
 		local slot = env.build.itemsTab.slots[slotName]
-		local item = MercenaryTools.equippedItem(itemSet, itemsTab.items, slotName, env.override, tab.itemSetId)
+		local item = MercenaryTools.equippedItem(itemSet, itemsTab.items, slotName, env.override, mercenaryItemSetId)
 		if item then addMercenaryItem(env, mercenary, item, slotName, slot and slot.slotNum or 1) end
 		for abyssalSocketIndex = 1, 6 do
 			local abyssalSlotName = slotName.." Abyssal Socket "..abyssalSocketIndex
-			local abyssalJewel = MercenaryTools.equippedItem(itemSet, itemsTab.items, abyssalSlotName, env.override, tab.itemSetId)
+			local abyssalJewel = MercenaryTools.equippedItem(itemSet, itemsTab.items, abyssalSlotName, env.override, mercenaryItemSetId)
 			if abyssalJewel then
 				local parentItem = mercenary.itemList[slotName]
 				addMercenaryItem(env, mercenary, abyssalJewel, abyssalSlotName, abyssalSocketIndex, parentItem and parentItem.socketedJewelEffectModifier)
@@ -805,14 +615,14 @@ function calcs.initMercenary(env)
 		mercInput = copyTable(mercInput)
 		mercPlaceholder = copyTable(mercPlaceholder)
 	end
-	local mercenaryEnv = calcs.createActorCalcEnv(env, {
+	local mercenaryEnv = calcs.createMercenaryCalcEnv(env, {
 		modDB = mercenary.modDB,
 		player = mercenary,
 		keystonesAdded = { },
 		minion = false,
 		configInput = mercInput,
 		configPlaceholder = mercPlaceholder,
-		itemModDB = recycledItemModDB or new("ModDB"):ModDB(),
+		itemModDB = new("ModDB"):ModDB(),
 		auxSkillList = { },
 		theIronMass = false,
 	})
@@ -1225,11 +1035,10 @@ function wipeEnv(env, accelerate)
 	end
 
 	if accelerate.everything then
-		-- perform() appends combat mods onto mercenary.modDB. Restore the
-		-- pre-combat snapshot when we have one; otherwise park and rebuild.
-		if not restoreCachedMercenary(env) then
-			parkCurrentMercenary(env)
-		end
+		-- Player DBs are restored via parent snapshots. Mercenary is
+		-- reconstructed at the end of initEnv rather than restored from a
+		-- pre-perform cache.
+		dropCurrentMercenary(env)
 		return
 	end
 
@@ -1286,7 +1095,7 @@ function wipeEnv(env, accelerate)
 		-- and modifiers that affect skill scaling (e.g., global buffs/effects)
 		wipeTable(env.auxSkillList)
 	end
-	parkCurrentMercenary(env)
+	dropCurrentMercenary(env)
 end
 
 local function applyGemMods(effect, modList)
@@ -2850,12 +2659,7 @@ function calcs.initEnv(build, mode, override, specEnv)
 
 	-- Merge Requirements Tables
 	env.requirementsTable = tableConcat(env.requirementsTableItems, env.requirementsTableGems)
-	if env.mercenaryFromCache then
-		env.mercenaryFromCache = nil
-	else
-		calcs.initMercenary(env)
-		cacheMercenaryBaseline(env)
-	end
+	calcs.initMercenary(env)
 
 	return env, cachedPlayerDB, cachedEnemyDB, cachedMinionDB
 end

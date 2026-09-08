@@ -831,14 +831,14 @@ function TradeQueryClass:GetResultEvaluation(row_idx, result_index, calcFunc, ba
 	local slotTbl = self.slotTables[row_idx]
 	local jewelNodeId = slotTbl.nodeId or slotTbl.selectedJewelNodeId
 	local slotName = jewelNodeId and "Jewel " .. tostring(jewelNodeId) or slotTbl.fullName or slotTbl.slotName
-	local comparisonActor = MercenaryTools.comparisonActorForSlot(slotName, slotTbl.itemSetId, self.itemsTab)
+	local comparisonActor = self.itemsTab:ComparisonActorForSlot(slotName, slotTbl.itemSetId)
 	if not calcFunc then -- Always evaluate when calcFunc is given
 		local actorOutputs
 		calcFunc, baseOutput, actorOutputs = self.itemsTab.build.calcsTab:GetMiscCalculator()
 		if slotTbl.itemSetId then
 			baseOutput = calcFunc({ itemSetId = slotTbl.itemSetId, comparisonActor = comparisonActor })
 		else
-			baseOutput = MercenaryTools.comparisonBaseOutput(baseOutput, actorOutputs, slotName)
+			baseOutput = MercenaryTools.comparisonBaseOutput(baseOutput, actorOutputs, comparisonActor)
 		end
 		if comparisonActor == "MERCENARY" and not MercenaryTools.mercenaryOutputAvailable(baseOutput) then
 			result.evaluation = { }
@@ -892,7 +892,7 @@ function TradeQueryClass:GetResultEvaluation(row_idx, result_index, calcFunc, ba
 		local slotName = jewelNodeId and "Jewel " .. tostring(jewelNodeId) or slotTbl.selectedSlotName or slotTbl.slotName
 		local item = new("Item"):Item(result.item_string)
 
-		local output = self:ReduceOutput(calcFunc(MercenaryTools.itemCalculationOverride(slotTbl.itemSetId, slotName, item, self.itemsTab)))
+		local output = self:ReduceOutput(calcFunc(self.itemsTab:ItemCalculationOverride(slotName, item, slotTbl.itemSetId)))
 		local weight = self.tradeQueryGenerator.WeightedRatioOutputs(baseOutput, output, self.statSortSelectionList)
 		result.evaluation = {{ output = output, weight = weight }}
 	end

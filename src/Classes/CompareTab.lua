@@ -27,7 +27,7 @@ local function getComparisonItemSet(itemsTab)
 end
 
 local function isMercenaryComparisonSet(itemsTab)
-	return MercenaryTools.comparisonActorForItemSet(itemsTab and itemsTab.viewItemSetId, itemsTab) == "MERCENARY"
+	return itemsTab and itemsTab:ComparisonActorForItemSet() == "MERCENARY"
 end
 
 local function getActiveItemSetSlot(itemsTab, slotName)
@@ -2965,7 +2965,7 @@ function CompareTabClass:ComparePowerBuilder(compareEntry, powerStat, categories
 				end
 
 
-				local output = calcFunc(MercenaryTools.itemCalculationOverride(self.primaryBuild.itemsTab.viewItemSetId, slotName, newItem, self.primaryBuild.itemsTab), useFullDPS)
+				local output = calcFunc(self.primaryBuild.itemsTab:ItemCalculationOverride(slotName, newItem), useFullDPS)
 				local impact = self.primaryBuild.calcsTab:CalculatePowerStat(powerStat, output, itemCalcBase)
 				local impactStr, impactVal, combinedImpactStr, impactPercent, impactIsZero = formatImpact(impact)
 
@@ -3047,14 +3047,14 @@ function CompareTabClass:ComparePowerBuilder(compareEntry, powerStat, categories
 
 				if jEntry.pNodeAllocated then
 					-- Socket is allocated in primary build, test directly in that socket
-					local output = calcFunc(MercenaryTools.itemCalculationOverride(self.primaryBuild.itemsTab.viewItemSetId, jEntry.cSlotName, newItem, self.primaryBuild.itemsTab), useFullDPS)
+					local output = calcFunc(self.primaryBuild.itemsTab:ItemCalculationOverride(jEntry.cSlotName, newItem), useFullDPS)
 					bestImpactVal = self.primaryBuild.calcsTab:CalculatePowerStat(powerStat, output, calcBase)
 				else
 					-- Socket is NOT allocated in primary build; try the jewel in every
 					-- jewel socket on the primary build's tree, temporarily allocating
 					-- unallocated sockets via addNodes so CalcSetup doesn't skip them
 					for _, socketInfo in ipairs(primaryJewelSockets) do
-						local override = MercenaryTools.itemCalculationOverride(self.primaryBuild.itemsTab.viewItemSetId, socketInfo.slotName, newItem, self.primaryBuild.itemsTab)
+						local override = self.primaryBuild.itemsTab:ItemCalculationOverride(socketInfo.slotName, newItem)
 						if not socketInfo.allocated then
 							override.addNodes = { [socketInfo.node] = true }
 						end
@@ -4198,7 +4198,7 @@ function CompareTabClass:DrawItems(vp, compareEntry, inputEvents)
 			local selItem = getActiveItem(itemsTab, hoverEquipSlotName)
 
 			-- For jewel sockets that aren't allocated, temporarily allocate the node
-			local override = MercenaryTools.itemCalculationOverride(itemsTab.viewItemSetId, hoverEquipSlotName, newItem, itemsTab)
+			local override = itemsTab:ItemCalculationOverride(hoverEquipSlotName, newItem)
 			if pSlot and pSlot.nodeId then
 				local pSpec = self.primaryBuild.spec
 				if pSpec and pSpec.allocNodes and not pSpec.allocNodes[pSlot.nodeId] then

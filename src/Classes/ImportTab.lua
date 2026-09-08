@@ -2246,11 +2246,11 @@ function ImportTabClass:ImportMercenary(hire, source, destinationId)
 			return nil, "This item is still equipped by the player in PoB; refresh the character import or unequip it first."
 		end
 	end
-	profile.importAssociation = association
 
-	-- Re-import into the existing set. Fork only if that would overwrite the
-	-- player's currently equipped gear.
-	local itemSet = previous and itemsTab.itemSets[previous.itemSetId]
+	-- Re-import into the existing mercenary equipment set. Fork only if that
+	-- would overwrite the player's currently equipped gear.
+	local previousSetId = itemsTab:GetActorItemSetId("MERCENARY")
+	local itemSet = previousSetId and itemsTab.itemSets[previousSetId]
 	itemsTab:AddUndoState()
 	if not itemSet or itemSet.id == itemsTab.activeItemSetId then
 		itemSet = itemsTab:NewItemSet()
@@ -2312,22 +2312,16 @@ function ImportTabClass:ImportMercenary(hire, source, destinationId)
 		profile.id = tab:NewMercenarySet().id
 		t_insert(tab.mercenarySetOrderList, profile.id)
 	end
-	profile.itemSetId = itemSet.id
+	profile.importAssociation = association
+	itemsTab:SetActorItemSet("MERCENARY", itemSet.id, false)
 	tab.mercenarySets[profile.id] = profile
 	-- SetActiveMercenarySet stores the outgoing profile; replace its pointer first.
 	if tab.activeMercenarySetId == profile.id then
 		tab.profile = profile
 	end
-	-- Items owns API-import undo. Refresh the Mercenary tab without pushing
-	-- Mercenary history that could restore the old profile without equipment.
-	tab.skipUndo = true
 	tab:SetActiveMercenarySet(profile.id)
-	tab:Changed()
-	tab.skipUndo = false
-	itemsTab.mercenaryChangedByItems = true
 	itemsTab:PopulateSlots()
 	itemsTab:AddUndoState()
-	tab:ResetUndo()
 	local supports = 0
 	for _, skill in ipairs(profile.skills) do
 		supports = supports + #skill.supports

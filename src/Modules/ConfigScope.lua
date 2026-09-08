@@ -17,6 +17,10 @@
 -- names likewise require explicit enemyState so a game update cannot silently
 -- share a new source-owned condition.
 --
+-- "ByYou" name matching is an index-time assertion only. Calculation reads
+-- tag.sourceOwned, which parse/config stamping must set. ModStore does not
+-- consult this module.
+--
 local ConfigScope = { }
 
 local PLAYER_VARS = {
@@ -69,7 +73,14 @@ local SOURCE_OWNED_TAG_TYPES = {
 
 local sourceOwnedNameCache = { }
 
-local function isSourceOwnedName(name)
+-- Runtime classification: explicit config metadata and the inherent source-owned
+-- vocabulary. Does not match "ByYou" in names.
+local function isExplicitSourceOwnedName(name)
+	return name and (SOURCE_OWNED_ENEMY_VARS[name] or indexedSourceOwned[name]) or false
+end
+
+-- Index-time assertion: explicit names plus ByYou wording that still needs enemyState.
+local function looksSourceOwnedName(name)
 	if not name then
 		return false
 	end
@@ -78,33 +89,76 @@ local function isSourceOwnedName(name)
 		return cached
 	end
 	-- "ByYou" is also a prefix of "ByYour".
-	local owned = SOURCE_OWNED_ENEMY_VARS[name] or indexedSourceOwned[name] or name:find("ByYou", 1, true) ~= nil
+	local owned = isExplicitSourceOwnedName(name) or name:find("ByYou", 1, true) ~= nil
 	sourceOwnedNameCache[name] = owned
 	return owned
 end
 
-local function anySourceOwned(value)
+local function anyLooksSourceOwned(value)
 	if type(value) == "table" then
 		for _, name in ipairs(value) do
-			if isSourceOwnedName(name) then
+			if looksSourceOwnedName(name) then
 				return true
 			end
 		end
 		return false
 	end
-	return isSourceOwnedName(value)
+	return looksSourceOwnedName(value)
+end
+
+local function anyExplicitSourceOwned(value)
+	if type(value) == "table" then
+		for _, name in ipairs(value) do
+			if isExplicitSourceOwnedName(name) then
+				return true
+			end
+		end
+		return false
+	end
+	return isExplicitSourceOwnedName(value)
 end
 
 function ConfigScope.isSourceOwnedEnemyVar(var)
-	return isSourceOwnedName(var)
+	return isExplicitSourceOwnedName(var)
 end
 
 function ConfigScope.isSourceOwnedEnemyMod(mod)
 	if not mod or not mod.name then
 		return false
 	end
+	if mod.sourceOwned == true then
+		return true
+	end
 	local var = mod.name:match("^Condition:(.+)$") or mod.name:match("^Multiplier:(.+)$")
-	return var and isSourceOwnedName(var)
+	return var and isExplicitSourceOwnedName(var)
+end
+
+-- Stamp tag.sourceOwned on inherently source-owned predicates. Parser patterns
+-- that wrap encounter names ("Ignited by you") already set the flag themselves.
+function ConfigScope.stampSourceOwnedOnMod(mod)
+	if type(mod) ~= "table" then
+		return
+	end
+	for _, tag in ipairs(mod) do
+		if type(tag) == "table" and SOURCE_OWNED_TAG_TYPES[tag.type] and tag.sourceOwned == nil then
+			if anyExplicitSourceOwned(tag.var or tag.varList) then
+				tag.sourceOwned = true
+			end
+		end
+	end
+	local value = mod.value
+	if type(value) == "table" and value.mod then
+		ConfigScope.stampSourceOwnedOnMod(value.mod)
+	end
+end
+
+function ConfigScope.stampSourceOwnedOnMods(mods)
+	if type(mods) ~= "table" then
+		return
+	end
+	for _, mod in ipairs(mods) do
+		ConfigScope.stampSourceOwnedOnMod(mod)
+	end
 end
 
 -- Encounter statuses that "by you" mods query by the shared ailment name.
@@ -149,22 +203,7 @@ function ConfigScope.shouldCopyEncounterOntoPlayerOverlay(mod)
 	if not var then
 		return false
 	end
-	return isSourceOwnedName(var) or ENCOUNTER_OVERLAY_VARS[var]
-end
-
-function ConfigScope.isSourceOwnedEnemyTag(tag)
-	if not (tag and SOURCE_OWNED_TAG_TYPES[tag.type]) then
-		return false
-	end
-	-- Stamp the result on the tag. EvalMod hits this per Condition/Multiplier
-	-- tag; the classification never changes for a given tag table.
-	local cached = tag.sourceOwned
-	if cached ~= nil then
-		return cached
-	end
-	local owned = anySourceOwned(tag.var or tag.varList)
-	tag.sourceOwned = owned
-	return owned
+	return isExplicitSourceOwnedName(var) or ENCOUNTER_OVERLAY_VARS[var]
 end
 
 function ConfigScope.impliesChilledByYourHits(modName)
@@ -193,7 +232,7 @@ local function hasEnemyPredicate(varData)
 end
 
 local function looksSourceOwned(varData)
-	if anySourceOwned(varData.ifEnemyCond) or anySourceOwned(varData.ifEnemyMult) then
+	if anyLooksSourceOwned(varData.ifEnemyCond) or anyLooksSourceOwned(varData.ifEnemyMult) then
 		return true
 	end
 	local var = varData.var or ""

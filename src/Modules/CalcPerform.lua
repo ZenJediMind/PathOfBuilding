@@ -6,7 +6,6 @@
 ---@class Calcs
 local calcs = require("Modules.CalcBase")
 local MercenaryTools = require("Modules.MercenaryTools")
-local ConfigScope = require("Modules.ConfigScope")
 
 local pairs = pairs
 local ipairs = ipairs
@@ -36,9 +35,18 @@ local function getCachedOutputValue(env, activeSkill, ...)
 		calcs.buildActiveSkill(env, env.mode, activeSkill, uuid, {uuid})
 	end
 
+	local cached = GlobalCache.cachedData[env.mode][uuid]
+	if not cached or not cached.Env then
+		error("No cached calculation for "..activeSkill.activeEffect.grantedEffect.name)
+	end
+	local cachedEnv = cached.Env
+	local output = cachedEnv.player.output
+	if activeSkill.actor and activeSkill.actor.isMercenary and cachedEnv.mercenary and cachedEnv.mercenary.output then
+		output = cachedEnv.mercenary.output
+	end
 	local tempValues = {}
 	for i,v in ipairs({...}) do
-		tempValues[i] = GlobalCache.cachedData[env.mode][uuid].Env.player.output[v]
+		tempValues[i] = output[v]
 	end
 	return unpack(tempValues)
 end
@@ -869,7 +877,7 @@ local function bindSourceOwnedEnemyMod(mod, actor)
 	end
 	local hasSource = false
 	for _, tag in ipairs(mod) do
-		if ConfigScope.isSourceOwnedEnemyTag(tag) then
+		if tag.sourceOwned == true then
 			hasSource = true
 			break
 		end
@@ -879,7 +887,7 @@ local function bindSourceOwnedEnemyMod(mod, actor)
 	end
 	local bound = copyTable(mod, true)
 	for i, tag in ipairs(bound) do
-		if ConfigScope.isSourceOwnedEnemyTag(tag) then
+		if tag.sourceOwned == true then
 			bound[i] = copyTable(tag, true)
 			bound[i].sourceActor = actor
 		end
@@ -2892,31 +2900,41 @@ function calcs.perform(env, skipEHP)
 	-- To support maximum sustainable stages for the following skills we need to get the data from already
 	-- computed cached versions to satisfy the order of operations.
 	-- See: https://github.com/PathOfBuildingCommunity/PathOfBuilding/pull/5164
+	local function prepareSustainableStages(activeSkill)
+		if activeSkill.skillFlags.disable or (env.limitedSkills and env.limitedSkills[cacheSkillUUID(activeSkill, env)]) then
+			return
+		end
+		local grantedName = activeSkill.activeEffect.grantedEffect.name
+		if (grantedName == "Blight" or grantedName == "Blight of Contagion" or grantedName == "Blight of Atrophy") and activeSkill.skillPart == 2 then
+			local rate, duration = getCachedOutputValue(env, activeSkill, "Speed", "Duration")
+			local baseMaxStages = activeSkill.skillModList:Sum("BASE", activeSkill.skillCfg, "BlightBaseMaxStages")
+			local maximum = m_min((m_floor(rate * duration) - 1), baseMaxStages - 1)
+			activeSkill.skillModList:NewMod("Multiplier:"..grantedName:gsub("%s+", "").."MaxStages", "BASE", maximum, "Base")
+			activeSkill.skillModList:NewMod("Multiplier:"..grantedName:gsub("%s+", "").."StageAfterFirst", "BASE", maximum, "Base")
+		end
+		if grantedName == "Penance Brand of Dissipation" and activeSkill.skillPart == 2 then
+			local activation_frequency, duration = getCachedOutputValue(env, activeSkill, "HitSpeed", "Duration") -- HitSpeed is the brand activation frequency
+			local ticks = m_max(m_min((m_floor((activation_frequency or 0) * duration) - 1), 19), 0)
+			activeSkill.skillModList:NewMod("Multiplier:PenanceBrandofDissipationMaxStages", "BASE", ticks, "Base")
+			activeSkill.skillModList:NewMod("Multiplier:PenanceBrandofDissipationStageAfterFirst", "BASE", ticks, "Base")
+		end
+		if (grantedName == "Scorching Ray" or grantedName == "Scorching Ray of Immolation") and activeSkill.skillPart == 2 then
+			local maximum = 7
+			activeSkill.skillModList:NewMod("Multiplier:"..grantedName:gsub("%s+", "").."MaxStages", "BASE", maximum, "Base")
+			activeSkill.skillModList:NewMod("Multiplier:"..grantedName:gsub("%s+", "").."StageAfterFirst", "BASE", maximum, "Base")
+		end
+		if grantedName == "Earthquake of Amplification" and activeSkill.skillPart == 2 then
+			local duration = getCachedOutputValue(env, activeSkill, "Duration")
+			local durationMulti = m_floor(duration * 10)
+			activeSkill.skillModList:NewMod("Multiplier:100msEarthquakeDuration", "BASE", durationMulti, "Skill:EarthquakeAltX")
+		end
+	end
 	for _, activeSkill in ipairs(env.player.activeSkillList) do
-		if not activeSkill.skillFlags.disable and not (env.limitedSkills and env.limitedSkills[cacheSkillUUID(activeSkill, env)]) then
-			if (activeSkill.activeEffect.grantedEffect.name == "Blight" or activeSkill.activeEffect.grantedEffect.name == "Blight of Contagion" or activeSkill.activeEffect.grantedEffect.name == "Blight of Atrophy") and activeSkill.skillPart == 2 then
-				local rate, duration = getCachedOutputValue(env, activeSkill, "Speed", "Duration")
-				local baseMaxStages = activeSkill.skillModList:Sum("BASE", env.player.mainSkill.skillCfg, "BlightBaseMaxStages")
-				local maximum = m_min((m_floor(rate * duration) - 1), baseMaxStages - 1)
-				activeSkill.skillModList:NewMod("Multiplier:"..activeSkill.activeEffect.grantedEffect.name:gsub("%s+", "").."MaxStages", "BASE", maximum, "Base")
-				activeSkill.skillModList:NewMod("Multiplier:"..activeSkill.activeEffect.grantedEffect.name:gsub("%s+", "").."StageAfterFirst", "BASE", maximum, "Base")
-			end
-			if activeSkill.activeEffect.grantedEffect.name == "Penance Brand of Dissipation" and activeSkill.skillPart == 2 then
-				local activation_frequency, duration = getCachedOutputValue(env, activeSkill, "HitSpeed", "Duration") -- HitSpeed is the brand activation frequency
-				local ticks = m_max(m_min((m_floor((activation_frequency or 0) * duration) - 1), 19), 0)
-				activeSkill.skillModList:NewMod("Multiplier:PenanceBrandofDissipationMaxStages", "BASE", ticks, "Base")
-				activeSkill.skillModList:NewMod("Multiplier:PenanceBrandofDissipationStageAfterFirst", "BASE", ticks, "Base")
-			end
-			if (activeSkill.activeEffect.grantedEffect.name == "Scorching Ray" or activeSkill.activeEffect.grantedEffect.name == "Scorching Ray of Immolation") and activeSkill.skillPart == 2 then
-				local maximum = 7
-				activeSkill.skillModList:NewMod("Multiplier:"..activeSkill.activeEffect.grantedEffect.name:gsub("%s+", "").."MaxStages", "BASE", maximum, "Base")
-				activeSkill.skillModList:NewMod("Multiplier:"..activeSkill.activeEffect.grantedEffect.name:gsub("%s+", "").."StageAfterFirst", "BASE", maximum, "Base")
-			end
-			if (activeSkill.activeEffect.grantedEffect.name == "Earthquake of Amplification")  and activeSkill.skillPart == 2 then
-				local duration = getCachedOutputValue(env, activeSkill, "Duration")
-				local durationMulti = m_floor(duration * 10)
-				activeSkill.skillModList:NewMod("Multiplier:100msEarthquakeDuration", "BASE", durationMulti, "Skill:EarthquakeAltX")
-			end
+		prepareSustainableStages(activeSkill)
+	end
+	if env.mercenary then
+		for _, activeSkill in ipairs(env.mercenary.activeSkillList) do
+			prepareSustainableStages(activeSkill)
 		end
 	end
 
@@ -3683,11 +3701,9 @@ function calcs.perform(env, skipEHP)
 							mergeAuraFromSkill(activeSkill, buff, env.player, buffs, { "AuraEffect", "BuffEffect" }, { "BuffEffectOnSelf", "AuraEffectOnSelf" }, extraAuraModList)
 						end
 						if env.minion and not env.minion.hostile then
-							mergeAuraFromSkill(activeSkill, buff, env.minion, minionBuffs, { "AuraEffect", "BuffEffect" }, { "BuffEffectOnSelf", "AuraEffectOnSelf" }, extraAuraModList)
+							mergeIncomingAuraOnRecipient(skillModList, skillCfg, buff, env.minion, minionBuffs, extraAuraModList, allyBuffs)
 						end
-						if env.mercenaryMinion then
-							mergeAuraFromSkill(activeSkill, buff, env.mercenaryMinion, mercenaryMinionBuffs, { "AuraEffect", "BuffEffect" }, { "BuffEffectOnSelf", "AuraEffectOnSelf" }, extraAuraModList)
-						end
+						mergeIncomingAuraOnRecipient(skillModList, skillCfg, buff, env.mercenaryMinion, mercenaryMinionBuffs, extraAuraModList, allyBuffs)
 						if partyTabEnableExportBuffs then
 							local exported = new("ModList"):ModList()
 							exported:AddList(buff.modList)
@@ -5183,4 +5199,11 @@ function calcs.perform(env, skipEHP)
 	end
 
 	cacheData(cacheSkillUUID(env.player.mainSkill, env), env)
+	if env.mercenary and env.mercenary.mainSkill then
+		local mercenaryUUID = cacheSkillUUID(env.mercenary.mainSkill, env)
+		local playerUUID = cacheSkillUUID(env.player.mainSkill, env)
+		if mercenaryUUID ~= playerUUID then
+			GlobalCache.cachedData[env.mode][mercenaryUUID] = GlobalCache.cachedData[env.mode][playerUUID]
+		end
+	end
 end

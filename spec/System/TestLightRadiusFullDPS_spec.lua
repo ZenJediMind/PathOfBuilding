@@ -2,7 +2,6 @@ describe("Light Radius integration", function()
 	local MercenaryTest = dofile("../spec/System/MercenaryTestHelpers.lua")
 	local selectScionLuminary = MercenaryTest.selectScionLuminary
 	local allocate = MercenaryTest.allocate
-	local MercenaryTools = require("Modules.MercenaryTools")
 
 	local function configureMercenary()
 		local profile = build.mercenaryTab.profile
@@ -87,7 +86,7 @@ describe("Light Radius integration", function()
 		local function calculationOverride(item)
 			return {
 				itemSetId = queryGenerator.calcContext.itemSetId,
-				comparisonActor = MercenaryTools.comparisonActorForSlot(slot.slotName, queryGenerator.calcContext.itemSetId, build.itemsTab),
+				comparisonActor = build.itemsTab:ComparisonActorForSlot(slot.slotName, queryGenerator.calcContext.itemSetId),
 				repSlotName = slot.slotName,
 				repItem = item,
 			}

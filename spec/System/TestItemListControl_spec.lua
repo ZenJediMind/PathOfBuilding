@@ -52,7 +52,6 @@ describe("ItemListControl", function()
 			PopulateSlots = function() end,
 			AddUndoState = function() end,
 		}
-		itemsTab.GetPlayerItemSetOrderList = function() return itemsTab.itemSetOrderList end
 		itemsTab.GetVisibleItemSet = function() return itemsTab.visibleItemSet or itemsTab.activeItemSet end
 		local control = new("ItemListControl"):ItemListControl(nil, { 0, 0, 360, 308 }, itemsTab, true)
 		return control, itemsTab, treeTab

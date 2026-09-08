@@ -342,8 +342,6 @@ function buildMode:Init(dbFileName, buildName, buildXML, convertBuild, importLin
 				local configSet = self.configTab:NewConfigSet(#self.configTab.configSets + 1)
 				t_insert(self.configTab.configSetOrderList, configSet.id)
 				configSet.title = loadout
-				self.configTab:EnsureActorConfig(configSet)
-				configSet.actors.player.itemSetId = itemSet.id
 
 				self:SyncLoadouts()
 				self.modFlag = true
@@ -392,7 +390,7 @@ function buildMode:Init(dbFileName, buildName, buildXML, convertBuild, importLin
 		end
 
 		local oneSkill = self.skillsTab and #self.skillsTab.skillSetOrderList == 1
-		local itemSetOrderList = self.itemsTab and self.itemsTab:GetPlayerItemSetOrderList() or { }
+		local itemSetOrderList = self.itemsTab and self.itemsTab.itemSetOrderList or { }
 		local oneItem = self.itemsTab and #itemSetOrderList == 1
 		local oneConfig = self.configTab and #self.configTab.configSetOrderList == 1
 
@@ -410,12 +408,10 @@ function buildMode:Init(dbFileName, buildName, buildXML, convertBuild, importLin
 			self.treeTab:SetActiveSpec(newSpecId)
 		end
 		if newConfigId ~= self.configTab.activeConfigSetId then
-			self.configTab:SetActiveConfigSet(newConfigId, nil, { player = false })
+			self.configTab:SetActiveConfigSet(newConfigId)
 		end
 		if newItemId ~= self.itemsTab.activeItemSetId then
 			self.itemsTab:SetActiveItemSet(newItemId)
-		else
-			self.configTab:SyncActorItemSet("player", newItemId)
 		end
 		if newSkillId ~= self.skillsTab.activeSkillSetId then
 			self.skillsTab:SetActiveSkillSet(newSkillId)
@@ -796,7 +792,7 @@ function buildMode:SyncLoadouts()
 	self.treeListSpecialLinks, self.itemListSpecialLinks, self.skillListSpecialLinks, self.configListSpecialLinks = {}, {}, {}, {}
 
 	local oneSkill = self.skillsTab and #self.skillsTab.skillSetOrderList == 1
-	local itemSetOrderList = self.itemsTab and self.itemsTab:GetPlayerItemSetOrderList() or { }
+	local itemSetOrderList = self.itemsTab and self.itemsTab.itemSetOrderList or { }
 	local oneItem = self.itemsTab and #itemSetOrderList == 1
 	local oneConfig = self.configTab and #self.configTab.configSetOrderList == 1
 
@@ -1703,7 +1699,7 @@ function buildMode:RefreshSkillSelectControls(controls, mainGroup, suffix)
 				if not activeSkill.skillFlags.disable and (activeEffect.grantedEffect.minionList or activeSkill.minionList[1]) then
 					wipeTable(controls.mainSkillMinion.list)
 					if activeEffect.grantedEffect.minionHasItemSet then
-						for _, itemSetId in ipairs(self.itemsTab:GetPlayerItemSetOrderList()) do
+						for _, itemSetId in ipairs(self.itemsTab.itemSetOrderList) do
 							local itemSet = self.itemsTab.itemSets[itemSetId]
 							t_insert(controls.mainSkillMinion.list, {
 								label = itemSet.title or "Default Item Set",

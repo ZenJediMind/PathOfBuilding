@@ -394,7 +394,7 @@ end
 function CompareEntryClass:RefreshMinionControls(controls, activeSkill, activeEffect, suffix)
 	wipeTable(controls.mainSkillMinion.list)
 	if activeEffect.grantedEffect.minionHasItemSet then
-		for _, itemSetId in ipairs(self.itemsTab:GetPlayerItemSetOrderList()) do
+		for _, itemSetId in ipairs(self.itemsTab.itemSetOrderList) do
 			local itemSet = self.itemsTab.itemSets[itemSetId]
 			t_insert(controls.mainSkillMinion.list, {
 				label = itemSet.title or "Default Item Set",

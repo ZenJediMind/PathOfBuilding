@@ -3736,8 +3736,8 @@ local specialModList = {
 	["enemies ignited by you during f?l?a?s?k? ?effect take (%d+)%% increased damage"] = function(num) return { mod("EnemyModifier", "LIST", { mod = mod("DamageTaken", "INC", num) }, { type = "ActorCondition", actor = "enemy", var = "Ignited", sourceOwned = true }) } end,
 	["enemies ignited by you take chaos damage instead of fire damage from ignite"] = { flag("IgniteToChaos") },
 	["enemies chilled by your hits are shocked"] = {
-		mod("ShockBase", "BASE", data.nonDamagingAilment["Shock"].default, { type = "ActorCondition", actor = "enemy", var = "ChilledByYourHits" }),
-		mod("EnemyModifier", "LIST", { mod = flag("Condition:Shocked", { type = "Condition", var = "ChilledByYourHits" }) })
+		mod("ShockBase", "BASE", data.nonDamagingAilment["Shock"].default, { type = "ActorCondition", actor = "enemy", var = "ChilledByYourHits", sourceOwned = true }),
+		mod("EnemyModifier", "LIST", { mod = flag("Condition:Shocked", { type = "Condition", var = "ChilledByYourHits", sourceOwned = true }) })
 	},
 	["cannot inflict ignite"] = { flag("CannotIgnite") },
 	["cannot inflict freeze or chill"] = { flag("CannotFreeze"), flag("CannotChill") },
@@ -3857,8 +3857,8 @@ local specialModList = {
 	} end,
 	["chance to avoid being shocked applies to all elemental ailments"] = { flag("ShockAvoidAppliesToElementalAilments") }, -- typo / old wording change
 	["modifiers to chance to avoid being shocked apply to all elemental ailments"] = { flag("ShockAvoidAppliesToElementalAilments") },
-	["enemies permanently take (%d+)%% increased damage for each second they've ever been frozen by you, up to a maximum of (%d+)%%"] = function(num, _, limit) return { mod("EnemyModifier", "LIST", { mod = mod("DamageTaken", "INC", num, { type = "Condition", var = "FrozenByYou" }, { type = "Multiplier", var = "FrozenByYouSeconds", limit = limit / num }) }) } end,
-	["enemies permanently take (%d+)%% increased damage for each second they've ever been chilled by you, up to a maximum of (%d+)%%"] = function(num, _, limit) return { mod("EnemyModifier", "LIST", { mod = mod("DamageTaken", "INC", num, { type = "Condition", var = "ChilledByYou" }, { type = "Multiplier", var = "ChilledByYouSeconds", limit = limit / num }) }) } end,
+	["enemies permanently take (%d+)%% increased damage for each second they've ever been frozen by you, up to a maximum of (%d+)%%"] = function(num, _, limit) return { mod("EnemyModifier", "LIST", { mod = mod("DamageTaken", "INC", num, { type = "Condition", var = "FrozenByYou", sourceOwned = true }, { type = "Multiplier", var = "FrozenByYouSeconds", limit = limit / num, sourceOwned = true }) }) } end,
+	["enemies permanently take (%d+)%% increased damage for each second they've ever been chilled by you, up to a maximum of (%d+)%%"] = function(num, _, limit) return { mod("EnemyModifier", "LIST", { mod = mod("DamageTaken", "INC", num, { type = "Condition", var = "ChilledByYou", sourceOwned = true }, { type = "Multiplier", var = "ChilledByYouSeconds", limit = limit / num, sourceOwned = true }) }) } end,
 	["modifiers to chance to suppress spell damage also apply to chance to avoid elemental ailments at (%d+)%% of their value"] = function(num) return {
 		mod("SpellSuppressionAppliesToAilmentAvoidancePercent", "BASE", num),
 		flag("SpellSuppressionAppliesToAilmentAvoidance")
@@ -7036,6 +7036,8 @@ local count = 0
 --local foo = io.open("../unsupported.txt", "w")
 --foo:close()
 
+local ConfigScope = require("Modules.ConfigScope")
+
 return {
 	parseMod = function(line, isComb)
 		if not cache[line] then
@@ -7055,7 +7057,9 @@ return {
 				end
 			end
 		end
-		return unpack(copyTable(cache[line]))
+		local cached = copyTable(cache[line])
+		ConfigScope.stampSourceOwnedOnMods(cached[1])
+		return unpack(cached)
 	end,
 	parseModCache = cache,
 }

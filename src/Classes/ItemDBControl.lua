@@ -8,8 +8,6 @@ local ipairs = ipairs
 local t_insert = table.insert
 local m_max = math.max
 local m_floor = math.floor
-local MercenaryTools = require("Modules.MercenaryTools")
-
 
 ---@class ItemDBControl: ListControl
 local ItemDBClass = newClass("ItemDBControl", "ListControl")
@@ -269,7 +267,7 @@ function ItemDBClass:ListBuilder()
 					elseif item.base.tincture then
 						override = { toggleTincture = item }
 					else
-						override = MercenaryTools.itemCalculationOverride(self.itemsTab.viewItemSetId, slotName, item, self.itemsTab)
+						override = self.itemsTab:ItemCalculationOverride(slotName, item)
 					end
 					local output = calcFunc(override, useFullDPS)
 					local measuredPower = data.powerStatList.GetFromOutput(output, self.sortDetail)

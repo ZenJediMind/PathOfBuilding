@@ -16,7 +16,10 @@ function ItemSetListClass:ItemSetListControl(anchor, rect, itemsTab)
 	self.itemsTab = itemsTab
 	self.controls.copy = new("ButtonControl"):ButtonControl({"BOTTOMLEFT",self,"TOP"}, {2, -4, 60, 18}, "Copy", function()
 		local newSet = copyTable(itemsTab.itemSets[self.selValue])
-		newSet.id = itemsTab:AllocItemSetId()
+		newSet.id = 1
+		while itemsTab.itemSets[newSet.id] do
+			newSet.id = newSet.id + 1
+		end
 		itemsTab.itemSets[newSet.id] = newSet
 		self:RenameSet(newSet, true)
 	end)
@@ -82,7 +85,9 @@ function ItemSetListClass:GetRowValue(column, index, itemSetId)
 	local itemSet = self.itemsTab.itemSets[itemSetId]
 	if column == 1 then
 		local title = itemSet.title or "Default"
-		return title .. (itemSetId == self.itemsTab.viewItemSetId and "  ^9(Visible)" or "") .. (itemSetId == self.itemsTab.activeItemSetId and "  ^9(Current player)" or "")
+		return title .. (itemSetId == self.itemsTab.viewItemSetId and "  ^9(Visible)" or "")
+			.. (itemSetId == self.itemsTab.activeItemSetId and "  ^9(Current player)" or "")
+			.. (itemSetId == self.itemsTab:GetActorItemSetId("MERCENARY") and "  ^9(Current mercenary)" or "")
 	end
 end
 
@@ -143,13 +148,6 @@ function ItemSetListClass:OnSelDelete(index, itemSetId)
 				self.itemsTab:SetActiveItemSet(replacementItemSetId)
 			elseif itemSetId == self.itemsTab.viewItemSetId then
 				self.itemsTab:SetViewItemSet(self.list[m_max(1, index - 1)])
-			end
-			if self.itemsTab.build.configTab then
-				self.itemsTab.build.configTab:RemapItemSetId(itemSetId, replacementItemSetId)
-			end
-			local mercenaryTab = self.itemsTab.build.mercenaryTab
-			if mercenaryTab and mercenaryTab.auxiliaryItemSetId == itemSetId then
-				mercenaryTab.auxiliaryItemSetId = nil
 			end
 			self.itemsTab:AddUndoState()
 			self.itemsTab.build:SyncLoadouts()

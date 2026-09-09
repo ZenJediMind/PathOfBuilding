@@ -340,7 +340,7 @@ describe("Player and mercenary configuration", function()
 			assert.are.equal(case.applies, not not enemyShocked(env), case.source.." -> "..case.target)
 			local sourceDB = case.source == "PLAYER" and env.player.enemySourceDB or env.mercenary.enemySourceDB
 			local otherDB = case.source == "PLAYER" and env.mercenary.enemySourceDB or env.player.enemySourceDB
-			assert.is_not_true(env.enemyDB:GetCondition("Chilled") or env.enemyDB:Flag(nil, "Condition:Chilled"), case.source.." shared Chilled")
+			assert.is_true(env.enemyDB:GetCondition("Chilled") or env.enemyDB:Flag(nil, "Condition:Chilled"), case.source.." shared Chilled")
 			assert.is_true(sourceDB:GetCondition("Chilled") or sourceDB:Flag(nil, "Condition:Chilled"), case.source.." overlay Chilled")
 			assert.is_not_true(otherDB:GetCondition("Chilled") or otherDB:Flag(nil, "Condition:Chilled"), case.source.." other overlay Chilled")
 		end
@@ -360,6 +360,11 @@ describe("Player and mercenary configuration", function()
 			local env = calculateBuild()
 			assert.is_not_nil(env.mercenary, table.concat(env.mercenaryCalculationErrors or { }, "\n"))
 			assert.are.equal(case.delta, enemyDamageTaken(env) - baseline, case.source.." frozen -> "..case.target)
+			local sourceDB = case.source == "PLAYER" and env.player.enemySourceDB or env.mercenary.enemySourceDB
+			local otherDB = case.source == "PLAYER" and env.mercenary.enemySourceDB or env.player.enemySourceDB
+			assert.is_true(env.enemyDB:GetCondition("Frozen") or env.enemyDB:Flag(nil, "Condition:Frozen"), case.source.." shared Frozen")
+			assert.is_true(sourceDB:GetCondition("Frozen") or sourceDB:Flag(nil, "Condition:Frozen"), case.source.." overlay Frozen")
+			assert.is_not_true(otherDB:GetCondition("Frozen") or otherDB:Flag(nil, "Condition:Frozen"), case.source.." other overlay Frozen")
 		end
 
 		local chilledByYouBurningMod = "Enemies Chilled by you take 20% increased Burning Damage"
@@ -398,6 +403,28 @@ describe("Player and mercenary configuration", function()
 			local env = calculateBuild()
 			assert.is_not_nil(env.mercenary, table.concat(env.mercenaryCalculationErrors or { }, "\n"))
 			assert.are.equal(case.delta, enemyFireDotTaken(env) - baseline, case.source.." chilled-by-hits -> "..case.target)
+		end
+
+		local againstChilledMod = "20% increased Damage against Chilled Enemies"
+		local function actorDamageInc(env, owner)
+			local actor = owner == "PLAYER" and env.player or env.mercenary
+			return actor.modDB:Sum("INC", nil, "Damage")
+		end
+		for _, case in ipairs({
+			{ source = "PLAYER", target = "MERCENARY" },
+			{ source = "MERCENARY", target = "MERCENARY" },
+			{ source = "MERCENARY", target = "PLAYER" },
+			{ source = "PLAYER", target = "PLAYER" },
+		}) do
+			newBuild()
+			selectScionLuminary()
+			configureMercenary()
+			local baseline = actorDamageInc(calculateBuild(), case.target)
+			setActorInput(case.source, "conditionEnemyChilledByYourHits", true)
+			setActorMod(case.target, againstChilledMod)
+			local env = calculateBuild()
+			assert.is_not_nil(env.mercenary, table.concat(env.mercenaryCalculationErrors or { }, "\n"))
+			assert.are.equal(20, actorDamageInc(env, case.target) - baseline, case.source.." against-chilled -> "..case.target)
 		end
 
 		for _, case in ipairs({

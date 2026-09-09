@@ -176,18 +176,7 @@ function MercenaryTabClass:MercenaryTab(build)
 		self.profile.lifeComparison = value.id
 		self:Changed()
 	end)
-	self.controls.itemSetLabel = new("LabelControl"):LabelControl({ "TOPLEFT", self.controls.editEquipment, "BOTTOMLEFT" }, { 0, 12, 0, 16 }, "^7Equipment item set:")
-	self.controls.itemSetSelect = new("DropDownControl"):DropDownControl({ "LEFT", self.controls.itemSetLabel, "RIGHT" }, { 6, 0, 230, 20 }, { }, function(_, value)
-		if value and value.id then
-			self:SetItemSet(value.id)
-		end
-	end)
-	self.controls.itemSetSelect.enableDroppedWidth = true
-	self.controls.itemSetManage = new("ButtonControl"):ButtonControl({ "LEFT", self.controls.itemSetSelect, "RIGHT" }, { 4, 0, 90, 20 }, "Manage...", function()
-		self.build.itemsTab:OpenItemSetManagePopup()
-	end)
-
-	self.controls.skillList = new("MercenarySkillListControl"):MercenarySkillListControl({ "TOPLEFT", self.controls.itemSetLabel, "BOTTOMLEFT" }, { 0, 32, 360, 300 }, self)
+	self.controls.skillList = new("MercenarySkillListControl"):MercenarySkillListControl({ "TOPLEFT", self.controls.editEquipment, "BOTTOMLEFT" }, { 0, 32, 360, 300 }, self)
 	self.controls.skillTip = new("LabelControl"):LabelControl({ "TOPLEFT", self.controls.skillList, "BOTTOMLEFT" }, { 0, 8, 0, 14 }, [[
 ^7Usage Tips:
 - Ctrl + Click to enable/disable skill groups.
@@ -466,35 +455,12 @@ function MercenaryTabClass:Changed()
 	self:AddUndoState()
 end
 
-function MercenaryTabClass:GetMercenaryItemSetList()
-	local itemSetList = { }
-	for _, itemSetId in ipairs(self.build.itemsTab.itemSetOrderList) do
-		local itemSet = self.build.itemsTab.itemSets[itemSetId]
-		t_insert(itemSetList, {
-			id = itemSetId,
-			label = itemSet.title or "Default",
-		})
-	end
-	return itemSetList
-end
-
 function MercenaryTabClass:GetItemSet(create)
 	local itemsTab = self.build.itemsTab
 	if create == true then
 		return itemsTab:EnsureActorItemSet("MERCENARY")
 	end
 	return itemsTab:GetActorItemSet("MERCENARY")
-end
-
-function MercenaryTabClass:SetItemSet(itemSetId, changeView)
-	local itemsTab = self.build.itemsTab
-	if not itemsTab:SetActorItemSet("MERCENARY", itemSetId, changeView) then
-		return false
-	end
-	itemsTab:AddUndoState()
-	self:RefreshControls()
-	self.build.buildFlag = true
-	return true
 end
 
 function MercenaryTabClass:InvalidateSupportSort()
@@ -662,14 +628,6 @@ function MercenaryTabClass:RefreshControls()
 	end
 	self.controls.setSelect:SetList(setList)
 	self.controls.setSelect:SelByValue(self.activeMercenarySetId, "id")
-	local itemSetList = self:GetMercenaryItemSetList()
-	local hasMercenaryItemSets = #itemSetList > 0
-	if #itemSetList == 0 then
-		itemSetList[1] = { label = "<No Mercenary item set>" }
-	end
-	self.controls.itemSetSelect:SetList(itemSetList)
-	self.controls.itemSetSelect:SelByValue(self.build.itemsTab:GetActorItemSetId("MERCENARY"), "id")
-	self.controls.itemSetSelect.enabled = hasMercenaryItemSets
 
 	local classGroup = self.classGroupsByClassId[self.profile.classId]
 	self.controls.class:SelByValue(classGroup and classGroup.id, "id")

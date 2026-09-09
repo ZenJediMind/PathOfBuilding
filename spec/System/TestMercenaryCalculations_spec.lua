@@ -2247,7 +2247,7 @@ Hypnotic Eye Jewel
 		firstSet["Helmet"].selItemId = firstHelmet.id
 		secondSet["Helmet"].selItemId = secondHelmet.id
 
-		build.mercenaryTab:SetItemSet(secondSet.id)
+		build.itemsTab:SetActorItemSet("MERCENARY", secondSet.id)
 		env = calculate()
 		assert.are.equal(secondSet.id, build.itemsTab:GetActorItemSetId("MERCENARY"))
 		assert.are.equal(secondHelmet, env.mercenary.itemList.Helmet)
@@ -2368,7 +2368,7 @@ Leather Cap
 		configure("MeleeAOEMarauder", "MeleeAOEMarauderFireSlam", "InfernalCryMercenary")
 		itemsTab = build.itemsTab
 		local playerSetId = itemsTab.activeItemSetId
-		assert(build.mercenaryTab:SetItemSet(playerSetId, false))
+		assert(build.itemsTab:SetActorItemSet("MERCENARY", playerSetId, false))
 		playerHelmet = new("Item"):Item([[Rarity: Rare
 Player Helmet
 Iron Hat
@@ -2394,7 +2394,7 @@ Iron Hat
 		configure("MeleeAOEMarauder", "MeleeAOEMarauderFireSlam", "InfernalCryMercenary")
 		itemsTab = build.itemsTab
 		playerSetId = itemsTab.activeItemSetId
-		assert(build.mercenaryTab:SetItemSet(playerSetId, false))
+		assert(build.itemsTab:SetActorItemSet("MERCENARY", playerSetId, false))
 		playerHelmet = new("Item"):Item([[Rarity: Rare
 Player Helmet
 Iron Hat

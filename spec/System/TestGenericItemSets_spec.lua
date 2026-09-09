@@ -135,7 +135,7 @@ describe("Generic item sets for player, Animate Guardian, and Mercenary", functi
 		build.mercenaryTab:Changed()
 		local mercSet = build.mercenaryTab:GetItemSet(true)
 		assert.are_not.equal(playerSet.id, mercSet.id)
-		assert(build.mercenaryTab:SetItemSet(playerSet.id))
+		assert(build.itemsTab:SetActorItemSet("MERCENARY", playerSet.id))
 		assert.are.equal(playerSet.id, itemsTab:GetActorItemSetId("MERCENARY"))
 		build.skillsTab:PasteSocketGroup("Animate Guardian 20/0  1")
 		local gem = assert(findGuardianGem())
@@ -167,7 +167,7 @@ describe("Generic item sets for player, Animate Guardian, and Mercenary", functi
 		local bossingSet = itemsTab:NewItemSet()
 		bossingSet.title = "Bossing"
 		table.insert(itemsTab.itemSetOrderList, bossingSet.id)
-		assert(build.mercenaryTab:SetItemSet(bossingSet.id))
+		assert(build.itemsTab:SetActorItemSet("MERCENARY", bossingSet.id))
 		assert.is_true(contains(itemsTab.itemSetOrderList, playerSet.id))
 		assert.is_true(contains(itemsTab.itemSetOrderList, bossingSet.id))
 		assert.is_true(contains(itemsTab.itemSetOrderList, mercSet.id))

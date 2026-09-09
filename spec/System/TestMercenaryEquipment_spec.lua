@@ -94,7 +94,7 @@ describe("Mercenary equipment validation", function()
 		local userSet = itemsTab:NewItemSet()
 		userSet.title = "Mercenary Equipment"
 		table.insert(itemsTab.itemSetOrderList, userSet.id)
-		assert.is_true(mercenaryTab:SetItemSet(userSet.id, false))
+		assert.is_true(itemsTab:SetActorItemSet("MERCENARY", userSet.id, false))
 		assert.are.equal(userSet.id, itemsTab:GetActorItemSetId("MERCENARY"))
 		local saved = { }
 		mercenaryTab:Save(saved)
@@ -270,14 +270,7 @@ describe("Mercenary equipment validation", function()
 		local secondSet = itemsTab:NewItemSet()
 		secondSet.title = "Alternate Mercenary Equipment"
 		table.insert(itemsTab.itemSetOrderList, secondSet.id)
-		tab:RefreshControls()
-
-		local secondSetIndex
-		for index, value in ipairs(tab.controls.itemSetSelect.list) do
-			if value.id == secondSet.id then secondSetIndex = index break end
-		end
-		assert.is_not_nil(secondSetIndex)
-		tab.controls.itemSetSelect:SetSel(secondSetIndex)
+		assert(itemsTab:SetActorItemSet("MERCENARY", secondSet.id))
 		assert.are.equal(secondSet.id, itemsTab:GetActorItemSetId("MERCENARY"))
 		assert.are.equal(secondSet.id, itemsTab.viewItemSetId)
 		assert.are.equal(activePlayerSetId, itemsTab.activeItemSetId)
@@ -359,10 +352,13 @@ describe("Mercenary equipment validation", function()
 		local itemsTab = build.itemsTab
 		local playerSetId = itemsTab.activeItemSetId
 		local manager = new("ItemSetListControl"):ItemSetListControl(nil, {0, 0, 350, 200}, itemsTab)
-		assert.is_table(tab.controls.itemSetManage)
+		assert.is_nil(tab.controls.itemSetSelect)
+		assert.is_nil(tab.controls.itemSetManage)
 		assert.is_table(manager.controls.copy)
 		assert.is_table(manager.controls.delete)
 		assert.is_table(manager.controls.new)
+		assert.is_table(manager.controls.equip)
+		assert.is_table(manager.controls.equipActor)
 
 		local originalOpenPopup = main.OpenPopup
 		local originalClosePopup = main.ClosePopup
@@ -389,7 +385,7 @@ describe("Mercenary equipment validation", function()
 		manager:OnSelClick(isValueInArray(manager.list, newSetId), newSetId, true)
 		assert.are.equal(newSetId, itemsTab.viewItemSetId)
 		assert.are.equal(playerSetId, itemsTab.activeItemSetId)
-		assert(tab:SetItemSet(newSetId))
+		assert(itemsTab:SetActorItemSet("MERCENARY", newSetId))
 		assert.are.equal(newSetId, build.itemsTab:GetActorItemSetId("MERCENARY"))
 		assert.are.equal(newSetId, itemsTab.viewItemSetId)
 		assert.are.equal(playerSetId, itemsTab.activeItemSetId)
@@ -1230,7 +1226,7 @@ Note: ~b/o 1 mirror
 		selectBuild("MeleeAOEMarauderFireSlam")
 		local itemsTab = build.itemsTab
 		local playerSetId = itemsTab.activeItemSetId
-		assert(tab:SetItemSet(playerSetId, false))
+		assert(itemsTab:SetActorItemSet("MERCENARY", playerSetId, false))
 		tab.controls.editEquipment.onClick()
 		assert.are.equal("ITEMS", build.viewMode)
 		assert.are.equal(playerSetId, itemsTab.viewItemSetId)
@@ -1255,7 +1251,7 @@ Note: ~b/o 1 mirror
 		local bossingSet = itemsTab:NewItemSet()
 		bossingSet.title = "Bossing"
 		table.insert(itemsTab.itemSetOrderList, bossingSet.id)
-		assert(tab:SetItemSet(bossingSet.id, false))
+		assert(itemsTab:SetActorItemSet("MERCENARY", bossingSet.id, false))
 		assert(itemsTab:SetViewItemSet(bossingSet.id))
 		assert.are_not.equal(itemsTab.activeItemSetId, bossingSet.id)
 		assert.are.equal("MERCENARY", itemsTab:ComparisonActorForItemSet(bossingSet.id))
@@ -1363,7 +1359,8 @@ Note: ~b/o 1 mirror
 		tab.profile.foundAreaLevel = 80
 		tab:Changed()
 		itemsTab:ResetUndo()
-		assert(tab:SetItemSet(bossing.id, false))
+		assert(itemsTab:SetActorItemSet("MERCENARY", bossing.id, false))
+		itemsTab:AddUndoState()
 		assert.are.equal(bossing.id, itemsTab:GetActorItemSetId("MERCENARY"))
 		tab:Undo()
 		assert.are.equal(68, tab.profile.foundAreaLevel)

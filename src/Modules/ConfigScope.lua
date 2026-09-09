@@ -196,7 +196,7 @@ local ENCOUNTER_OVERLAY_VARS = {
 }
 
 function ConfigScope.shouldCopyEncounterOntoPlayerOverlay(mod)
-	if not mod or not mod.name then
+	if not mod or not mod.name or mod.skipEncounterOverlayCopy then
 		return false
 	end
 	local var = mod.name:match("^Condition:(.+)$") or mod.name:match("^Multiplier:(.+)$")
@@ -204,6 +204,18 @@ function ConfigScope.shouldCopyEncounterOntoPlayerOverlay(mod)
 		return false
 	end
 	return isExplicitSourceOwnedName(var) or ENCOUNTER_OVERLAY_VARS[var]
+end
+
+-- Source-owned options imply an encounter fact (one shared enemy is chilled/frozen)
+-- and a source-owned copy for "by you" predicates. The shared half must not be
+-- copied onto the player overlay or the other actor's "by you" mods would fire.
+function ConfigScope.addSourceEncounterFact(enemyModList, conditionName)
+	local shared = modLib.createMod("Condition:"..conditionName, "FLAG", true, "Config", { type = "Condition", var = "Effective" })
+	shared.skipEncounterOverlayCopy = true
+	enemyModList:AddMod(shared)
+	local owned = modLib.createMod("Condition:"..conditionName, "FLAG", true, "Config", { type = "Condition", var = "Effective" })
+	owned.sourceOwned = true
+	enemyModList:AddMod(owned)
 end
 
 function ConfigScope.impliesChilledByYourHits(modName)

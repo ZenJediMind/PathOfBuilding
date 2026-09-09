@@ -1411,7 +1411,14 @@ function ItemsTabClass:Save(xml)
 		end
 		t_insert(xml, child)
 	end
-	for _, actor in ipairs({ "MERCENARY" }) do
+	local actors = { }
+	for actor in pairs(self.actorItemSetIds) do
+		if actor ~= "PLAYER" then
+			t_insert(actors, actor)
+		end
+	end
+	table.sort(actors)
+	for _, actor in ipairs(actors) do
 		local itemSetId = self.actorItemSetIds[actor]
 		if itemSetId and self.itemSets[itemSetId] then
 			t_insert(xml, { elem = "ActorItemSet", attrib = { actor = actor, itemSetId = tostring(itemSetId) } })
@@ -2834,10 +2841,10 @@ function ItemsTabClass:OpenItemSetManagePopup()
 	controls.sharedList = new("SharedItemSetListControl"):SharedItemSetListControl(nil, {155, 50, 300, 200}, self)
 	controls.setList.dragTargetList = { controls.sharedList }
 	controls.sharedList.dragTargetList = { controls.setList }
-	controls.close = new("ButtonControl"):ButtonControl(nil, {0, 260, 90, 20}, "Done", function()
+	controls.close = new("ButtonControl"):ButtonControl(nil, {0, 290, 90, 20}, "Done", function()
 		main:ClosePopup()
 	end)
-	main:OpenPopup(630, 290, "Manage Item Sets", controls)
+	main:OpenPopup(630, 320, "Manage Item Sets", controls)
 end
 
 -- Opens the item crafting popup

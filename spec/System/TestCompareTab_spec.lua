@@ -159,7 +159,7 @@ describe("CompareTab", function()
 		assert.are.equal(mercSet.id, itemsTab.viewItemSetId)
 		assert.are.equal("MERCENARY", itemsTab.viewComparisonActor)
 
-		assert(build.mercenaryTab:SetItemSet(playerSetId))
+		assert(build.itemsTab:SetActorItemSet("MERCENARY", playerSetId))
 		itemsTab:SetViewItemSet(playerSetId, "MERCENARY")
 		build.compareTab.controls.primaryItemSetSelect.selFunc(playerIndex, itemsTab.itemSets[playerSetId].title or "Default")
 		assert.are.equal("MERCENARY", itemsTab.viewComparisonActor)

@@ -7,6 +7,7 @@ local t_insert = table.insert
 local t_remove = table.remove
 local ipairs = ipairs
 local m_max = math.max
+local MercenaryTools = require("Modules.MercenaryTools")
 
 ---@class ItemSetListControl: ListControl
 local ItemSetListClass = newClass("ItemSetListControl", "ListControl")
@@ -42,7 +43,27 @@ function ItemSetListClass:ItemSetListControl(anchor, rect, itemsTab)
 		local newSet = itemsTab:NewItemSet()
 		self:RenameSet(newSet, true)
 	end)
+	self.controls.equipActorLabel = new("LabelControl"):LabelControl({"TOPLEFT", self, "BOTTOMLEFT"}, {0, 6, 0, 16}, "^7Assign to:")
+	self.controls.equipActor = new("DropDownControl"):DropDownControl({"LEFT", self.controls.equipActorLabel, "RIGHT"}, {6, 0, 120, 18}, self:EquipActorList())
+	self.controls.equip = new("ButtonControl"):ButtonControl({"LEFT", self.controls.equipActor, "RIGHT"}, {4, 0, 90, 18}, "Equip", function()
+		local actor = self.controls.equipActor:GetSelValueByKey("id")
+		if self.selValue and actor then
+			itemsTab:SetActorItemSet(actor, self.selValue)
+			itemsTab:AddUndoState()
+		end
+	end)
+	self.controls.equip.enabled = function()
+		return self.selValue ~= nil
+	end
 	return self
+end
+
+function ItemSetListClass:EquipActorList()
+	local list = { { id = "PLAYER", label = "Player" } }
+	if MercenaryTools.tabVisible(self.itemsTab.build) then
+		t_insert(list, { id = "MERCENARY", label = "Mercenary" })
+	end
+	return list
 end
 
 function ItemSetListClass:CanDeleteItemSet(itemSetId)

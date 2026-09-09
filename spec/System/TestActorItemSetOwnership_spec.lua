@@ -218,6 +218,42 @@ describe("ItemsTab actor item-set ownership", function()
 		assert.are.equal(1, #build.itemsTab.itemSetOrderList)
 	end)
 
+	it("saves non-PLAYER actor item-set assignments in sorted actor order", function()
+		hireMercenary()
+		local itemsTab = build.itemsTab
+		local mercSet = itemsTab:EnsureActorItemSet("MERCENARY")
+		local extra = itemsTab:NewItemSet()
+		extra.title = "Other Actor"
+		table.insert(itemsTab.itemSetOrderList, extra.id)
+		itemsTab.actorItemSetIds.PLAYER = itemsTab.activeItemSetId
+		itemsTab.actorItemSetIds.ZED = extra.id
+		itemsTab.actorItemSetIds.MERCENARY = mercSet.id
+		local xml = { }
+		itemsTab:Save(xml)
+		local actors = { }
+		for _, node in ipairs(xml) do
+			if node.elem == "ActorItemSet" then
+				table.insert(actors, node.attrib.actor)
+			end
+		end
+		assert.are.same({ "MERCENARY", "ZED" }, actors)
+	end)
+
+	it("assigns the selected item set to an actor from the item-set manager", function()
+		hireMercenary()
+		local itemsTab = build.itemsTab
+		local extra = itemsTab:NewItemSet()
+		extra.title = "Merc Gear"
+		table.insert(itemsTab.itemSetOrderList, extra.id)
+		local manager = new("ItemSetListControl"):ItemSetListControl(nil, { 0, 0, 300, 200 }, itemsTab)
+		assert.are.equal("MERCENARY", manager:EquipActorList()[2].id)
+		manager.selValue = extra.id
+		manager.controls.equipActor:SelByValue("MERCENARY", "id")
+		manager.controls.equip.onClick()
+		assert.are.equal(extra.id, itemsTab:GetActorItemSetId("MERCENARY"))
+		assert.are.equal(extra.id, itemsTab.viewItemSetId)
+	end)
+
 	it("UndoHandler restore does not receive a second discarded-state argument", function()
 		local itemsTab = build.itemsTab
 		local seen

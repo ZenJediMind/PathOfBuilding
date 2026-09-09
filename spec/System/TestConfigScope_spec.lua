@@ -43,4 +43,22 @@ describe("ConfigScope source-owned enemy semantics", function()
 		assert.is_true(seen.FrozenByYou)
 		assert.is_true(seen.FrozenByYouSeconds)
 	end)
+
+	it("does not copy source-option encounter facts onto the player overlay", function()
+		local shared = { name = "Condition:Chilled", skipEncounterOverlayCopy = true }
+		local encounter = { name = "Condition:Chilled" }
+		assert.is_false(ConfigScope.shouldCopyEncounterOntoPlayerOverlay(shared))
+		assert.is_true(ConfigScope.shouldCopyEncounterOntoPlayerOverlay(encounter))
+		local mods = { }
+		function mods:AddMod(mod)
+			table.insert(self, mod)
+		end
+		ConfigScope.addSourceEncounterFact(mods, "Chilled")
+		assert.are.equal(2, #mods)
+		assert.is_true(mods[1].skipEncounterOverlayCopy)
+		assert.is_not_true(mods[1].sourceOwned)
+		assert.is_true(mods[2].sourceOwned)
+		assert.is_false(ConfigScope.shouldCopyEncounterOntoPlayerOverlay(mods[1]))
+		assert.is_true(ConfigScope.isSourceOwnedEnemyMod(mods[2]))
+	end)
 end)

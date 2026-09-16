@@ -917,7 +917,15 @@ function cacheSkillUUID(skill, env)
 		end
 	end
 
-	return strName.."_"..strSlotName.."_"..tostring(slotIndx) .. "_" .. tostring(groupIdx)
+	local uuid = strName.."_"..strSlotName.."_"..tostring(slotIndx) .. "_" .. tostring(groupIdx)
+	if skill.actor and skill.actor.isMercenary then
+		local grantedId = skill.activeEffect.grantedEffect.id
+		if not grantedId then
+			error("Mercenary skill cache UUID requires grantedEffect.id")
+		end
+		uuid = uuid .. "_MERCENARY_" .. grantedId
+	end
+	return uuid
 end
 
 -- Global Cache related

@@ -264,6 +264,9 @@ describe("Generic item sets for player, Animate Guardian, and Mercenary", functi
 		build.mercenaryTab:Changed()
 		local itemsTab = build.itemsTab
 		local mercSet = assert(build.mercenaryTab:GetItemSet(true))
+		local mercHat = new("Item"):Item("Rarity: Normal\nLeather Cap")
+		itemsTab:AddItem(mercHat, true)
+		mercSet.Helmet.selItemId = mercHat.id
 		assert(itemsTab:SetViewItemSet(mercSet.id, "MERCENARY"))
 		assert.are.equal(mercSet.id, itemsTab.viewItemSetId)
 		build.importTab:ImportItemsAndSkills({
@@ -272,6 +275,9 @@ describe("Generic item sets for player, Animate Guardian, and Mercenary", functi
 		}, false, false, true)
 		assert.are.equal(itemsTab.activeItemSetId, itemsTab.viewItemSetId)
 		assert.are.equal("PLAYER", itemsTab.viewComparisonActor)
+		assert.are.equal(mercSet.id, itemsTab:GetActorItemSetId("MERCENARY"))
+		assert.are.equal(mercHat.id, itemsTab:GetActorItemSet("MERCENARY").Helmet.selItemId)
+		assert.are.equal("Iron Hat", itemsTab.items[itemsTab.activeItemSet.Helmet.selItemId].name)
 	end)
 
 	it("tooltips and equipped detection follow the visible actor except tree jewels stay player", function()
@@ -415,5 +421,104 @@ describe("Generic item sets for player, Animate Guardian, and Mercenary", functi
 		local actual = calcs.calcFullDPS(build, "CALCULATOR", {}).combinedDPS
 		assert.are.near(actual, preview.FullDPS, 1e-8)
 		assert.is_true(preview.FullDPS > base.FullDPS)
+	end)
+
+	it("edits and undoes actor item-set assignments without a discarded-state argument", function()
+		MercenaryTest.allocatePermanentHire()
+		local itemsTab = build.itemsTab
+		build.mercenaryTab.profile.buildId = "MeleeAOEMarauderFireSlam"
+		build.mercenaryTab:Changed()
+		local mercSet = itemsTab:EnsureActorItemSet("MERCENARY")
+		local helm = new("Item"):Item("Rarity: Normal\nLeather Cap")
+		itemsTab:AddItem(helm, true)
+		assert(itemsTab:SetViewItemSet(mercSet.id, "MERCENARY"))
+		itemsTab.slots.Helmet:SetSelItemId(helm.id)
+		itemsTab:AddUndoState()
+		assert.are.equal(helm.id, itemsTab:GetActorItemSet("MERCENARY").Helmet.selItemId)
+		assert.are.equal(0, itemsTab.activeItemSet.Helmet.selItemId)
+		local playerSetId = itemsTab.activeItemSetId
+		assert(itemsTab:SetActorItemSet("MERCENARY", playerSetId, false))
+		itemsTab:AddUndoState()
+		itemsTab:Undo()
+		assert.are.equal(mercSet.id, itemsTab:GetActorItemSetId("MERCENARY"))
+		assert.are.equal(helm.id, itemsTab.itemSets[mercSet.id].Helmet.selItemId)
+		local seen
+		function itemsTab:RestoreUndoState(state, extra)
+			seen = extra
+			self.activeItemSetId = state.activeItemSetId
+			self.activeItemSet = self.itemSets[self.activeItemSetId]
+		end
+		itemsTab:ResetUndo()
+		itemsTab:AddUndoState()
+		itemsTab:Undo()
+		assert.is_nil(seen)
+	end)
+
+	it("persists actor assignments, blocks deleting referenced sets, and assigns from the manager", function()
+		MercenaryTest.allocatePermanentHire()
+		local itemsTab = build.itemsTab
+		build.mercenaryTab.profile.buildId = "MeleeAOEMarauderFireSlam"
+		build.mercenaryTab:Changed()
+		local mercSet = itemsTab:EnsureActorItemSet("MERCENARY")
+		local helm = new("Item"):Item("Rarity: Normal\nIron Hat")
+		itemsTab:AddItem(helm, true)
+		mercSet.Helmet.selItemId = helm.id
+		local extra = itemsTab:NewItemSet()
+		extra.title = "Merc Gear"
+		table.insert(itemsTab.itemSetOrderList, extra.id)
+		itemsTab.actorItemSetIds.ZED = extra.id
+		local xml = { elem = "Items" }
+		itemsTab:Save(xml)
+		local actors, found = { }
+		for _, node in ipairs(xml) do
+			if node.elem == "ActorItemSet" then
+				table.insert(actors, node.attrib.actor)
+				if node.attrib.actor == "MERCENARY" then found = tonumber(node.attrib.itemSetId) end
+			end
+		end
+		assert.are.same({ "MERCENARY", "ZED" }, actors)
+		assert.are.equal(mercSet.id, found)
+		local control = new("ItemSetListControl"):ItemSetListControl(nil, {0,0,350,200}, itemsTab)
+		assert.is_false(control:CanDeleteItemSet(mercSet.id))
+		control.selValue = extra.id
+		control.controls.equipActor:SelByValue("MERCENARY", "id")
+		control.controls.equip.onClick()
+		assert.are.equal(extra.id, itemsTab:GetActorItemSetId("MERCENARY"))
+		newBuild()
+		build.itemsTab:Load(xml, "items.xml")
+		build.mercenaryTab:Load({ elem = "Mercenary", attrib = { } })
+		build.mercenaryTab:PostLoad()
+		newBuild()
+		MercenaryTest.allocatePermanentHire()
+		build.mercenaryTab.profile.buildId = "MeleeAOEMarauderFireSlam"
+		build.mercenaryTab:Changed()
+		local migrated = build.itemsTab:NewItemSet()
+		table.insert(build.itemsTab.itemSetOrderList, migrated.id)
+		build.mercenaryTab:Load({
+			elem = "Mercenary",
+			attrib = { activeMercenarySet = "1" },
+			{ elem = "MercenarySet", attrib = { id = "1", itemSetId = tostring(migrated.id), buildId = "MeleeAOEMarauderFireSlam" } },
+		})
+		build.mercenaryTab:PostLoad()
+		assert.are.equal(migrated.id, build.itemsTab:GetActorItemSetId("MERCENARY"))
+	end)
+
+	it("routes comparison to the viewing actor and does not create a set when selecting a build", function()
+		MercenaryTest.allocatePermanentHire()
+		local itemsTab = build.itemsTab
+		build.mercenaryTab.profile.classId = "MeleeAOEMarauder"
+		build.mercenaryTab.profile.buildId = "MeleeAOEMarauderFireSlam"
+		build.mercenaryTab.profile.mainSkillId = "TectonicSlamFireMercenary"
+		build.mercenaryTab.profile.skills = { { id = "TectonicSlamFireMercenary", enabled = true, supports = { } } }
+		build.mercenaryTab:Changed()
+		assert.is_nil(itemsTab:GetActorItemSetId("MERCENARY"))
+		assert.are.equal(1, #itemsTab.itemSetOrderList)
+		local mercSet = itemsTab:EnsureActorItemSet("MERCENARY")
+		assert(itemsTab:SetViewItemSet(mercSet.id, "MERCENARY"))
+		assert.is_false(itemsTab.controls.weaponSwap2:IsShown())
+		assert.are.equal("MERCENARY", itemsTab:ComparisonActorForItemSet(mercSet.id))
+		assert.are.equal("PLAYER", itemsTab:ComparisonActorForItemSet(itemsTab.activeItemSetId))
+		assert.are.equal("MERCENARY", itemsTab:ComparisonActorForSlot("Mercenary Helmet", itemsTab.activeItemSetId))
+		assert.are.equal("PLAYER", itemsTab:ComparisonActorForSlot("Jewel 12345", mercSet.id))
 	end)
 end)

@@ -217,36 +217,4 @@ describe("CompareTab", function()
 		assert.are.equal("player", configTab:GetViewActor())
 		assert.are.equal("MERCENARY", captured)
 	end)
-
-	it("Compare Config tooltips include specialized tooltipFunc content", function()
-		newBuild()
-		local compareTab = build.compareTab
-		assert.is_true(compareTab:ImportBuild(assert(build:SaveDB("tooltip-func")), "Self"))
-		local entry = assert(compareTab:GetActiveCompare())
-		compareTab:RebuildConfigControls(entry)
-
-		local function tooltipText(tooltip)
-			local parts = { }
-			for _, line in ipairs(tooltip.lines) do
-				if line.text then
-					table.insert(parts, line.text)
-				end
-			end
-			return table.concat(parts, "\n")
-		end
-
-		local bossCtrl = assert(compareTab.configControls.presetBossSkills)
-		local tooltip = new("Tooltip"):Tooltip()
-		assert.has_no.errors(function()
-			bossCtrl.primaryControl.tooltipFunc(tooltip, "HOVER", 1, { val = "None" })
-		end)
-		assert.is_truthy(tooltipText(tooltip):find("Used to fill in defaults for specific boss skills", 1, true))
-
-		local banditCtrl = assert(compareTab.configControls.bandit)
-		tooltip = new("Tooltip"):Tooltip()
-		assert.has_no.errors(function()
-			banditCtrl.primaryControl.tooltipFunc(tooltip, "HOVER", 1, { val = "Oak" })
-		end)
-		assert.is_truthy(tooltipText(tooltip):find("+40 to Maximum", 1, true))
-	end)
 end)

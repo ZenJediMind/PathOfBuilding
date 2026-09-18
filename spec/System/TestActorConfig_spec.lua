@@ -38,11 +38,13 @@ describe("Player and mercenary configuration", function()
 		return build.calcsTab.mainEnv
 	end
 
-	before_each(function()
+	local function fresh()
 		newBuild()
 		selectScionLuminary()
 		configureMercenary()
-	end)
+	end
+
+	before_each(fresh)
 
 	it("rebuilds actor configuration when a Mercenary is hired", function()
 		newBuild()
@@ -55,9 +57,9 @@ describe("Player and mercenary configuration", function()
 		local env = calculateWithoutConfigRebuild()
 		local mercenary = assert(env.mercenary, table.concat(env.mercenaryCalculationErrors or { }, "\n"))
 		assert.is_true(mercenary.modDB:Flag(nil, "UsePowerCharges"))
-	end)
 
-	it("restores player source configuration when a Mercenary is removed", function()
+		fresh()
+		-- restores player source configuration when a Mercenary is removed
 		local configSet = actorConfig()
 		configSet.input.conditionEnemyChilledByYourHits = true
 		configSet.customModsList[1].text = "Enemies Chilled by your Hits are Shocked"
@@ -156,9 +158,9 @@ describe("Player and mercenary configuration", function()
 		assert.are.equal(originalMercId, itemsTab:GetActorItemSetId("MERCENARY"))
 		assert.is_nil(configTab.configSets[bossing.id].actors.player.itemSetId)
 		assert.is_nil(configTab.configSets[bossing.id].actors.mercenary.itemSetId)
-	end)
 
-	it("round-trips actor combat config XML without owning item sets", function()
+		fresh()
+		-- round-trips actor combat config XML without owning item sets
 		local configTab = build.configTab
 		local configSet = actorConfig()
 		configSet.customModsList[1].text = "10% increased Damage"
@@ -189,9 +191,7 @@ describe("Player and mercenary configuration", function()
 		assert.are.equal("20% increased Damage", mercenaryMods)
 		assert.are.equal("Uber", sharedBoss)
 
-		newBuild()
-		selectScionLuminary()
-		configureMercenary()
+		fresh()
 		build.configTab:Load(xml, "actor-config.xml")
 		build.configTab:PostLoad()
 		local loaded = build.configTab.configSets[build.configTab.activeConfigSetId]
@@ -299,18 +299,27 @@ describe("Player and mercenary configuration", function()
 		assert.is_nil(env.actorUsage.player.enemyConditions.ChilledByYourHits)
 		assert.is_not_nil(env.actorUsage.mercenary.enemyConditions.ChilledByYourHits)
 		assertShownForActor(false, true)
-	end)
 
-	it("keeps by-you ailment conditions source-owned", function()
-		local chilledByHitsMod = "Enemies Chilled by your Hits are Shocked"
+		-- keeps by-you ailment conditions source-owned
 		local frozenByYouMod = "Enemies permanently take 5% increased Damage for each second they've ever been Frozen by you, up to a maximum of 50%"
 		local ignitedByYouMod = "Enemies Ignited by you take 20% increased Damage"
 		local curseByYouMod = "Enemies you Curse take 20% increased Damage"
+		local chilledByYouBurningMod = "Enemies Chilled by you take 20% increased Burning Damage"
+		local againstChilledMod = "20% increased Damage against Chilled Enemies"
 		local function enemyShocked(env)
 			return env.enemyDB:GetCondition("Shocked") or env.enemyDB:Flag(nil, "Condition:Shocked")
 		end
 		local function enemyDamageTaken(env)
 			return env.enemyDB:Sum("INC", nil, "DamageTaken")
+		end
+		local function enemyFireDotTaken(env)
+			return env.enemyDB:Sum("INC", nil, "FireDamageTakenOverTime")
+		end
+		local function actorDamageInc(env, owner)
+			return (owner == "PLAYER" and env.player or env.mercenary).modDB:Sum("INC", nil, "Damage")
+		end
+		local function overlayFlag(db, name)
+			return db:GetCondition(name) or db:Flag(nil, "Condition:"..name)
 		end
 		local function setActorMod(owner, text)
 			local configSet = actorConfig()
@@ -328,118 +337,89 @@ describe("Player and mercenary configuration", function()
 				configSet.actors.mercenary.input[key] = value
 			end
 		end
-
-		for _, case in ipairs({
-			{ source = "PLAYER", target = "MERCENARY", applies = false },
-			{ source = "MERCENARY", target = "MERCENARY", applies = true },
-			{ source = "MERCENARY", target = "PLAYER", applies = false },
-			{ source = "PLAYER", target = "PLAYER", applies = true },
-		}) do
-			newBuild()
-			selectScionLuminary()
-			configureMercenary()
-			setActorInput(case.source, "conditionEnemyChilledByYourHits", true)
-			setActorMod(case.target, chilledByHitsMod)
-			local env = calculateBuild()
-			assert.is_not_nil(env.mercenary, table.concat(env.mercenaryCalculationErrors or { }, "\n"))
-			assert.are.equal(case.applies, not not enemyShocked(env), case.source.." -> "..case.target)
-			local sourceDB = case.source == "PLAYER" and env.player.enemySourceDB or env.mercenary.enemySourceDB
-			local otherDB = case.source == "PLAYER" and env.mercenary.enemySourceDB or env.player.enemySourceDB
-			assert.is_true(env.enemyDB:GetCondition("Chilled") or env.enemyDB:Flag(nil, "Condition:Chilled"), case.source.." shared Chilled")
-			assert.is_true(sourceDB:GetCondition("Chilled") or sourceDB:Flag(nil, "Condition:Chilled"), case.source.." overlay Chilled")
-			assert.is_not_true(otherDB:GetCondition("Chilled") or otherDB:Flag(nil, "Condition:Chilled"), case.source.." other overlay Chilled")
+		local ownerMatrix = {
+			{ source = "PLAYER", target = "MERCENARY", match = false },
+			{ source = "MERCENARY", target = "MERCENARY", match = true },
+			{ source = "MERCENARY", target = "PLAYER", match = false },
+			{ source = "PLAYER", target = "PLAYER", match = true },
+		}
+		local function runOwnerMatrix(spec)
+			for _, case in ipairs(ownerMatrix) do
+				fresh()
+				local baseline = spec.measure and spec.measure(calculateBuild(), case) or 0
+				setActorInput(case.source, spec.input, spec.value)
+				setActorMod(case.target, spec.mod)
+				local env = calculateBuild()
+				assert.is_not_nil(env.mercenary, table.concat(env.mercenaryCalculationErrors or { }, "\n"))
+				local actual = spec.actual(env, case)
+				local expect = spec.expect and spec.expect(case) or (case.match and spec.effect or 0)
+				assert.are.equal(expect, actual - (spec.subtractBaseline and baseline or 0), spec.name.." "..case.source.." -> "..case.target)
+				if spec.overlay then
+					local sourceDB = case.source == "PLAYER" and env.player.enemySourceDB or env.mercenary.enemySourceDB
+					local otherDB = case.source == "PLAYER" and env.mercenary.enemySourceDB or env.player.enemySourceDB
+					assert.is_true(overlayFlag(env.enemyDB, spec.overlay), spec.name.." shared")
+					assert.is_true(overlayFlag(sourceDB, spec.overlay), spec.name.." overlay")
+					assert.is_not_true(overlayFlag(otherDB, spec.overlay), spec.name.." other")
+				end
+			end
 		end
-
-		for _, case in ipairs({
-			{ source = "PLAYER", target = "MERCENARY", delta = 0 },
-			{ source = "MERCENARY", target = "MERCENARY", delta = 50 },
-			{ source = "MERCENARY", target = "PLAYER", delta = 0 },
-			{ source = "PLAYER", target = "PLAYER", delta = 50 },
-		}) do
-			newBuild()
-			selectScionLuminary()
-			configureMercenary()
-			local baseline = enemyDamageTaken(calculateBuild())
-			setActorInput(case.source, "multiplierFrozenByYouSeconds", 10)
-			setActorMod(case.target, frozenByYouMod)
-			local env = calculateBuild()
-			assert.is_not_nil(env.mercenary, table.concat(env.mercenaryCalculationErrors or { }, "\n"))
-			assert.are.equal(case.delta, enemyDamageTaken(env) - baseline, case.source.." frozen -> "..case.target)
-			local sourceDB = case.source == "PLAYER" and env.player.enemySourceDB or env.mercenary.enemySourceDB
-			local otherDB = case.source == "PLAYER" and env.mercenary.enemySourceDB or env.player.enemySourceDB
-			assert.is_true(env.enemyDB:GetCondition("Frozen") or env.enemyDB:Flag(nil, "Condition:Frozen"), case.source.." shared Frozen")
-			assert.is_true(sourceDB:GetCondition("Frozen") or sourceDB:Flag(nil, "Condition:Frozen"), case.source.." overlay Frozen")
-			assert.is_not_true(otherDB:GetCondition("Frozen") or otherDB:Flag(nil, "Condition:Frozen"), case.source.." other overlay Frozen")
-		end
-
-		local chilledByYouBurningMod = "Enemies Chilled by you take 20% increased Burning Damage"
-		local function enemyFireDotTaken(env)
-			return env.enemyDB:Sum("INC", nil, "FireDamageTakenOverTime")
-		end
-		for _, case in ipairs({
-			{ source = "PLAYER", target = "MERCENARY", delta = 0 },
-			{ source = "MERCENARY", target = "MERCENARY", delta = 20 },
-			{ source = "MERCENARY", target = "PLAYER", delta = 0 },
-			{ source = "PLAYER", target = "PLAYER", delta = 20 },
-		}) do
-			newBuild()
-			selectScionLuminary()
-			configureMercenary()
-			local baseline = enemyFireDotTaken(calculateBuild())
-			setActorInput(case.source, "multiplierChilledByYouSeconds", 10)
-			setActorMod(case.target, chilledByYouBurningMod)
-			local env = calculateBuild()
-			assert.is_not_nil(env.mercenary, table.concat(env.mercenaryCalculationErrors or { }, "\n"))
-			assert.are.equal(case.delta, enemyFireDotTaken(env) - baseline, case.source.." chilled -> "..case.target)
-		end
-
-		for _, case in ipairs({
-			{ source = "PLAYER", target = "MERCENARY", delta = 0 },
-			{ source = "MERCENARY", target = "MERCENARY", delta = 20 },
-			{ source = "MERCENARY", target = "PLAYER", delta = 0 },
-			{ source = "PLAYER", target = "PLAYER", delta = 20 },
-		}) do
-			newBuild()
-			selectScionLuminary()
-			configureMercenary()
-			local baseline = enemyFireDotTaken(calculateBuild())
-			setActorInput(case.source, "conditionEnemyChilledByYourHits", true)
-			setActorMod(case.target, chilledByYouBurningMod)
-			local env = calculateBuild()
-			assert.is_not_nil(env.mercenary, table.concat(env.mercenaryCalculationErrors or { }, "\n"))
-			assert.are.equal(case.delta, enemyFireDotTaken(env) - baseline, case.source.." chilled-by-hits -> "..case.target)
-		end
-
-		local againstChilledMod = "20% increased Damage against Chilled Enemies"
-		local function actorDamageInc(env, owner)
-			local actor = owner == "PLAYER" and env.player or env.mercenary
-			return actor.modDB:Sum("INC", nil, "Damage")
-		end
-		for _, case in ipairs({
-			{ source = "PLAYER", target = "MERCENARY" },
-			{ source = "MERCENARY", target = "MERCENARY" },
-			{ source = "MERCENARY", target = "PLAYER" },
-			{ source = "PLAYER", target = "PLAYER" },
-		}) do
-			newBuild()
-			selectScionLuminary()
-			configureMercenary()
-			local baseline = actorDamageInc(calculateBuild(), case.target)
-			setActorInput(case.source, "conditionEnemyChilledByYourHits", true)
-			setActorMod(case.target, againstChilledMod)
-			local env = calculateBuild()
-			assert.is_not_nil(env.mercenary, table.concat(env.mercenaryCalculationErrors or { }, "\n"))
-			assert.are.equal(20, actorDamageInc(env, case.target) - baseline, case.source.." against-chilled -> "..case.target)
-		end
+		runOwnerMatrix({
+			name = "shock",
+			input = "conditionEnemyChilledByYourHits",
+			value = true,
+			mod = chilledByHitsMod,
+			actual = function(env) return enemyShocked(env) and 1 or 0 end,
+			effect = 1,
+			overlay = "Chilled",
+		})
+		runOwnerMatrix({
+			name = "frozen",
+			input = "multiplierFrozenByYouSeconds",
+			value = 10,
+			mod = frozenByYouMod,
+			measure = enemyDamageTaken,
+			actual = enemyDamageTaken,
+			subtractBaseline = true,
+			effect = 50,
+			overlay = "Frozen",
+		})
+		runOwnerMatrix({
+			name = "chilled-burning",
+			input = "multiplierChilledByYouSeconds",
+			value = 10,
+			mod = chilledByYouBurningMod,
+			measure = enemyFireDotTaken,
+			actual = enemyFireDotTaken,
+			subtractBaseline = true,
+			effect = 20,
+		})
+		runOwnerMatrix({
+			name = "chilled-by-hits-burning",
+			input = "conditionEnemyChilledByYourHits",
+			value = true,
+			mod = chilledByYouBurningMod,
+			measure = enemyFireDotTaken,
+			actual = enemyFireDotTaken,
+			subtractBaseline = true,
+			effect = 20,
+		})
+		runOwnerMatrix({
+			name = "against-chilled",
+			input = "conditionEnemyChilledByYourHits",
+			value = true,
+			mod = againstChilledMod,
+			measure = function(env, case) return actorDamageInc(env, case.target) end,
+			actual = function(env, case) return actorDamageInc(env, case.target) end,
+			subtractBaseline = true,
+			expect = function() return 20 end,
+		})
 
 		for _, case in ipairs({
 			{ key = "conditionEnemyIgnited", mod = ignitedByYouMod, owner = "MERCENARY", delta = 0 },
 			{ key = "conditionEnemyShocked", mod = "Enemies Shocked by you take 20% increased Damage", owner = "MERCENARY", delta = 0 },
 			{ key = "conditionEnemyIgnited", mod = ignitedByYouMod, owner = "PLAYER", delta = 20 },
 		}) do
-			newBuild()
-			selectScionLuminary()
-			configureMercenary()
+			fresh()
 			local configSet = actorConfig()
 			configSet.input[case.key] = true
 			local baseline = enemyDamageTaken(calculateBuild())
@@ -449,9 +429,7 @@ describe("Player and mercenary configuration", function()
 			assert.are.equal(case.delta, enemyDamageTaken(env) - baseline, case.mod)
 		end
 
-		newBuild()
-		selectScionLuminary()
-		configureMercenary()
+		fresh()
 		local configSet = actorConfig()
 		configSet.customModsList[1].text = curseByYouMod
 		local baseline = enemyDamageTaken(calculateBuild())
@@ -473,9 +451,7 @@ describe("Player and mercenary configuration", function()
 			build.mercenaryTab:Changed()
 			build.mercenaryTab:GetItemSet(true)
 		end
-		newBuild()
-		selectScionLuminary()
-		configureMercenary()
+		fresh()
 		configSet = actorConfig()
 		configSet.customModsList[1].text = curseByYouMod
 		baseline = enemyDamageTaken(calculateBuild())
@@ -485,9 +461,7 @@ describe("Player and mercenary configuration", function()
 		assert.is_true(env.enemy.modDB.conditions.Cursed)
 		assert.are.equal(baseline, enemyDamageTaken(env))
 
-		newBuild()
-		selectScionLuminary()
-		configureMercenary()
+		fresh()
 		configureCurseMerc()
 		configSet = actorConfig()
 		baseline = enemyDamageTaken(calculateBuild())
@@ -513,9 +487,7 @@ describe("Player and mercenary configuration", function()
 		assert.is_true(env.mercenary.enemySourceDB:GetCondition("HitByFireDamage"))
 		assert.is_not_true(env.player.enemySourceDB:GetCondition("HitByFireDamage"))
 
-		newBuild()
-		selectScionLuminary()
-		configureMercenary()
+		fresh()
 		allocate("Elemental Equilibrium")
 		build.skillsTab:PasteSocketGroup("Fireball 20/0  1")
 		env = calculateBuild()
@@ -526,9 +498,7 @@ describe("Player and mercenary configuration", function()
 		assert.is_true(env.enemyDB:Flag(nil, "Condition:HasLightningExposure") or env.enemy.modDB.conditions.HasLightningExposure)
 		assert.is_not_true(env.enemyDB:Flag(nil, "Condition:HasFireExposure") or env.enemy.modDB.conditions.HasFireExposure)
 
-		newBuild()
-		selectScionLuminary()
-		configureMercenary()
+		fresh()
 		allocate("Elemental Equilibrium")
 		build.skillsTab:PasteSocketGroup("Arc 20/0  1")
 		configSet = actorConfig()
@@ -542,9 +512,9 @@ describe("Player and mercenary configuration", function()
 		assert.is_not_true(env.enemyDB:Flag(nil, "Condition:HasLightningExposure") or env.enemy.modDB.conditions.HasLightningExposure)
 		assert.is_true(env.enemyDB:Flag(nil, "Condition:HasColdExposure") or env.enemy.modDB.conditions.HasColdExposure)
 		assert.is_not_true(env.enemyDB:Flag(nil, "Condition:HasFireExposure") or env.enemy.modDB.conditions.HasFireExposure)
-	end)
 
-	it("keeps Mercenary EE hit history on an overlay when config source mods are empty", function()
+		fresh()
+		-- keeps Mercenary EE hit history on an overlay when config source mods are empty
 		local calcs = require("Modules.CalcBase")
 		local configSet = actorConfig()
 		assert.is_nil(configSet.actors.mercenary.input.enemyConditionHitByFireDamage)
@@ -565,9 +535,9 @@ describe("Player and mercenary configuration", function()
 		assert.is_true(env.enemyDB:Flag(nil, "Condition:HasColdExposure") or env.enemy.modDB.conditions.HasColdExposure)
 		assert.is_true(env.enemyDB:Flag(nil, "Condition:HasLightningExposure") or env.enemy.modDB.conditions.HasLightningExposure)
 		assert.is_not_true(env.enemyDB:Flag(nil, "Condition:HasFireExposure") or env.enemy.modDB.conditions.HasFireExposure)
-	end)
 
-	it("scales each exposure with its inflictor before choosing the strongest", function()
+		fresh()
+		-- scales each exposure with its inflictor before choosing the strongest
 		local configSet = actorConfig()
 		build.skillsTab:PasteSocketGroup("Arc 20/0  1")
 		local exposure = "Nearby Enemies have Fire Exposure"
@@ -624,9 +594,9 @@ describe("Player and mercenary configuration", function()
 			assert.is_not_true(env.player.enemySourceDB:GetCondition("Cursed"))
 			assert.is_not_true(env.mercenary.enemySourceDB:GetCondition("Cursed"))
 		end
-	end)
 
-	it("preserves competing skill exposures through debuff merging", function()
+		fresh()
+		-- preserves competing skill exposures through debuff merging
 		local configSet = actorConfig()
 		local profile = build.mercenaryTab.profile
 		for _, buildId in ipairs(build.data.mercenaries.buildOrder) do
@@ -650,9 +620,9 @@ describe("Player and mercenary configuration", function()
 			assert.are.equal(firstDPS, calculateBuild().player.output.FullDPS)
 			config.customModsList[1].text = ""
 		end
-	end)
 
-	it("hover comparisons use the viewed actor's output", function()
+		fresh()
+		-- hover comparisons use the viewed actor's output
 		calculateBuild()
 		local configTab = build.configTab
 		local captured

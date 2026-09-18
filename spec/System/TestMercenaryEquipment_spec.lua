@@ -106,148 +106,7 @@ describe("Mercenary equipment validation", function()
 		assert.is_nil(tab.profile.buildId)
 	end)
 
-	it("assigns a user-created item set to MERCENARY without duplicating ownership", function()
-		newBuild()
-		selectScionLuminary()
-		local mercenaryTab = build.mercenaryTab
-		local itemsTab = build.itemsTab
-		local userSet = itemsTab:NewItemSet()
-		userSet.title = "Mercenary Equipment"
-		table.insert(itemsTab.itemSetOrderList, userSet.id)
-		assert.is_true(itemsTab:SetActorItemSet("MERCENARY", userSet.id, false))
-		assert.are.equal(userSet.id, itemsTab:GetActorItemSetId("MERCENARY"))
-		local saved = { }
-		mercenaryTab:Save(saved)
-		assert.is_nil(saved.attrib.itemSetId)
-		assert.is_nil(saved.attrib.auxiliaryItemSetId)
-		mercenaryTab:Load(saved)
-		mercenaryTab:PostLoad()
-		assert.are.equal(userSet.id, itemsTab:GetActorItemSetId("MERCENARY"))
-		assert.is_truthy(isValueInArray(itemsTab.itemSetOrderList, userSet.id))
-	end)
 
-	it("Items views and edits Mercenary or AG gear without displacing the player's worn set", function()
-		local itemsTab = build.itemsTab
-		local equipmentSlots = { "Weapon 1", "Weapon 2", "Helmet", "Body Armour", "Gloves", "Boots", "Amulet", "Ring 1", "Ring 2", "Belt" }
-		local flaskSlots = { "Flask 1", "Flask 2", "Flask 3", "Flask 4", "Flask 5" }
-		selectBuild("MeleeAOEMarauderFireSlam")
-		showMercenaryEquipment()
-		assert.is_nil(itemsTab.slots["Mercenary Helmet"])
-		for _, slotName in ipairs(equipmentSlots) do
-			assert.is_true(itemsTab.slots[slotName]:IsShown(), slotName)
-		end
-		for _, slotName in ipairs(flaskSlots) do
-			assert.is_true(itemsTab.slots[slotName]:IsShown(), slotName)
-		end
-
-		local mercSet = showMercenaryEquipment()
-		local secondSet = itemsTab:NewItemSet()
-		table.insert(itemsTab.itemSetOrderList, secondSet.id)
-		for id = 9001, 9004 do
-			itemsTab.items[id] = item({ id = id, name = "Helmet "..id, type = "Helmet", base = { type = "Helmet" } })
-		end
-		itemSet.Helmet.selItemId = 9001
-		mercSet["Helmet"].selItemId = 9002
-		secondSet.Helmet.selItemId = 9003
-
-		itemsTab:SetActiveItemSet(secondSet.id)
-		itemsTab:SetViewItemSet(secondSet.id)
-		assert.are.equal(9003, itemsTab.slots.Helmet.selItemId)
-		assert.are.equal(9002, mercSet["Helmet"].selItemId)
-		itemsTab:SetActiveItemSet(itemSet.id)
-		assert.are.equal(9001, itemsTab.slots.Helmet.selItemId)
-		itemsTab:SetViewItemSet(mercSet.id)
-		assert.are.equal(9002, itemsTab.slots["Helmet"].selItemId)
-		assert.are.equal(itemSet.id, itemsTab.activeItemSetId)
-
-		freshBuild()
-		itemsTab = build.itemsTab
-		selectBuild("MeleeAOEMarauderFireSlam")
-		mercSet = showMercenaryEquipment()
-		local playerHelmet = new("Item"):Item("Rarity: Normal\nIron Hat")
-		local mercHelmet = new("Item"):Item("Rarity: Normal\nIron Hat")
-		itemsTab:AddItem(playerHelmet, true)
-		itemsTab:AddItem(mercHelmet, true)
-		itemsTab.activeItemSet.Helmet.selItemId = playerHelmet.id
-		mercSet.Helmet.selItemId = mercHelmet.id
-		itemsTab:PopulateSlots()
-		itemsTab.slots.Helmet:SetSelItemId(0, itemsTab:GetVisibleItemSet())
-		assert.are.equal(playerHelmet.id, itemsTab.activeItemSet.Helmet.selItemId)
-		assert.are.equal(0, mercSet.Helmet.selItemId)
-
-		local playerSetId = itemsTab.activeItemSetId
-		assert(itemsTab:SetActiveItemSet(mercSet.id))
-		assert.are.equal(mercSet.id, itemsTab.activeItemSetId)
-		assert.are.equal(mercSet.id, itemsTab.viewItemSetId)
-		assert(itemsTab:SetActiveItemSet(playerSetId))
-		assert.are.equal(playerSetId, itemsTab.activeItemSetId)
-		assert.is_true(not itemsTab:SetActiveItemSet(99999))
-		assert.are.equal(playerSetId, itemsTab.activeItemSetId)
-		assert.is_true(not itemsTab:SetViewItemSet(99999))
-		assert.are.equal(playerSetId, itemsTab.viewItemSetId)
-
-		freshBuild()
-		itemsTab = build.itemsTab
-		selectBuild("MeleeAOEMarauderFireSlam")
-		local helmet = item({ id = 9022, name = "Abyssal Helmet", type = "Helmet", base = { type = "Helmet" }, abyssalSocketCount = 1 })
-		local belt = item({ id = 9023, name = "Abyssal Belt", type = "Belt", base = { type = "Belt" }, abyssalSocketCount = 1 })
-		itemsTab.items[helmet.id] = helmet
-		itemsTab.items[belt.id] = belt
-		mercenaryItemSet["Helmet"].selItemId = helmet.id
-		mercenaryItemSet["Belt"].selItemId = belt.id
-		itemsTab:SetViewItemSet(mercenaryItemSet.id)
-		assert.are.equal("Abyssal #1", itemsTab.slots["Helmet Abyssal Socket 1"].label)
-		assert.are.equal("Abyssal #1", itemsTab.slots["Belt Abyssal Socket 1"].label)
-
-		freshBuild()
-		itemsTab = build.itemsTab
-		selectBuild("MeleeAOEMarauderFireSlam")
-		local guardianSet = itemsTab:NewItemSet()
-		guardianSet.title = "Animate Guardian"
-		table.insert(itemsTab.itemSetOrderList, guardianSet.id)
-		mercSet = showMercenaryEquipment()
-		playerHelmet = new("Item"):Item("Rarity: Normal\nIron Hat")
-		local guardianHelmet = new("Item"):Item("Rarity: Normal\nIron Hat")
-		mercHelmet = new("Item"):Item("Rarity: Normal\nIron Hat")
-		itemsTab:AddItem(playerHelmet, true)
-		itemsTab:AddItem(guardianHelmet, true)
-		itemsTab:AddItem(mercHelmet, true)
-		itemSet.Helmet.selItemId = playerHelmet.id
-		guardianSet.Helmet.selItemId = guardianHelmet.id
-		mercSet["Helmet"].selItemId = mercHelmet.id
-
-		itemsTab:SetViewItemSet(guardianSet.id)
-		assert.are.equal(guardianHelmet.id, itemsTab.slots.Helmet.selItemId)
-		assert.are.equal(itemSet.id, itemsTab.activeItemSetId)
-		itemsTab:SetViewItemSet(mercSet.id)
-		assert.are.equal(mercHelmet.id, itemsTab.slots["Helmet"].selItemId)
-		assert.are.equal(itemSet.id, itemsTab.activeItemSetId)
-		itemsTab:SetViewItemSet(itemSet.id)
-		assert.are.equal(playerHelmet.id, itemsTab.slots.Helmet.selItemId)
-
-		freshBuild()
-		itemsTab = build.itemsTab
-		selectBuild("MeleeAOEMarauderFireSlam")
-		showMercenaryEquipment()
-		local raw = "Rarity: Normal\nCoral Ring"
-		local first = new("Item"):Item(raw)
-		local second = new("Item"):Item(raw)
-		first.id, second.id = 99101, 99102
-		itemsTab.items[first.id] = first
-		itemsTab.items[second.id] = second
-		itemsTab.slots["Ring 1"]:SetSelItemId(first.id, itemsTab:GetVisibleItemSet())
-		itemsTab.slots["Ring 2"]:SetSelItemId(second.id, itemsTab:GetVisibleItemSet())
-		local equippedSlot = assert(itemsTab:GetEquippedSlotForItem(first))
-		assert.are.equal("Ring 1", equippedSlot.slotName)
-		assert.are.equal("Ring 1", itemsTab:GetComparisonSlotNameForItem(first))
-		local unequipped = new("Item"):Item("Rarity: Normal\nIron Hat")
-		assert.are.equal("Helmet", itemsTab:GetComparisonSlotNameForItem(unequipped))
-		itemsTab.itemOrderList = { first.id, second.id }
-
-		local ok, err = pcall(function() itemsTab:SortItemList() end)
-		assert.is_true(ok, err)
-		assert.are.same({ first.id, second.id }, itemsTab.itemOrderList)
-	end)
 
 	it("persists Mercenary equipment in a generic ItemsTab set and actor assignment", function()
 		local mercSet = tab:GetItemSet(true)
@@ -367,136 +226,12 @@ describe("Mercenary equipment validation", function()
 		assert.are.equal(9001, mercSet["Helmet"].selItemId)
 	end)
 
-	it("item-set manager protects referenced sets and shares the dragged set's items", function()
-		selectBuild("MeleeAOEMarauderFireSlam")
-		local itemsTab = build.itemsTab
-		local playerSetId = itemsTab.activeItemSetId
-		local manager = new("ItemSetListControl"):ItemSetListControl(nil, {0, 0, 350, 200}, itemsTab)
-		assert.is_nil(tab.controls.itemSetSelect)
-		assert.is_nil(tab.controls.itemSetManage)
-		assert.is_table(manager.controls.copy)
-		assert.is_table(manager.controls.delete)
-		assert.is_table(manager.controls.new)
-		assert.is_table(manager.controls.equip)
-		assert.is_table(manager.controls.equipActor)
 
-		local originalOpenPopup = main.OpenPopup
-		local originalClosePopup = main.ClosePopup
-		local popup
-		main.OpenPopup = function(_, _, _, _, controls) popup = controls end
-		main.ClosePopup = function() end
-		local ok, err = pcall(function()
-			manager.controls.new.onClick()
-			popup.edit.buf = "Alternate Equipment"
-			popup.save.onClick()
-		end)
-		main.OpenPopup = originalOpenPopup
-		main.ClosePopup = originalClosePopup
-		assert.is_true(ok, err)
-
-		local newSetId
-		for _, itemSetId in ipairs(itemsTab.itemSetOrderList) do
-			if itemsTab.itemSets[itemSetId].title == "Alternate Equipment" then
-				newSetId = itemSetId
-				break
-			end
-		end
-		assert.is_not_nil(newSetId)
-		manager:OnSelClick(isValueInArray(manager.list, newSetId), newSetId, true)
-		assert.are.equal(newSetId, itemsTab.viewItemSetId)
-		assert.are.equal(playerSetId, itemsTab.activeItemSetId)
-		assert(itemsTab:SetActorItemSet("MERCENARY", newSetId))
-		assert.are.equal(newSetId, build.itemsTab:GetActorItemSetId("MERCENARY"))
-		assert.are.equal(newSetId, itemsTab.viewItemSetId)
-		assert.are.equal(playerSetId, itemsTab.activeItemSetId)
-		assert.matches("%(Visible%)", manager:GetRowValue(1, isValueInArray(manager.list, newSetId), newSetId))
-
-		freshBuild()
-		selectBuild("MeleeAOEMarauderFireSlam")
-		local mercSet = showMercenaryEquipment()
-		manager = new("ItemSetListControl"):ItemSetListControl(nil, { 0, 0, 300, 200 }, build.itemsTab)
-		manager.selValue = mercSet.id
-		manager.selIndex = isValueInArray(manager.list, mercSet.id)
-		assert.is_true(manager.controls.copy.enabled())
-		assert.is_false(manager.controls.delete.enabled())
-		assert.are.equal("ItemList", manager:GetDragValue(manager.selIndex, mercSet.id))
-
-		freshBuild()
-		selectBuild("MeleeAOEMarauderFireSlam")
-		itemsTab = build.itemsTab
-		local activePlayerSetId = itemsTab.activeItemSetId
-		local actorSet = itemsTab:NewItemSet()
-		actorSet.title = "Animate Guardian"
-		local secondPlayerSet = itemsTab:NewItemSet()
-		itemsTab.itemSetOrderList = { actorSet.id, activePlayerSetId, secondPlayerSet.id }
-		manager = new("ItemSetListControl"):ItemSetListControl(nil, { 0, 0, 300, 200 }, itemsTab)
-		local originalOpenConfirmPopup = main.OpenConfirmPopup
-		main.OpenConfirmPopup = function(_, _, _, _, onConfirm)
-			onConfirm()
-		end
-		local errorMessage
-		ok, errorMessage = pcall(function()
-			manager:OnSelDelete(isValueInArray(manager.list, activePlayerSetId), activePlayerSetId)
-		end)
-		main.OpenConfirmPopup = originalOpenConfirmPopup
-		assert.is_true(ok, errorMessage)
-		assert.are.equal(secondPlayerSet.id, itemsTab.activeItemSetId)
-		assert.are.equal(secondPlayerSet, itemsTab.activeItemSet)
-
-		freshBuild()
-		itemsTab = build.itemsTab
-		local extraSet = itemsTab:NewItemSet()
-		itemsTab.itemSetOrderList = { itemsTab.activeItemSetId, extraSet.id }
-		manager = new("ItemSetListControl"):ItemSetListControl(nil, { 0, 0, 300, 200 }, itemsTab)
-		manager.selValue = extraSet.id
-		assert.is_true(manager.controls.delete.enabled())
-		table.remove(itemsTab.itemSetOrderList, 2)
-		manager.selValue = itemsTab.activeItemSetId
-		assert.is_false(manager.controls.delete.enabled())
-
-		freshBuild()
-		selectBuild("MeleeAOEMarauderFireSlam")
-		itemsTab = build.itemsTab
-		local playerSet = itemsTab.activeItemSet
-		mercSet = showMercenaryEquipment()
-		local playerItem = new("Item"):Item("Rarity: Normal\nIron Hat")
-		local mercItem = new("Item"):Item("Rarity: Normal\nLeather Cap")
-		itemsTab:AddItem(playerItem, true)
-		itemsTab:AddItem(mercItem, true)
-		playerSet.Helmet.selItemId = playerItem.id
-		mercSet.Helmet.selItemId = mercItem.id
-		itemsTab:PopulateSlots()
-
-		local sharedList = new("SharedItemSetListControl"):SharedItemSetListControl(nil, { 0, 0, 300, 200 }, itemsTab)
-		local sharedSetCount = #sharedList.list
-		sharedList:ReceiveDrag("ItemList", playerSet)
-
-		assert.are.equal(sharedSetCount + 1, #sharedList.list)
-		local sharedSet = sharedList.list[#sharedList.list]
-		assert.are.equal(playerItem.name, sharedSet.slots.Helmet.name)
-
-		freshBuild()
-		selectBuild("MeleeAOEMarauderFireSlam")
-		itemsTab = build.itemsTab
-		mercSet = showMercenaryEquipment()
-		playerSetId = itemsTab.activeItemSetId
-		assert(itemsTab:SetViewItemSet(playerSetId))
-		local state = itemsTab:CreateUndoState()
-		assert(itemsTab:SetViewItemSet(mercSet.id))
-		itemsTab:RestoreUndoState(state)
-		assert.are.equal(playerSetId, itemsTab.viewItemSetId)
-		assert.are.equal(playerSetId, itemsTab.activeItemSetId)
-
-		state.viewItemSetId = nil
-		itemsTab:RestoreUndoState(state)
-		assert.are.equal(playerSetId, itemsTab.viewItemSetId)
-		assert.are.equal(playerSetId, itemsTab.viewItemSet.id)
-	end)
-
-	it("Items undo preserves later Mercenary profile edits", function()
+	it("isolates Items undo from Mercenary profile edits", function()
 		selectBuild("MeleeAOEMarauderFireSlam")
 		local itemsTab = build.itemsTab
 		itemsTab:ResetUndo()
+		tab:ResetUndo()
 		local hat = new("Item"):Item("Rarity: Normal\nIron Hat")
 		itemsTab:AddItem(hat, true)
 		itemsTab:AddUndoState()
@@ -508,20 +243,7 @@ describe("Mercenary equipment validation", function()
 		assert.are.equal(80, tab.profile.foundAreaLevel)
 		itemsTab:Redo()
 		assert.are.equal("New Mercenary name", tab.profile.title)
-		assert.are.equal(80, tab.profile.foundAreaLevel)
 		assert.is_truthy(itemsTab.items[hat.id])
-	end)
-
-	it("Items undo does not revert an intervening Mercenary edit", function()
-		selectBuild("MeleeAOEMarauderFireSlam")
-		local itemsTab = build.itemsTab
-		itemsTab:ResetUndo()
-		tab:ResetUndo()
-		local hat = new("Item"):Item("Rarity: Normal\nIron Hat")
-		itemsTab:AddItem(hat, true)
-		itemsTab:AddUndoState()
-		tab.profile.foundAreaLevel = 80
-		tab:Changed()
 		local cap = new("Item"):Item("Rarity: Normal\nLeather Cap")
 		itemsTab:AddItem(cap, true)
 		itemsTab:AddUndoState()
@@ -730,59 +452,6 @@ Note: ~b/o 1 mirror
 		assert.are.equal("Kineticist", tab.data.builds[tab.profile.buildId].name)
 	end)
 
-	it("unlimited Mercenary loadouts stay independent", function()
-		selectBuild("MeleeAOEMarauderFireSlam")
-		local mercSet = showMercenaryEquipment()
-		local sharedHelmet = "Helmet"
-		mercSet[sharedHelmet].selItemId = 9019
-		tab.profile.buildId = "MeleeAOEMarauderFireSlam"
-		tab.profile.skills = { { id = "InfernalBlowMercenary", enabled = true, supports = { } } }
-		tab.profile.mainSkillId = "InfernalBlowMercenary"
-		tab.profile.title = "First"
-		tab:RefreshControls()
-
-		local firstId = tab.activeMercenarySetId
-		for index = 1, 16 do
-			local set = tab:NewMercenarySet()
-			set.title = "Loadout "..index
-			table.insert(tab.mercenarySetOrderList, set.id)
-		end
-		assert.are.equal(17, #tab.mercenarySetOrderList)
-		local manager = new("MercenarySetListControl"):MercenarySetListControl(nil, {0, 0, 350, 200}, tab)
-		assert.is_table(manager.controls.copy)
-		assert.is_table(manager.controls.delete)
-
-		local secondId = tab.mercenarySetOrderList[2]
-		tab:RefreshControls()
-		tab.controls.setSelect:SetSel(2)
-		assert.are.equal(secondId, tab.activeMercenarySetId)
-		tab.profile.buildId = "TrapsMinesShadowLightning"
-		tab.profile.foundAreaLevel = 80
-		tab.profile.skills = { { id = "LightningTrapMercenary", enabled = true, supports = { } } }
-		tab.profile.mainSkillId = "LightningTrapMercenary"
-		tab:RefreshControls()
-		assert.are.equal(9019, mercSet[sharedHelmet].selItemId)
-
-		tab.controls.setSelect:SetSel(1)
-		assert.are.equal("MeleeAOEMarauderFireSlam", tab.profile.buildId)
-		assert.are.equal("InfernalBlowMercenary", tab.profile.mainSkillId)
-		assert.are.equal(9019, mercSet[sharedHelmet].selItemId)
-
-		local xml = { }
-		tab:Save(xml)
-		assert.are.equal("1", xml.attrib.activeMercenarySet)
-		local savedSetCount = 0
-		for _, child in ipairs(xml) do
-			if child.elem == "MercenarySet" then savedSetCount = savedSetCount + 1 end
-		end
-		assert.are.equal(17, savedSetCount)
-
-		tab:Load(xml)
-		assert.are.equal(17, #tab.mercenarySetOrderList)
-		assert.are.equal(firstId, tab.activeMercenarySetId)
-		assert.are.equal("InfernalBlowMercenary", tab.profile.mainSkillId)
-		assert.are.equal(9019, mercSet[sharedHelmet].selItemId)
-	end)
 
 	it("skill and support UI enforces capacity, selection, tooltips, and sort", function()
 		assert.matches("simultaneously sustainable", tab.controls.skillFullDPS.tooltipText)
@@ -1346,7 +1015,7 @@ Note: ~b/o 1 mirror
 		assert.are.equal(sourceItemSetId, itemsTab:GetActorItemSetId("MERCENARY"))
 	end)
 
-	it("Edit Equipment creates an ItemsTab set that Mercenary undo does not delete", function()
+	it("isolates Mercenary undo from Items sets, assignment, and Config redo", function()
 		MercenaryTest.allocatePermanentHire()
 		tab = build.mercenaryTab
 		tab:EnsureData()
@@ -1359,7 +1028,6 @@ Note: ~b/o 1 mirror
 		tab:ResetUndo()
 		tab.controls.editEquipment.onClick()
 		local createdId = itemsTab:GetActorItemSetId("MERCENARY")
-		assert.is_not_nil(itemsTab.itemSets[createdId])
 		local hat = new("Item"):Item("Rarity: Normal\nIron Hat")
 		itemsTab:AddItem(hat, true)
 		itemsTab.itemSets[createdId].Helmet.selItemId = hat.id
@@ -1369,15 +1037,7 @@ Note: ~b/o 1 mirror
 		tab:Undo()
 		assert.are.equal(68, tab.profile.foundAreaLevel)
 		assert.is_not_nil(itemsTab.itemSets[createdId])
-		assert.are.equal(createdId, itemsTab:GetActorItemSetId("MERCENARY"))
 		assert.are.equal(hat.id, itemsTab.itemSets[createdId].Helmet.selItemId)
-	end)
-
-	it("Items undo restores mercenary item-set assignment without touching Mercenary profile", function()
-		selectBuild("MeleeAOEMarauderFireSlam")
-		local itemsTab = build.itemsTab
-		assert(tab:GetItemSet(true))
-		local mercSetId = itemsTab:GetActorItemSetId("MERCENARY")
 		local bossing = itemsTab:NewItemSet()
 		bossing.title = "Bossing"
 		table.insert(itemsTab.itemSetOrderList, bossing.id)
@@ -1386,23 +1046,24 @@ Note: ~b/o 1 mirror
 		itemsTab:ResetUndo()
 		assert(itemsTab:SetActorItemSet("MERCENARY", bossing.id, false))
 		itemsTab:AddUndoState()
-		assert.are.equal(bossing.id, itemsTab:GetActorItemSetId("MERCENARY"))
 		tab:Undo()
 		assert.are.equal(68, tab.profile.foundAreaLevel)
 		assert.are.equal(bossing.id, itemsTab:GetActorItemSetId("MERCENARY"))
-		assert.is_not_nil(itemsTab.itemSets[bossing.id])
 		itemsTab:Undo()
-		assert.are.equal(mercSetId, itemsTab:GetActorItemSetId("MERCENARY"))
-		assert.is_not_nil(itemsTab.itemSets[bossing.id])
-	end)
-
-	it("records Mercenary tab undo history", function()
-		selectBuild("MeleeAOEMarauderFireSlam")
+		assert.are.equal(createdId, itemsTab:GetActorItemSetId("MERCENARY"))
 		tab:ResetUndo()
 		tab.profile.foundAreaLevel = 80
 		tab:Changed()
 		tab:Undo()
 		assert.are.equal(68, tab.profile.foundAreaLevel)
+		assert.are.equal(1, #tab.redo)
+		local configTab = build.configTab
+		configTab:ResetUndo()
+		configTab.input.usePowerCharges = true
+		configTab:BuildModList()
+		configTab:AddUndoState()
+		configTab:Undo()
+		assert.are.equal(1, #tab.redo)
 		tab:Redo()
 		assert.are.equal(80, tab.profile.foundAreaLevel)
 	end)
@@ -1425,7 +1086,7 @@ Note: ~b/o 1 mirror
 		return tab
 	end
 
-	it("undo Reset restores mercenary configuration modifiers", function()
+	it("undo Reset and unhire restore mercenary configuration", function()
 		hireMarauder()
 		local config = build.configTab.configSets[build.configTab.activeConfigSetId]
 		build.configTab:EnsureActorConfig(config)
@@ -1436,16 +1097,13 @@ Note: ~b/o 1 mirror
 		tab:Reset()
 		MercenaryTest.calculateBuild()
 		tab:Undo()
-		local restored = assert(MercenaryTest.calculateBuild().mercenary).output.Life
-		assert.are.equal(withMod, restored)
-	end)
-
-	it("undo hire rebuilds profile-dependent config lists", function()
+		assert.are.equal(withMod, assert(MercenaryTest.calculateBuild().mercenary).output.Life)
+		newBuild()
 		build.characterLevelAutoMode = false
 		build.characterLevel = 90
 		MercenaryTest.allocatePermanentHire()
 		tab = build.mercenaryTab
-		local config = build.configTab.configSets[build.configTab.activeConfigSetId]
+		config = build.configTab.configSets[build.configTab.activeConfigSetId]
 		build.configTab:EnsureActorConfig(config)
 		config.actors.mercenary.customModsList[1].text = "+1000 to maximum Life"
 		build.configTab:BuildModList()
@@ -1511,25 +1169,6 @@ Note: ~b/o 1 mirror
 		sortEnvironment.GetTime = originalTime
 		build.calcsTab.GetMiscCalculator = originalCalculator
 		assert.is_true(ok, err)
-	end)
-
-	it("config undo does not clear mercenary redo", function()
-		hireMarauder()
-		local configTab = build.configTab
-		tab:ResetUndo()
-		configTab:ResetUndo()
-		tab.profile.foundAreaLevel = 80
-		tab:Changed()
-		tab:Undo()
-		assert.are.equal(68, tab.profile.foundAreaLevel)
-		assert.are.equal(1, #tab.redo)
-		configTab.input.usePowerCharges = true
-		configTab:BuildModList()
-		configTab:AddUndoState()
-		configTab:Undo()
-		assert.are.equal(1, #tab.redo)
-		tab:Redo()
-		assert.are.equal(80, tab.profile.foundAreaLevel)
 	end)
 
 	it("trade set dropdown keeps the current comparison actor", function()

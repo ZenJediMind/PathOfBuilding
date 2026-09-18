@@ -37,6 +37,13 @@ function MercenaryTest.allocatePermanentHire()
 	MercenaryTest.allocate("Noble Blood")
 end
 
+function MercenaryTest.freshHire()
+	newBuild()
+	MercenaryTest.allocatePermanentHire()
+	build.characterLevel = 90
+	build.characterLevelAutoMode = false
+end
+
 function MercenaryTest.calculateBuild(enemyLevel)
 	build.configTab.input.enemyLevel = enemyLevel or 83
 	build.configTab:BuildModList()
@@ -45,14 +52,6 @@ function MercenaryTest.calculateBuild(enemyLevel)
 	runCallback("OnFrame")
 	runCallback("OnFrame")
 	return build.calcsTab.mainEnv
-end
-
-function MercenaryTest.mercenaryItemSetId()
-	return build.itemsTab:GetActorItemSetId("MERCENARY")
-end
-
-function MercenaryTest.playerItemSetId()
-	return build.itemsTab:GetActorItemSetId("PLAYER")
 end
 
 return MercenaryTest

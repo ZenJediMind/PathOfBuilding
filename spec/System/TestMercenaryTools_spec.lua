@@ -19,11 +19,13 @@ describe("Mercenary tools", function()
 		supportCounts = { Low = { maximum = 2 }, High = { maximum = 5 } },
 	}
 
-	it("routes comparison output and overrides by actor", function()
+	it("maps Mercenary-prefixed slot names to base slots", function()
 		assert.are.equal("Helmet", tools.baseItemSlotName("Mercenary Helmet"))
 		assert.is_nil(tools.baseItemSlotName("Helmet"))
 		assert.is_nil(tools.baseItemSlotName(1))
+	end)
 
+	it("routes comparison output by actor", function()
 		local playerOutput = { CombinedDPS = 100, FullDPS = 1000, FullDotDPS = 10 }
 		local mercenaryOutput = { CombinedDPS = 50, FullDPS = 50, FullDotDPS = 1 }
 		assert.are.equal(playerOutput, tools.comparisonBaseOutput(playerOutput, { PLAYER = playerOutput }, "PLAYER"))
@@ -43,7 +45,9 @@ describe("Mercenary tools", function()
 		assert.are.equal(mercenaryOutput, tools.buildComparisonOutput(mercenaryOutput, nil))
 		local unavailable = { ActorUnavailableMessage = "missing" }
 		assert.are.equal(unavailable, tools.buildComparisonOutput(unavailable, playerOutput))
+	end)
 
+	it("classifies item overrides by comparison actor", function()
 		local playerOverride = { itemSetId = 1, comparisonActor = "PLAYER", repSlotName = "Helmet", repItem = { } }
 		assert.is_true(tools.overrideReplacesPlayerItem(playerOverride, 1))
 		assert.is_false(tools.overrideReplacesMercenarySlot(playerOverride, "Helmet", 1))
@@ -53,7 +57,9 @@ describe("Mercenary tools", function()
 		local dedicatedMerc = { itemSetId = 2, repSlotName = "Helmet", repItem = { } }
 		assert.is_false(tools.overrideReplacesPlayerItem(dedicatedMerc, 1))
 		assert.is_true(tools.overrideReplacesMercenarySlot(dedicatedMerc, "Helmet", 2))
+	end)
 
+	it("resolves equipped items and reports weapon-configuration errors", function()
 		local itemSet = {
 			Helmet = { selItemId = 1 },
 			["Helmet Abyssal Socket 1"] = { selItemId = 2 },
@@ -118,7 +124,9 @@ describe("Mercenary tools", function()
 		assert.matches("Weapon 2: invalid base slot or weapon configuration", table.concat(tools.equipmentErrors(weaponContext), "\n"))
 		weaponContext.override = nil
 		assert.are.equal("", table.concat(tools.equipmentErrors(weaponContext), "\n"))
+	end)
 
+	it("restores profile skills after withMainSkill and withReplacedSkill", function()
 		local profile = { mainSkillId = "A" }
 		assert.are.equal("B", tools.withMainSkill(profile, "B", function()
 			assert.are.equal("B", profile.mainSkillId)
@@ -142,7 +150,9 @@ describe("Mercenary tools", function()
 			tools.withReplacedSkill({ skills = skills }, 1, replaced, function() error("boom") end)
 		end)
 		assert.are.equal("A", skills[1].id)
+	end)
 
+	it("reports missing attribute data and unique-item requirements", function()
 		local missingAttribute = {
 			profile = { buildId = "dual", foundAreaLevel = 68 },
 			mercenaryData = {

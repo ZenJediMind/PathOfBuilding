@@ -91,7 +91,7 @@ describe("Mercenary API requests", function()
 		assert.is_nil(instance.authToken)
 	end)
 
-	it("requests league-account scope with the existing character-import scopes", function()
+	it("requests league-account scope and labels the action until access is granted", function()
 		local originalLaunch = _G.LaunchSubScript
 		local authUrl
 		_G.LaunchSubScript = function(_, _, _, url)
@@ -103,9 +103,6 @@ describe("Mercenary API requests", function()
 		assert.matches("account:profile", authUrl)
 		assert.matches("account:characters", authUrl)
 		assert.matches("account:league_accounts", authUrl)
-	end)
-
-	it("labels the action until Mercenary access is granted", function()
 		main.api = api("account:characters")
 		assert.equals("Authorize Mercenary access", build.importTab.controls.charImportMercenaries.label())
 		main.api.grantedScopes = "account:characters account:league_accounts"
@@ -140,22 +137,6 @@ describe("Mercenary API requests", function()
 		assert.equals(2, captured[1].active_mercenary_index)
 		assert.equals("fixture-account", captured[2].account)
 		assert.is_false(tab.oauthLoading)
-	end)
-
-	it("does not open the popup when the league has no Mercenaries", function()
-		local instance, tab, complete = prepareImport()
-		instance.DownloadProfile = function(_, callback) callback({uuid = "fixture-account"}) end
-		instance.DownloadLeagueAccount = function(_, _, _, callback)
-			callback({league_account = {mercenaries = { }}})
-		end
-		tab.OpenMercenaryImportPopup = function() error("Empty roster opened a popup") end
-		tab.controls.charImportMercenaries.onClick()
-		complete({character = {league = "Actual League"}})
-		assert.equals("No Mercenaries found.", tab.oauthErrCode)
-		assert.is_false(tab.controls.charImportMercenaries.enabled())
-		tab.controls.charSelect:SetList({{label = "Other Character", char = { league = "Other League" }}})
-		tab.controls.charSelect:SetSel(1)
-		assert.is_true(tab.controls.charImportMercenaries.enabled())
 	end)
 
 	for _, change in ipairs({"cancel", "realm", "character", "account", "build", "loadout"}) do

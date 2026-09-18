@@ -852,7 +852,7 @@ function calcs.initModDB(env, modDB)
 	modDB.conditions["Effective"] = env.mode_effective
 end
 
--- Character combat inherents shared by the player and a hired Mercenary.
+-- Character combat inherent mods shared by the player and a hired Mercenary.
 function calcs.addActorInherentCombatMods(modDB)
 	modDB:NewMod("ActiveBrandLimit", "BASE", 3, "Base")
 	modDB:NewMod("EnemyCurseLimit", "BASE", 1, "Base")

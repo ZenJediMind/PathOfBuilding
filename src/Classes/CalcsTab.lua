@@ -234,7 +234,7 @@ function CalcsTabClass:RefreshMercenarySkillSelectControls(controls, suffix)
 	if not self:IsMercenaryActor() then return end
 	local minionSkillField = suffix == "Calcs" and "skillMinionSkillCalcs" or "skillMinionSkill"
 	local profile = self.build.mercenaryTab.profile
-	controls.mainSocketGroup:SetList({ { label = "Mercenary Inherent Skills" } })
+	controls.mainSocketGroup:SetList({ { label = "Mercenary Skills" } })
 	controls.mainSocketGroup.selIndex = 1
 	controls.mainSocketGroup.enabled = false
 	controls.mainSocketGroup.shown = true

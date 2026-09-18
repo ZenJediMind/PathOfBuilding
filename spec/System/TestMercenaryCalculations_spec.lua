@@ -3605,7 +3605,7 @@ Implicits: 1
 		assert.are_not.equal(output.CombinedDPS, selectedRow.dps)
 	end)
 
-	it("gives mercenaries player combat inherents, curse slots, skill setup, and aura accounting", function()
+	it("gives mercenaries player combat inherent mods, curse slots, skill setup, and aura accounting", function()
 		configure("MeleeAOEMarauder", "MeleeAOEMarauderFireSlam", "TectonicSlamFireMercenary")
 		local env = calculate()
 		local constants = build.data.characterConstants

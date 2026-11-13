@@ -274,6 +274,7 @@ function GGPKClass:GetNeededFiles()
 		"Data/DivinationBuffTemplates.dat",
 		"Data/MinionDoublingStatTypes.dat",
 		"Data/MercenaryAttributes.dat",
+		"Data/MercenaryBuildExtraStats.dat",
 		"Data/MercenaryBuilds.dat",
 		"Data/MercenaryClasses.dat",
 		"Data/MercenarySkillFamilies.dat",

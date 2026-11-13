@@ -5899,7 +5899,7 @@ return {
 		},
 		[23]={
 			list=false,
-			name="",
+			name="SkillID",
 			refTo="",
 			type="Int",
 			width=150
@@ -7725,6 +7725,43 @@ return {
 			width=500
 		}
 	},
+	mercenarybuildextrastats={
+		[1]={
+			list=false,
+			name="Id",
+			refTo="",
+			type="String",
+			width=220
+		},
+		[2]={
+			list=false,
+			name="Stat",
+			refTo="Stats",
+			type="Key",
+			width=280
+		},
+		[3]={
+			list=false,
+			name="Level24",
+			refTo="",
+			type="Int",
+			width=80
+		},
+		[4]={
+			list=false,
+			name="Level68",
+			refTo="",
+			type="Int",
+			width=80
+		},
+		[5]={
+			list=false,
+			name="Level84",
+			refTo="",
+			type="Int",
+			width=80
+		}
+	},
 	mercenarybuilds={
 		[1]={
 			list=false,
@@ -7749,7 +7786,7 @@ return {
 		},
 		[4]={
 			list=false,
-			name="Skill1CountMax",
+			name="Skill2Count",
 			refTo="",
 			type="Int",
 			width=100
@@ -7777,7 +7814,7 @@ return {
 		},
 		[8]={
 			list=false,
-			name="Skill2CountMax",
+			name="Skill3Count",
 			refTo="",
 			type="Int",
 			width=100
@@ -7872,6 +7909,13 @@ return {
 			refTo="MercenaryWieldableTypes",
 			type="Key",
 			width=220
+		},
+		[22]={
+			list=true,
+			name="BuildStats",
+			refTo="MercenaryBuildExtraStats",
+			type="Key",
+			width=400
 		}
 	},
 	mercenaryclasses={
@@ -7963,7 +8007,7 @@ return {
 		},
 		[2]={
 			list=false,
-			name="Id",
+			name="",
 			refTo="",
 			type="Int",
 			width=100
@@ -7984,7 +8028,7 @@ return {
 		},
 		[5]={
 			list=false,
-			name="InventoryType",
+			name="",
 			refTo="",
 			type="Int",
 			width=100
@@ -8023,7 +8067,7 @@ return {
 		},
 		[4]={
 			list=false,
-			name="SecondaryGrantedEffect",
+			name="EncounterGrantedEffect",
 			refTo="GrantedEffects",
 			type="Key",
 			width=250
@@ -8044,7 +8088,7 @@ return {
 		},
 		[7]={
 			list=false,
-			name="",
+			name="RequiredLevel",
 			refTo="",
 			type="Int",
 			width=50
@@ -8169,7 +8213,7 @@ return {
 		},
 		[11]={
 			list=false,
-			name="Variant",
+			name="Tier",
 			refTo="",
 			type="Int",
 			width=100
@@ -9003,42 +9047,42 @@ return {
 		},
 		[41]={
 			list=false,
-			name="Heist_SubStatValue1",
-			refTo="Heist_SubStatValue1",
+			name="Stat7Min",
+			refTo="",
 			type="Int",
 			width=150
 		},
 		[42]={
 			list=false,
-			name="Heist_SubStatValue2",
-			refTo="GrantedEffectsPerLevel",
+			name="Stat7Max",
+			refTo="",
 			type="Int",
 			width=150
 		},
 		[43]={
 			list=false,
-			name="Heist_StatsKey0",
+			name="Stat7",
 			refTo="Stats",
 			type="Key",
 			width=150
 		},
 		[44]={
 			list=false,
-			name="Heist_StatsKey1",
+			name="Stat8",
 			refTo="Stats",
 			type="Key",
 			width=150
 		},
 		[45]={
 			list=false,
-			name="Heist_AddStatValue1",
+			name="Stat8Min",
 			refTo="",
 			type="Int",
 			width=240
 		},
 		[46]={
 			list=false,
-			name="Heist_AddStatValue2",
+			name="Stat8Max",
 			refTo="",
 			type="Int",
 			width=150

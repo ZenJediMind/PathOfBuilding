@@ -77,9 +77,33 @@ directiveTable.addSkillTypes = function(state, args, out)
 	end
 end
 
+local mercenarySkills
+
+local function mercenaryLevelRows(effectLevels, statLevels)
+	local rows = { }
+	if #effectLevels == 1 then
+		for _, stat in ipairs(statLevels) do table.insert(rows, { effect = effectLevels[1], stats = stat }) end
+	elseif #statLevels == 1 then
+		for _, effect in ipairs(effectLevels) do table.insert(rows, { effect = effect, stats = statLevels[1] }) end
+	else
+		local effects = { }
+		for _, effect in ipairs(effectLevels) do effects[effect.Level] = effect end
+		for _, stat in ipairs(statLevels) do
+			if effects[stat.GemLevel] then table.insert(rows, { effect = effects[stat.GemLevel], stats = stat }) end
+		end
+	end
+	return rows
+end
+
+local function skillLevelRow(effectLevels, statLevels, mercenaryRows, index)
+	if mercenaryRows then return mercenaryRows[index].effect, mercenaryRows[index].stats end
+	return effectLevels[index] or effectLevels[1], statLevels[index] or statLevels[1]
+end
+
 -- #skill <GrantedEffectId> [<Display name>]
 -- Initialises the skill data and emits the skill header
 directiveTable.skill = function(state, args, out)
+	local isMercenary = state.mercenary
 	local grantedId, displayName = args:match("(%w+) (.+)")
 	if not grantedId then
 		grantedId = args
@@ -136,6 +160,14 @@ directiveTable.skill = function(state, args, out)
 		out:write('\tname = "', displayName, '",\n')
 		out:write('\thidden = true,\n')
 	end
+	if state.mercenary then
+		out:write('\tmercenary = true,\n')
+		if state.mercenaryBaseSkillId then
+			out:write('\tinheritedFrom = "', state.mercenaryBaseSkillId, '",\n')
+		end
+	end
+	state.mercenary = nil
+	state.mercenaryBaseSkillId = nil
 	if skillGem and skillGem.BaseItemType and skillGem.BaseItemType.FlavourTextKey then
 		out:write('\tflavourText = {')
 		for _, line in ipairs(cleanAndSplit(skillGem.BaseItemType.FlavourTextKey.Text)) do
@@ -151,6 +183,7 @@ directiveTable.skill = function(state, args, out)
 	local statMap = { }
 	skill.stats = { }
 	skill.CannotGrantToMinion = { }
+	skill.isMercenary = isMercenary
 	skill.constantStats = { }
 	skill.addSkillTypes = state.addSkillTypes
 	state.addSkillTypes = nil
@@ -256,12 +289,12 @@ directiveTable.skill = function(state, args, out)
 	local statsPerLevel = dat("GrantedEffectStatSetsPerLevel"):GetRowList("GrantedEffectStatSets", granted.GrantedEffectStatSets)
 	local statMapOrder = {}
 	local perLevel = dat("GrantedEffectsPerLevel"):GetRowList("GrantedEffect", granted)
-	if #perLevel ~= #statsPerLevel and #perLevel > 1 and #statsPerLevel > 1 then
+	if not isMercenary and #perLevel ~= #statsPerLevel and #perLevel > 1 and #statsPerLevel > 1 then
 		ConPrintf("UNKNOWN CASE of Level to Stat rows for '" .. granted.Id .. "'")
 	end
-	for indx = 1, math.max(#perLevel, #statsPerLevel) do
-		local levelRow = perLevel[indx] or perLevel[1]
-		local statRow = statsPerLevel[indx] or statsPerLevel[1]
+	local mercenaryRows = isMercenary and mercenaryLevelRows(perLevel, statsPerLevel)
+	for indx = 1, mercenaryRows and #mercenaryRows or math.max(#perLevel, #statsPerLevel) do
+		local levelRow, statRow = skillLevelRow(perLevel, statsPerLevel, mercenaryRows, indx)
 		local level = { extra = { }, statInterpolation = { }, cost = { } }
 		level.level = #perLevel == 1 and statRow.GemLevel or levelRow.Level
 		level.extra.levelRequirement = #perLevel == 1 and statRow.PlayerLevelReq or levelRow.PlayerLevelReq
@@ -320,7 +353,7 @@ directiveTable.skill = function(state, args, out)
 		if statRow.BaseMultiplier and statRow.BaseMultiplier ~= 0 then
 			level.extra.baseMultiplier = statRow.BaseMultiplier / 10000 + 1
 		end
-		level.statInterpolation = statRow.StatInterpolations
+		level.statInterpolation = isMercenary and copyTable(statRow.StatInterpolations, true) or statRow.StatInterpolations
 		local resolveInterpolation = false
 		local injectConstantValuesIntoEachLevel = false
 		local statMapOrderIndex = 1
@@ -424,6 +457,7 @@ directiveTable.skill = function(state, args, out)
 	for i, stat in ipairs(granted.GrantedEffectStatSets.ConstantStats) do
 		table.insert(skill.constantStats, { stat.Id, granted.GrantedEffectStatSets.ConstantStatsValues[i] })
 	end
+	if isMercenary then skill.CannotGrantToMinion = mercenarySkills.statSets[granted.GrantedEffectStatSets.Id].cannotGrantToMinion end
 	if not skill.qualityStats then
 		skill.qualityStats = { }
 		for i, qualityStatsRow in ipairs(dat("GrantedEffectQualityStats"):GetRowList("GrantedEffect", granted)) do
@@ -499,7 +533,7 @@ directiveTable.mods = function(state, args, out)
 			out:write('\t\t"', stat.id, '",\n')
 		end
 		out:write('\t},\n')
-		if next(skill.CannotGrantToMinion) then
+		if skill.isMercenary or next(skill.CannotGrantToMinion) then
 			out:write('\tnotMinionStat = {\n')
 			for _, stat in ipairs(skill.CannotGrantToMinion) do
 				out:write('\t\t"', stat, '",\n')
@@ -539,8 +573,156 @@ directiveTable.mods = function(state, args, out)
 	state.skill = nil
 end
 
+LoadModule("Scripts/mercenaries")
+mercenarySkills = LoadModule("../Data/MercenarySkills")
+local mercenaryData = LoadModule("../Data/Mercenaries")
+local mercenaryExport = LoadModule("MercenaryExport")
 for _, name in pairs({"act_str","act_dex","act_int","other","glove","minion","spectre","sup_str","sup_dex","sup_int"}) do
 	processTemplateFile(name, "Skills/", "../Data/Skills/", directiveTable)
+end
+
+do
+	local out = assert(io.open("../Data/Skills/mercenary.lua", "w"))
+	out:write("-- This file is automatically generated, do not edit!\n")
+	out:write("-- Mercenary skill data (c) Grinding Gear Games\n\nreturn function(skills, mod, flag, skill)\n")
+	local emitted = { }
+	for _, templateName in ipairs({"act_str","act_dex","act_int","other","glove","minion","spectre","sup_str","sup_dex","sup_int"}) do
+		for line in io.lines("Skills/"..templateName..".txt") do
+			local id = line:match("^#skill%s+(%S+)")
+			if id then
+				emitted[id] = true
+			end
+		end
+	end
+	local function rankedCandidate(groups)
+		if not groups then return end
+		for rank, category in ipairs({ "gems", "skills", "supports" }) do
+			if #groups[category] > 0 then return { ids = groups[category], rank = rank } end
+		end
+	end
+	local function uniqueCandidate(candidate)
+		return candidate and #candidate.ids == 1 and candidate or nil
+	end
+	local function resolveBaseSkill(effectId, candidates, override)
+		local byActiveSkill = rankedCandidate(candidates.activeSkill)
+		local byDisplayName = rankedCandidate(candidates.displayName)
+		local base = uniqueCandidate(byActiveSkill)
+		if uniqueCandidate(byDisplayName) and (not base or byDisplayName.rank < base.rank) then base = byDisplayName end
+		if base then return { id = base.ids[1], source = base == byActiveSkill and "activeSkill" or "displayName" } end
+		if override then
+			assert(emitted[override], "Mercenary base-skill override is not exported: "..effectId.." -> "..override)
+			return { id = override, source = "override" }
+		end
+		assert(not (byActiveSkill or byDisplayName), "Ambiguous Mercenary base skill: "..effectId)
+	end
+	local flagBySkillType = {
+		Attack = "attack",
+		Spell = "spell",
+		Area = "area",
+		Projectile = "projectile",
+		Duration = "duration",
+		Melee = "melee",
+		Minion = "minion",
+		Totem = "totem",
+		SummonsTotem = "totem",
+		Trap = "trap",
+		Trapped = "trap",
+		Mine = "mine",
+		RemoteMined = "mine",
+		Movement = "movement",
+		Travel = "movement",
+		Warcry = "warcry",
+		Aura = "aura",
+		Curse = "curse",
+		Hex = "hex",
+		Chaining = "chaining",
+		Link = "link",
+	}
+	local effectNames = { }
+	for row in dat("MercenarySkills"):Rows() do
+		for _, effect in ipairs({ row.Id, row.EncounterGrantedEffect }) do
+			effectNames[effect.Id] = row.Name ~= "" and row.Name or effect.ActiveSkill.DisplayName
+		end
+	end
+	local baseSkillOverrides = {
+		-- AtlasEyrieArcherSnipe shares the Mercenary effect's ActiveSkill, but is an
+		-- NPC copy; Snipe is the maintained gem implementation.
+		SkeletonLargeMapBoneProjectile = "Snipe",
+		-- Blood Mortar shares monster_mortar_attack with Herald of Agony's minion
+		-- mortar; there is no gem, so inherit the spectre blood-projectile mortar.
+		BloodMortarMercenary = "BirdmanBloodProjectileMortar",
+		-- These triggered area hits share the generic geometry_attack ActiveSkill
+		-- with dozens of spectre slams; keep the previously chosen implementation.
+		DeceleratingProjectileMercenaryExplode = "AfflictionMinionPhysSlamCircleBig",
+		DonutBladesMercenary = "AfflictionMinionPhysSlamCircleBig",
+		TriggeredFireSlamMercenary = "AfflictionMinionPhysSlamCircleBig",
+		-- Shares geometry_spell with many spectre spells and has no display name.
+		GSRitualChaosPulse = "AtlasExileCrusaderMageguardBombExplodeSpectre",
+		-- This explosion also uses geometry_spell; the shared base has no custom mods.
+		GSAbyssalTemplarProjectileExplosion = "AtlasExileCrusaderMageguardBombExplodeSpectre",
+		-- The shared monster_projectile_spell base has no custom mods.
+		MPSAbyssalMercenaryProjectileSpray = "AtlasExilesCrusaderMageguardProjectile",
+		-- Shares inspiring_cry with other NPC warcries; there is no gem.
+		InspiringCryMercenary = "DropBearSummonedRallyingCry",
+		-- Shares offering_of_judgement with the Azmeri fire and chaos pillars.
+		OfferingOfJudgementChaosMercenary = "AzmeriGoddessOfferingOfJudgement",
+		-- Shares sandstorm with the summoned chaos elemental auras.
+		SandstormChaosMercenary = "SandstormChaosElementalSummoned",
+	}
+	-- Unique ActiveSkill/name matches win. Remaining ties require an explicit
+	-- override so a generic shared ActiveSkill cannot silently pick a new base.
+	-- Skills with no unique match and no override still fail closed.
+	local resolvedByActiveSkill, resolvedByDisplayName, resolvedByOverride, withoutBase = 0, 0, 0, { }
+	local wroteSkill = false
+	for effectId, metadata in pairsSortByKey(mercenarySkills.grantedEffects) do
+		local effect = dat("GrantedEffects"):GetRow("Id", effectId)
+		if not emitted[effect.Id] then
+				emitted[effect.Id] = true
+				local displayName = effectNames[effectId] or metadata.activeSkill.DisplayName
+				if displayName == "" then displayName = effectId end
+				local resolved = resolveBaseSkill(effectId, metadata.baseSkillCandidates, baseSkillOverrides[effectId])
+				if baseSkillOverrides[effect.Id] then
+					baseSkillOverrides[effect.Id] = nil
+				end
+				if resolved then
+					if resolved.source == "activeSkill" then
+						resolvedByActiveSkill = resolvedByActiveSkill + 1
+					elseif resolved.source == "displayName" then
+						resolvedByDisplayName = resolvedByDisplayName + 1
+					else
+						resolvedByOverride = resolvedByOverride + 1
+					end
+				else
+					table.insert(withoutBase, effect.Id)
+				end
+				if wroteSkill then out:write("\n") end
+				wroteSkill = true
+				local state = { noGem = true, mercenary = true, mercenaryBaseSkillId = resolved and resolved.id }
+				directiveTable.skill(state, effect.Id.." "..displayName, out)
+				mercenaryExport.applySkillMetadata(state.skill, metadata, mercenaryData, out)
+				local flags = { }
+				local summon = mercenaryData.summonedMinions[effectId]
+				local buff = summon and mercenaryData.buffs[summon.buffId]
+				if buff and isValueInArray(buff.GrantedFlags, "is_raised_spectre") then flags.spectre = true end
+				for _, skillType in ipairs(effect.ActiveSkill.SkillTypes) do
+					if flagBySkillType[skillType.Id] then
+						flags[flagBySkillType[skillType.Id]] = true
+					end
+				end
+				local orderedFlags = { }
+				for flagName in pairsSortByKey(flags) do
+					table.insert(orderedFlags, flagName)
+				end
+				directiveTable.flags(state, table.concat(orderedFlags, " "), out)
+				directiveTable.mods(state, "", out)
+				out:write("\n")
+		end
+	end
+	for effectId in pairs(baseSkillOverrides) do error("Mercenary base-skill override references missing effect: "..effectId) end
+	out:write("end\n")
+	out:close()
+	print(string.format("Mercenary skill bases: %d from a shared ActiveSkill, %d from a shared display name, %d overridden, %d without a base (%s).",
+		resolvedByActiveSkill, resolvedByDisplayName, resolvedByOverride, #withoutBase, table.concat(withoutBase, ", ")))
 end
 
 local out = io.open("../Data/Gems.lua", "w")
